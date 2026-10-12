@@ -25,10 +25,10 @@ from src.config import MOCK_TODAY, MOCK_TOMORROW, STATIC_DIR, require_openai_api
 async def lifespan(_app: FastAPI):
     try:
         require_openai_api_key()
-        print("✓ OPENAI_API_KEY 已加载")
+        print("[OK] OPENAI_API_KEY loaded")
     except RuntimeError as exc:
-        print(f"⚠ {exc}")
-        print("  服务已启动，但 /api/chat 会返回 503，直到配置有效 Key。")
+        print(f"[WARN] {exc}")
+        print("  Server started, but /api/chat returns 503 until a valid key is set.")
     yield
 
 
