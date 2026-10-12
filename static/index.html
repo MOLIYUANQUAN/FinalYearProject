@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Personal AI Assistant · Baseline v1</title>
+  <style>
+    :root {
+      --bg: #f3f0ea;
+      --ink: #1c1a16;
+      --muted: #5c574e;
+      --line: #d8d2c6;
+      --panel: #fffcf7;
+      --accent: #0f5c4c;
+      --accent-soft: #dceee8;
+      --danger: #8b2e2e;
+      --user: #e8e2d6;
+      --bot: #fffcf7;
+      --radius: 10px;
+      --font: "IBM Plex Sans", "Noto Sans SC", "PingFang SC", "Segoe UI", sans-serif;
+      --mono: "IBM Plex Mono", "SF Mono", ui-monospace, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--font);
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 500px at 10% -10%, #e4efe9 0%, transparent 55%),
+        radial-gradient(900px 400px at 100% 0%, #efe6d8 0%, transparent 50%),
+        var(--bg);
+    }
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 28px 16px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 100vh;
+    }
+    header h1 {
+      margin: 0 0 6px;
+      font-size: 1.55rem;
+      letter-spacing: -0.02em;
+    }
+    header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.45;
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .chip {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel);
+      color: var(--muted);
+    }
+    .chip.ok { background: var(--accent-soft); color: var(--accent); border-color: #b7d6cc; }
+    .chip.bad { background: #f7e4e4; color: var(--danger); border-color: #e2bcbc; }
+    #log {
+      flex: 1;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px;
+      overflow-y: auto;
+      min-height: 360px;
+      max-height: min(58vh, 560px);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .msg {
+      max-width: 92%;
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+      border: 1px solid var(--line);
+    }
+    .msg.user {
+      align-self: flex-end;
+      background: var(--user);
+    }
+    .msg.bot {
+      align-self: flex-start;
+      background: var(--bot);
+    }
+    .msg.system {
+      align-self: stretch;
+      background: transparent;
+      border-style: dashed;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .msg.error {
+      align-self: stretch;
+      background: #f7e4e4;
+      border-color: #e2bcbc;
+      color: var(--danger);
+    }
+    .tools {
+      margin-top: 8px;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--accent);
+    }
+    .demos {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .demos button {
+      font: inherit;
+      font-size: 0.85rem;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .demos button:hover { border-color: var(--accent); color: var(--accent); }
+    form {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+    }
+    #input {
+      flex: 1;
+      font: inherit;
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--panel);
+      resize: vertical;
+      min-height: 48px;
+      max-height: 140px;
+    }
+    #send {
+      font: inherit;
+      font-weight: 600;
+      padding: 0 18px;
+      border: none;
+      border-radius: var(--radius);
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      min-width: 88px;
+    }
+    #send:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    footer {
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Personal AI Assistant</h1>
+      <p>Baseline v1 · 单 Agent · 本地日历与文件工具 · Manchester CS FYP</p>
+      <div class="meta">
+        <span class="chip" id="keyStatus">检查 API Key…</span>
+        <span class="chip" id="dateChip">演示今天：—</span>
+      </div>
+    </header>
+
+    <div class="demos" aria-label="示例问题">
+      <button type="button" data-q="我明天下午有什么安排？">Demo 1 · 明天下午</button>
+      <button type="button" data-q="找到我的 FYP proposal，告诉我项目在做什么。">Demo 2 · FYP proposal</button>
+      <button type="button" data-q="帮我准备明天的 FYP meeting。">Demo 3 · 会议 brief</button>
+    </div>
+
+    <div id="log" role="log" aria-live="polite"></div>
+
+    <form id="form">
+      <textarea id="input" rows="2" placeholder="输入问题，例如：我明天下午有什么安排？" required></textarea>
+      <button id="send" type="submit">发送</button>
+    </form>
+
+    <footer>工具：get_calendar_events · search_files · read_file。相对日期按演示固定「今天」解析，见 README。</footer>
+  </main>
+
+  <script>
+    const logEl = document.getElementById("log");
+    const form = document.getElementById("form");
+    const input = document.getElementById("input");
+    const send = document.getElementById("send");
+    const keyStatus = document.getElementById("keyStatus");
+    const dateChip = document.getElementById("dateChip");
+
+    function append(role, text, extra) {
+      const div = document.createElement("div");
+      div.className = "msg " + role;
+      div.textContent = text;
+      if (extra) {
+        const t = document.createElement("div");
+        t.className = "tools";
+        t.textContent = extra;
+        div.appendChild(t);
+      }
+      logEl.appendChild(div);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    async function refreshHealth() {
+      try {
+        const res = await fetch("/api/health");
+        const data = await res.json();
+        dateChip.textContent = "演示今天：" + data.mock_today + " → 明天 " + data.mock_tomorrow;
+        if (data.has_openai_api_key) {
+          keyStatus.textContent = "OPENAI_API_KEY 已配置";
+          keyStatus.className = "chip ok";
+        } else {
+          keyStatus.textContent = "缺少 OPENAI_API_KEY";
+          keyStatus.className = "chip bad";
+          append("system", "请复制 .env.example 为 .env 并填入 OPENAI_API_KEY，然后重启服务。");
+        }
+      } catch (e) {
+        keyStatus.textContent = "健康检查失败";
+        keyStatus.className = "chip bad";
+      }
+    }
+
+    async function chat(message) {
+      send.disabled = true;
+      append("user", message);
+      append("system", "思考中…");
+      const thinking = logEl.lastChild;
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message }),
+        });
+        const data = await res.json().catch(() => ({}));
+        thinking.remove();
+        if (!res.ok) {
+          append("error", data.detail || ("请求失败：" + res.status));
+          return;
+        }
+        const tools = (data.tools_called || []).length
+          ? "工具调用：" + data.tools_called.join(" → ")
+          : "工具调用：（无）";
+        append("bot", data.reply, tools);
+      } catch (e) {
+        thinking.remove();
+        append("error", "网络或服务错误：" + e.message);
+      } finally {
+        send.disabled = false;
+        input.focus();
+      }
+    }
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const msg = input.value.trim();
+      if (!msg) return;
+      input.value = "";
+      chat(msg);
+    });
+
+    document.querySelectorAll(".demos button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        input.value = btn.getAttribute("data-q");
+        chat(btn.getAttribute("data-q"));
+      });
+    });
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        form.requestSubmit();
+      }
+    });
+
+    refreshHealth();
+    append("system", "试试上方三条 Demo，或直接输入问题。");
+  </script>
+</body>
+</html>
