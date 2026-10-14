@@ -1,0 +1,50 @@
+{
+  "tag": "baseline-v1",
+  "recorded_at_utc": "2026-10-14T19:37:49.701192+00:00",
+  "mock_today": "2026-10-12",
+  "mock_tomorrow": "2026-10-13",
+  "runs": [
+    {
+      "id": "demo1_calendar",
+      "prompt": "我明天下午有什么安排？",
+      "tools_called": [
+        "get_calendar_events"
+      ],
+      "reply": "你明天下午有一个安排：14:00 到 15:00 在 Kilburn Building 有一个 FYP 导师会议，记得带上你的提案进展更新。需要我帮你准备会议资料吗？",
+      "expect_tools_include": [
+        "get_calendar_events"
+      ],
+      "success_notes": "应提到 2026-10-13 下午 FYP meeting（14:00、Kilburn Building）。"
+    },
+    {
+      "id": "demo2_proposal",
+      "prompt": "找到我的 FYP proposal，告诉我项目在做什么。",
+      "tools_called": [
+        "search_files",
+        "read_file"
+      ],
+      "reply": "你的 FYP 项目是构建一个面向个人日常任务的单 Agent 个人 AI 助手。它能理解用户目标，调用工具（如日历、本地文件等），并支持多次工具串联调用来完成复杂任务。项目使用现成的大语言模型 API，基于 OpenAI Agents SDK 运行，当前阶段主要在本地模拟日历和笔记，验证单工具和多工具链调用的可行性。后续计划接入真实日历、邮件等数据，并进行系统评测。",
+      "expect_tools_include": [
+        "search_files",
+        "read_file"
+      ],
+      "success_notes": "应基于 data/notes/fyp-proposal.md 概括 Personal AI Assistant / Baseline。"
+    },
+    {
+      "id": "demo3_meeting_brief",
+      "prompt": "帮我准备明天的 FYP meeting。",
+      "tools_called": [
+        "get_calendar_events",
+        "search_files",
+        "read_file"
+      ],
+      "reply": "明天下午2点到3点有FYP meeting，地点在Kilburn Building，会议备注是带上proposal进展更新。\n\n你的FYP项目是“Personal AI Assistant（个人AI助手）”，目标是构建一个面向个人日常任务的单Agent助手，能理解用户目标并调用工具（如日历、本地文件）完成任务，支持多次工具链调用。项目使用现成LLM API和OpenAI Agents SDK，当前阶段基于本地mock日历和笔记，演示多工具链调用能力。\n\n建议会议讨论点：\n1. 当前proposal进展和遇到的问题\n2. 多工具链调用的实现细节和挑战\n3. 后续阶段计划（接入真实日历/邮件，系统评测等）\n\n需要我帮你准备一份详细的会议brief吗？",
+      "expect_tools_include": [
+        "get_calendar_events",
+        "search_files",
+        "read_file"
+      ],
+      "success_notes": "应串联日历与文件，输出 meeting brief（时间地点、项目摘要、讨论点）。"
+    }
+  ]
+}

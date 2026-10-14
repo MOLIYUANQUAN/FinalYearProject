@@ -4,6 +4,10 @@ Manchester CS Final Year Project（Jia jimmy）的 **Baseline** 可运行骨架�
 
 > 阶段：仅 Baseline（Baseline → Application → Evaluation）。本仓库不包含 memory、数据库、多 Agent、MCP、OAuth、浏览器使用或网页搜索。
 
+**固定快照：** Git tag [`baseline-v1`](https://github.com/MOLIYUANQUAN/FinalYearProject/releases/tag/baseline-v1)  
+**复现与验收说明：** [docs/baseline-v1.md](docs/baseline-v1.md)  
+**Evaluation 对照证据：** [docs/evaluation/](docs/evaluation/)
+
 ## 成功标准
 
 | # | 标准 | 判定 |
@@ -84,7 +88,26 @@ python -m src.main
 
 ```bash
 python scripts/demo_cli.py
+# 同时写入 Evaluation 证据 JSON：
+python scripts/demo_cli.py --save
 ```
+
+### 5. 从 tag 复现 Baseline（报告用）
+
+```bash
+git fetch --tags
+git checkout baseline-v1
+```
+
+然后按上面「环境 → API Key → 启动」步骤操作。详细说明见 [docs/baseline-v1.md](docs/baseline-v1.md)。
+
+## 分支约定
+
+| 引用 | 用途 |
+|------|------|
+| `develop` | 日常开发 |
+| `main` | 重大里程碑 |
+| tag `baseline-v1` | 报告复现 Baseline |
 
 ## Demo 脚本（验收）
 
@@ -108,6 +131,9 @@ python scripts/demo_cli.py
 ├── README.md
 ├── requirements.txt
 ├── .env.example
+├── docs/
+│   ├── baseline-v1.md              # 复现与验收
+│   └── evaluation/                 # 报告对照证据
 ├── src/
 │   ├── main.py          # FastAPI 入口
 │   ├── agent.py         # Personal Assistant + 工具绑定
@@ -128,7 +154,19 @@ python scripts/demo_cli.py
 
 ## Out of scope（Baseline）
 
-长期 memory、数据库、multi-agent、MCP、真实日历/邮件 OAuth、Browser/Computer Use、语音、网页搜索、生产部署。
+为避免过度设计，**本阶段明确不做**（与 preliminary outline 一致）：
+
+- Mobile App
+- Long-term memory（含 Zep / Letta）
+- Database
+- Multi-agent
+- Browser / Computer Use / Cloud sandbox
+- Voice
+- Gmail / Drive / 真实日历 OAuth（Application Phase 1 再做日历）
+- Proactive notifications
+- 复杂权限系统
+- Production-level UI / 网页搜索
+- MCP 作为运行时依赖（可调研，Baseline 不接入）
 
 ## 许可与署名
 
