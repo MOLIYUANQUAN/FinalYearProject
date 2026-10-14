@@ -20,33 +20,32 @@ class GoogleCalendarProvider:
 
     def query_events(self, date: str, time_of_day: TimeOfDay | str = "all") -> dict[str, Any]:
         service = _build_service()
-        calendar_id = get_google_calendar_id()
+        calendars = _resolve_calendars(service, get_google_calendar_id())
         day_start = datetime.fromisoformat(f"{date}T00:00:00").astimezone()
         day_end = day_start + timedelta(days=1)
 
-        response = (
-            service.events()
-            .list(
-                calendarId=calendar_id,
-                timeMin=day_start.isoformat(),
-                timeMax=day_end.isoformat(),
-                singleEvents=True,
-                orderBy="startTime",
-                maxResults=50,
+        events: list[dict[str, Any]] = []
+        for cal in calendars:
+            response = (
+                service.events()
+                .list(
+                    calendarId=cal["id"],
+                    timeMin=day_start.isoformat(),
+                    timeMax=day_end.isoformat(),
+                    singleEvents=True,
+                    orderBy="startTime",
+                    maxResults=50,
+                )
+                .execute()
             )
-            .execute()
-        )
-
-        events = []
-        for item in response.get("items") or []:
-            start = _event_datetime(item.get("start") or {})
-            end = _event_datetime(item.get("end") or {})
-            if not start:
-                continue
-            if not in_time_of_day(start, time_of_day):
-                continue
-            events.append(
-                normalize_event(
+            for item in response.get("items") or []:
+                start = _event_datetime(item.get("start") or {})
+                end = _event_datetime(item.get("end") or {})
+                if not start:
+                    continue
+                if not in_time_of_day(start, time_of_day):
+                    continue
+                event = normalize_event(
                     {
                         "id": item.get("id"),
                         "title": item.get("summary") or "(no title)",
@@ -56,15 +55,53 @@ class GoogleCalendarProvider:
                         "notes": item.get("description"),
                     }
                 )
-            )
+                event["calendar"] = cal["summary"]
+                events.append(event)
 
+        events.sort(key=lambda e: e.get("start") or "")
         return {
             "source": self.name,
-            "calendar_id": calendar_id,
+            "calendars": [c["summary"] for c in calendars],
             "date": date,
             "time_of_day": time_of_day,
             "events": events,
         }
+
+
+def _resolve_calendars(service, setting: str) -> list[dict[str, str]]:
+    """解析要查询的日历列表。
+
+    - selected / all：Google 界面里勾选的日历（含导入课表）
+    - primary：仅主日历
+    - 其他：当作单个 calendarId
+    """
+    value = (setting or "selected").strip().lower()
+    listed = service.calendarList().list().execute().get("items") or []
+
+    if value in {"selected", "all"}:
+        chosen = []
+        for item in listed:
+            # selected=True 对应网页勾选；primary 始终纳入
+            if item.get("selected") or item.get("primary"):
+                chosen.append(
+                    {
+                        "id": str(item["id"]),
+                        "summary": str(item.get("summary") or item["id"]),
+                    }
+                )
+        if chosen:
+            return chosen
+        # 兜底：至少主日历
+        return [{"id": "primary", "summary": "primary"}]
+
+    if value == "primary":
+        primary = next((i for i in listed if i.get("primary")), None)
+        summary = str(primary.get("summary") or "primary") if primary else "primary"
+        return [{"id": "primary", "summary": summary}]
+
+    match = next((i for i in listed if i.get("id") == setting), None)
+    summary = str(match.get("summary") or setting) if match else setting
+    return [{"id": setting, "summary": summary}]
 
 
 def _event_datetime(payload: dict[str, Any]) -> str | None:

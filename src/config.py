@@ -42,8 +42,9 @@ def get_calendar_backend() -> str:
 
 
 def get_google_calendar_id() -> str:
+    """Google 日历选择：selected（默认，网页勾选的全部）| primary | 具体 calendarId。"""
     load_env()
-    return (os.getenv("GOOGLE_CALENDAR_ID") or "primary").strip() or "primary"
+    return (os.getenv("GOOGLE_CALENDAR_ID") or "selected").strip() or "selected"
 
 
 def effective_today() -> str:

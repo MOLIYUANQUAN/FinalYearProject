@@ -45,8 +45,9 @@ secrets/google_token.json
 
 ```env
 CALENDAR_BACKEND=google
-# 可选，默认 primary（你的主日历）
-GOOGLE_CALENDAR_ID=primary
+# selected = 网页里勾选的全部日历（含导入课表，推荐）
+# primary = 仅主日历
+GOOGLE_CALENDAR_ID=selected
 ```
 
 重启：
