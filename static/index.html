@@ -223,7 +223,9 @@
       try {
         const res = await fetch("/api/health");
         const data = await res.json();
-        dateChip.textContent = "演示今天：" + data.mock_today + " → 明天 " + data.mock_tomorrow;
+        const backend = data.calendar_backend || "mock";
+        dateChip.textContent =
+          "日历:" + backend + " · 今天 " + data.effective_today + " → 明天 " + data.effective_tomorrow;
         if (data.has_openai_api_key) {
           keyStatus.textContent = "OPENAI_API_KEY 已配置";
           keyStatus.className = "chip ok";

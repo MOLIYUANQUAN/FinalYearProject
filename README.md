@@ -6,7 +6,8 @@ Manchester CS Final Year Project（Jia jimmy）的 **Baseline** 可运行骨架�
 
 **固定快照：** Git tag [`baseline-v1`](https://github.com/MOLIYUANQUAN/FinalYearProject/releases/tag/baseline-v1)  
 **复现与验收说明：** [docs/baseline-v1.md](docs/baseline-v1.md)  
-**Evaluation 对照证据：** [docs/evaluation/](docs/evaluation/)
+**Evaluation 对照证据：** [docs/evaluation/](docs/evaluation/)  
+**真实日历（可选）：** [docs/google-calendar-setup.md](docs/google-calendar-setup.md) — 默认仍为 mock
 
 ## 成功标准
 
@@ -162,7 +163,7 @@ git checkout baseline-v1
 - Multi-agent
 - Browser / Computer Use / Cloud sandbox
 - Voice
-- Gmail / Drive / 真实日历 OAuth（Application Phase 1 再做日历）
+- Gmail / Drive（日历可选 Google 只读，见 docs/google-calendar-setup.md）
 - Proactive notifications
 - 复杂权限系统
 - Production-level UI / 网页搜索

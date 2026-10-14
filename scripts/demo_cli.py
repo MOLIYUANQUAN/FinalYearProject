@@ -18,7 +18,12 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from src.agent import run_assistant
-from src.config import MOCK_TODAY, MOCK_TOMORROW, require_openai_api_key
+from src.config import (
+    effective_today,
+    effective_tomorrow,
+    get_calendar_backend,
+    require_openai_api_key,
+)
 
 DEMOS = [
     {
@@ -46,7 +51,9 @@ EVIDENCE_PATH = ROOT / "docs" / "evaluation" / "baseline-v1-runs.json"
 
 async def run_demos(*, save: bool) -> int:
     require_openai_api_key()
-    print(f"演示今天={MOCK_TODAY}，明天={MOCK_TOMORROW}\n")
+    print(
+        f"日历后端={get_calendar_backend()}，今天={effective_today()}，明天={effective_tomorrow()}\n"
+    )
 
     runs: list[dict] = []
     for i, demo in enumerate(DEMOS, 1):
@@ -74,8 +81,9 @@ async def run_demos(*, save: bool) -> int:
         payload = {
             "tag": "baseline-v1",
             "recorded_at_utc": datetime.now(timezone.utc).isoformat(),
-            "mock_today": MOCK_TODAY,
-            "mock_tomorrow": MOCK_TOMORROW,
+            "calendar_backend": get_calendar_backend(),
+            "effective_today": effective_today(),
+            "effective_tomorrow": effective_tomorrow(),
             "runs": runs,
         }
         EVIDENCE_PATH.write_text(

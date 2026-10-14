@@ -18,7 +18,13 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src.agent import run_assistant
-from src.config import MOCK_TODAY, MOCK_TOMORROW, STATIC_DIR, require_openai_api_key
+from src.config import (
+    STATIC_DIR,
+    effective_today,
+    effective_tomorrow,
+    get_calendar_backend,
+    require_openai_api_key,
+)
 
 
 @asynccontextmanager
@@ -29,6 +35,11 @@ async def lifespan(_app: FastAPI):
     except RuntimeError as exc:
         print(f"[WARN] {exc}")
         print("  Server started, but /api/chat returns 503 until a valid key is set.")
+    try:
+        backend = get_calendar_backend()
+        print(f"[OK] CALENDAR_BACKEND={backend}")
+    except RuntimeError as exc:
+        print(f"[WARN] {exc}")
     yield
 
 
@@ -46,8 +57,9 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     tools_called: list[str]
-    mock_today: str = MOCK_TODAY
-    mock_tomorrow: str = MOCK_TOMORROW
+    calendar_backend: str = "mock"
+    effective_today: str = ""
+    effective_tomorrow: str = ""
 
 
 @app.get("/")
@@ -62,11 +74,17 @@ def health() -> dict:
         require_openai_api_key()
     except RuntimeError:
         has_key = False
+    backend = "mock"
+    try:
+        backend = get_calendar_backend()
+    except RuntimeError:
+        pass
     return {
         "ok": True,
         "has_openai_api_key": has_key,
-        "mock_today": MOCK_TODAY,
-        "mock_tomorrow": MOCK_TOMORROW,
+        "calendar_backend": backend,
+        "effective_today": effective_today(),
+        "effective_tomorrow": effective_tomorrow(),
     }
 
 
@@ -89,6 +107,9 @@ async def chat(body: ChatRequest) -> ChatResponse:
     return ChatResponse(
         reply=result["reply"],
         tools_called=result["tools_called"],
+        calendar_backend=get_calendar_backend(),
+        effective_today=effective_today(),
+        effective_tomorrow=effective_tomorrow(),
     )
 
 

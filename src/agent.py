@@ -4,27 +4,42 @@ from __future__ import annotations
 
 from agents import Agent, ModelSettings, Runner, RunResult
 
-from src.config import DEFAULT_MODEL, MOCK_TODAY, MOCK_TOMORROW, require_openai_api_key
+from src.config import (
+    DEFAULT_MODEL,
+    effective_today,
+    effective_tomorrow,
+    get_calendar_backend,
+    require_openai_api_key,
+)
 from src.tools import ALL_TOOLS
 
 
 def build_instructions() -> str:
+    today = effective_today()
+    tomorrow = effective_tomorrow()
+    backend = get_calendar_backend()
+    date_note = (
+        "日期约定（mock 演示固定日，勿用系统真实日期）："
+        if backend == "mock"
+        else "日期约定（真实日历：使用系统本地日期）："
+    )
     return f"""你是用户的单一个人 AI 助手（Personal Assistant）。
 
 规则：
-1. 有本地日历或文件相关问题时，必须调用工具核实，不要编造日程或文件内容。
+1. 有日历或本地文件相关问题时，必须调用工具核实，不要编造日程或文件内容。
 2. 可以串联多次工具调用：先查日历，再搜索/读取相关文件，最后综合回答。
 3. 工具结果不足时如实说明，不要假装知道。
 4. 用简洁中文回复（除非用户用英文提问）。
 
-日期约定（演示固定，勿用系统真实日期）：
-- 今天是 {MOCK_TODAY}
-- 「明天」= {MOCK_TOMORROW}
-- 调用 get_calendar_events 时，date 必须传 YYYY-MM-DD（例如明天 → {MOCK_TOMORROW}）
+{date_note}
+- 今天是 {today}
+- 「明天」= {tomorrow}
+- 调用 get_calendar_events 时，date 必须传 YYYY-MM-DD（例如明天 → {tomorrow}）
 - afternoon = 12:00–17:00；morning = 05:00–12:00；evening = 17:00 之后
+- 当前日历后端：{backend}
 
 可用工具：
-- get_calendar_events：查本地日历
+- get_calendar_events：查日历（mock 或 Google）
 - search_files：在本地笔记中搜索
 - read_file：读取笔记全文
 

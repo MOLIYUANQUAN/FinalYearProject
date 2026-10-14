@@ -1,8 +1,9 @@
-"""Baseline 配置：路径、演示用「今天」、API Key 检查。"""
+"""配置：路径、演示日期、日历后端、API Key。"""
 
 from __future__ import annotations
 
 import os
+from datetime import date, timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -12,17 +13,50 @@ DATA_DIR = ROOT_DIR / "data"
 CALENDAR_PATH = DATA_DIR / "calendar.json"
 NOTES_DIR = DATA_DIR / "notes"
 STATIC_DIR = ROOT_DIR / "static"
+SECRETS_DIR = ROOT_DIR / "secrets"
 
-# 演示固定「今天」：相对词「明天」→ 2026-10-13（日历里有 FYP meeting）
-# 不随系统时钟变化，保证 demo 可复现。详见 README。
+# 演示固定「今天」：仅 mock 后端使用，保证 Demo 可复现。详见 README / docs。
 MOCK_TODAY = "2026-10-12"
 MOCK_TOMORROW = "2026-10-13"
 
 DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
 
+# calendar backend: mock | google
+GOOGLE_CREDENTIALS_PATH = SECRETS_DIR / "credentials.json"
+GOOGLE_TOKEN_PATH = SECRETS_DIR / "google_token.json"
+
 
 def load_env() -> None:
     load_dotenv(ROOT_DIR / ".env")
+
+
+def get_calendar_backend() -> str:
+    """返回日历后端：mock（默认）或 google。"""
+    load_env()
+    value = (os.getenv("CALENDAR_BACKEND") or "mock").strip().lower()
+    if value not in {"mock", "google"}:
+        raise RuntimeError(
+            f"无效 CALENDAR_BACKEND={value!r}。请使用 mock 或 google。"
+        )
+    return value
+
+
+def get_google_calendar_id() -> str:
+    load_env()
+    return (os.getenv("GOOGLE_CALENDAR_ID") or "primary").strip() or "primary"
+
+
+def effective_today() -> str:
+    """Agent 指令用的「今天」：mock 后端用固定日，google 用系统本地日。"""
+    if get_calendar_backend() == "mock":
+        return MOCK_TODAY
+    return date.today().isoformat()
+
+
+def effective_tomorrow() -> str:
+    if get_calendar_backend() == "mock":
+        return MOCK_TOMORROW
+    return (date.today() + timedelta(days=1)).isoformat()
 
 
 def require_openai_api_key() -> str:

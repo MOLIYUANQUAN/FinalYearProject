@@ -71,7 +71,7 @@ Demo 3 是硬验收：证明 Agent 能自主连续调用多个工具。
 - Browser / Computer Use / Cloud sandbox
 - Voice
 - Gmail / Drive 等真实云端集成（含 OAuth）
-- 真实日历（Phase 1 才做）
+- 真实日历默认关闭（可选 Google 只读，见 google-calendar-setup.md；复现 Baseline 请保持 mock）
 - Proactive notifications
 - 复杂权限系统
 - Production-level UI
