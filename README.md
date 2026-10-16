@@ -81,11 +81,12 @@ cp .env.example .env
 
 ### 3. 打开
 
-双击仓库根目录的 **`Personal Agent.cmd`**：重启本地服务并打开 <http://127.0.0.1:8765>，它会先开口告诉你此刻最该知道的事。
+双击仓库根目录的 **`Friday.cmd`**：Friday 在独立窗口里打开，先开口告诉你此刻最该知道的事。服务已经在跑且代码没变就不重启；窗口已经开着就直接拿到最前面。
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\open_agent.py              # 同上（命令行）
-.\.venv\Scripts\python.exe scripts\open_agent.py --no-browser # 只重启服务
+.\.venv\Scripts\python.exe scripts\open_agent.py --no-window  # 只确保服务在跑
+.\.venv\Scripts\python.exe scripts\open_agent.py --restart    # 强制重启服务
 .\.venv\Scripts\python.exe scripts\open_agent.py --stop       # 停止
 .\.venv\Scripts\python.exe scripts\usage_report.py            # Tuesday test：最近 7 天用了几天、首字多快
 ```

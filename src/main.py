@@ -1,4 +1,4 @@
-"""FastAPI 本地入口：一个页面 + 流式对话。"""
+"""Friday 的本地入口：一个页面 + 流式对话。"""
 
 from __future__ import annotations
 
@@ -33,6 +33,9 @@ from src.config import (
     require_openai_api_key,
 )
 from src.context import weekday_zh
+from src.version import code_version
+
+CODE_VERSION = code_version()
 
 
 def _warm_calendar() -> None:
@@ -68,8 +71,8 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="Personal Agent",
-    version="0.4.0",
+    title="Friday",
+    version="0.5.0",
     lifespan=lifespan,
 )
 
@@ -131,6 +134,7 @@ def health() -> dict:
     now = effective_now()
     return {
         "ok": True,
+        "code_version": CODE_VERSION,
         "has_openai_api_key": has_key,
         "calendar_backend": backend,
         "mail_backend": mail,

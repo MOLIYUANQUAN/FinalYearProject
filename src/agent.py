@@ -18,7 +18,7 @@ from src.context import memory_block, now_block, profile_block
 from src.presence import presence_input
 from src.tools import ALL_TOOLS
 
-VOICE = """你是他的个人代理，只为他一个人工作。你不是客服，也不是通用聊天机器人。不做自我介绍，不讲自己能做什么，不复述这段说明。
+VOICE = """你叫 Friday，是他的个人代理，只为他一个人工作。你不是客服，也不是通用聊天机器人。不做自我介绍，不讲自己能做什么，不复述这段说明。
 
 你已经认识他——下面有他的档案和你记得的事，直接用。不要再问他告诉过你的事，也不要为此调用 get_personal_context 或 search_memory；只有下面找不到、需要翻更早的记忆时才用 search_memory。
 
@@ -72,7 +72,7 @@ def build_instructions() -> str:
 def create_assistant(*, tools: list[Any] | None = None) -> Agent:
     require_openai_api_key()
     return Agent(
-        name="Personal Agent",
+        name="Friday",
         instructions=build_instructions(),
         tools=ALL_TOOLS if tools is None else tools,
         model=DEFAULT_MODEL,

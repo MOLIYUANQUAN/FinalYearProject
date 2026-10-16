@@ -3,7 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Personal Agent</title>
+  <meta name="theme-color" content="#0f5c4c" />
+  <title>Friday</title>
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/static/icon-32.png" sizes="32x32" type="image/png" />
+  <link rel="apple-touch-icon" href="/static/icon-192.png" />
+  <link rel="manifest" href="/static/manifest.json" />
   <style>
     :root {
       --bg: #f3f0ea;
@@ -201,7 +206,7 @@
 <body>
   <main>
     <header>
-      <h1>Personal Agent</h1>
+      <h1>Friday</h1>
       <div class="right">
         <span id="today"></span>
         <button type="button" id="newChat">新对话</button>
@@ -360,7 +365,7 @@
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         if (res.status === 404) {
-          throw new Error("本地服务还是旧版本：双击 Personal Agent.cmd 重开，再刷新这页。");
+          throw new Error("本地服务还是旧版本：双击 Friday.cmd 重开，再刷新这页。");
         }
         throw new Error(data.detail || "请求失败：" + res.status);
       }
@@ -467,12 +472,12 @@
         const data = await res.json();
         if (data.now_label) todayEl.textContent = data.now_label;
         if (!data.has_openai_api_key) {
-          addMessage("error", "缺少 OPENAI_API_KEY：在 .env 里填好后，双击 Personal Agent.cmd 重开。");
+          addMessage("error", "缺少 OPENAI_API_KEY：在 .env 里填好后，双击 Friday.cmd 重开。");
           return false;
         }
         return true;
       } catch (e) {
-        addMessage("error", "连不上本地服务：双击 Personal Agent.cmd 重开。");
+        addMessage("error", "连不上本地服务：双击 Friday.cmd 重开。");
         return false;
       }
     }
