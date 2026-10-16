@@ -85,7 +85,8 @@ def search_facts(query: str, top: int = 5) -> dict[str, Any]:
                 score = max(score, 1)
             if score > 0:
                 scored.append((score, fact.get("updated_at") or "", fact))
-        scored.sort(key=lambda x: (-x[0], x[1]), reverse=False)
+        # 分高优先；同分取最近更新
+        scored.sort(key=lambda x: (x[0], x[1]), reverse=True)
         hits = [f for _, _, f in scored[:top]]
 
     return {
