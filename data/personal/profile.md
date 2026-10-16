@@ -18,8 +18,8 @@
 - Other CS modules as on the university timetable calendar (`Mr Zepeng Jia`)
 
 ## Email
-- Student mail is University Outlook (Microsoft 365), not Gmail
-- Prefer searching mail for FYP / mentor / module codes when preparing meetings
+- University Outlook exists, but Azure app registration is blocked for students
+- Integration demo uses personal Gmail (readonly); search for FYP / mentor when useful
 
 ## Autonomy / Approval
 - Allowed without asking: read calendar, read mail, search/read local notes, draft briefs

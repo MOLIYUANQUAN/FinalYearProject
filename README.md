@@ -10,7 +10,8 @@ Manchester CS Final Year Project（Jia jimmy）的 **Baseline** 可运行骨架�
 **真实日历（可选）：** [docs/google-calendar-setup.md](docs/google-calendar-setup.md) — 默认仍为 mock  
 **Application Calendar 说明：** [docs/application-calendar-v1.md](docs/application-calendar-v1.md)  
 **Personal 薄层：** [docs/application-personal-v1.md](docs/application-personal-v1.md)  
-**Outlook 邮件：** [docs/outlook-mail-setup.md](docs/outlook-mail-setup.md) · [docs/application-outlook-mail-v1.md](docs/application-outlook-mail-v1.md)
+**Gmail 邮件（推荐）：** [docs/gmail-setup.md](docs/gmail-setup.md) · [docs/application-gmail-mail-v1.md](docs/application-gmail-mail-v1.md)  
+**Outlook（学校常无 Azure 权限）：** [docs/outlook-mail-setup.md](docs/outlook-mail-setup.md)
 
 ## 成功标准
 

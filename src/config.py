@@ -28,6 +28,7 @@ DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
 # calendar backend: mock | google
 GOOGLE_CREDENTIALS_PATH = SECRETS_DIR / "credentials.json"
 GOOGLE_TOKEN_PATH = SECRETS_DIR / "google_token.json"
+GMAIL_TOKEN_PATH = SECRETS_DIR / "gmail_token.json"
 OUTLOOK_TOKEN_PATH = SECRETS_DIR / "outlook_token.json"
 
 
@@ -53,12 +54,12 @@ def get_google_calendar_id() -> str:
 
 
 def get_mail_backend() -> str:
-    """邮件后端：none（默认关闭）| mock | outlook。"""
+    """邮件后端：none | mock | gmail | outlook。"""
     load_env()
     value = (os.getenv("MAIL_BACKEND") or "none").strip().lower()
-    if value not in {"none", "mock", "outlook"}:
+    if value not in {"none", "mock", "gmail", "outlook"}:
         raise RuntimeError(
-            f"无效 MAIL_BACKEND={value!r}。请使用 none、mock 或 outlook。"
+            f"无效 MAIL_BACKEND={value!r}。请使用 none、mock、gmail 或 outlook。"
         )
     return value
 

@@ -1,6 +1,10 @@
-# Outlook / Microsoft 365 邮件只读（学生邮箱）
+# Outlook / Microsoft 365 邮件只读（可选）
 
-曼大学生邮箱走 **Microsoft Graph**，不是 Gmail。
+> 曼大学生账号通常 **无法** 打开 Azure Portal 注册应用（401）。  
+> **推荐改用 Gmail**：见 [gmail-setup.md](gmail-setup.md)。  
+> 下文仅在你有个人 Azure / 管理员同意时使用。
+
+曼大学生邮箱走 **Microsoft Graph**。
 
 ## 1. 在 Azure 注册应用
 

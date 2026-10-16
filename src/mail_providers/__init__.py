@@ -1,4 +1,4 @@
-"""邮件数据源：none | mock | outlook。"""
+"""邮件数据源：none | mock | gmail | outlook。"""
 
 from __future__ import annotations
 
@@ -19,6 +19,10 @@ class MailProvider(Protocol):
 
 def get_mail_provider() -> MailProvider:
     backend = get_mail_backend()
+    if backend == "gmail":
+        from src.mail_providers.gmail import GmailMailProvider
+
+        return GmailMailProvider()
     if backend == "outlook":
         from src.mail_providers.outlook import OutlookMailProvider
 

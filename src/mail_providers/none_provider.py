@@ -14,8 +14,8 @@ class DisabledMailProvider:
             "source": self.name,
             "error": "mail_disabled",
             "message": (
-                "邮件未启用。请在 .env 设置 MAIL_BACKEND=outlook 或 mock，"
-                "并按 docs/outlook-mail-setup.md 完成配置。"
+                "邮件未启用。请在 .env 设置 MAIL_BACKEND=gmail 或 mock，"
+                "并按 docs/gmail-setup.md 完成配置。"
             ),
             "messages": [],
         }
