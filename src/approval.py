@@ -12,6 +12,8 @@ TOOL_POLICIES: dict[str, ToolPolicy] = {
     "get_calendar_events": "allow",
     "search_files": "allow",
     "read_file": "allow",
+    "search_emails": "allow",
+    "read_email": "allow",
     "get_personal_context": "allow",
     "request_user_confirmation": "allow",
     "create_calendar_event": "require_confirmation",

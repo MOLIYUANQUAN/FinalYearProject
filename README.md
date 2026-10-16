@@ -9,7 +9,8 @@ Manchester CS Final Year Project（Jia jimmy）的 **Baseline** 可运行骨架�
 **Evaluation 对照证据：** [docs/evaluation/](docs/evaluation/)  
 **真实日历（可选）：** [docs/google-calendar-setup.md](docs/google-calendar-setup.md) — 默认仍为 mock  
 **Application Calendar 说明：** [docs/application-calendar-v1.md](docs/application-calendar-v1.md)  
-**Personal 薄层：** [docs/application-personal-v1.md](docs/application-personal-v1.md)
+**Personal 薄层：** [docs/application-personal-v1.md](docs/application-personal-v1.md)  
+**Outlook 邮件：** [docs/outlook-mail-setup.md](docs/outlook-mail-setup.md) · [docs/application-outlook-mail-v1.md](docs/application-outlook-mail-v1.md)
 
 ## 成功标准
 
@@ -32,10 +33,10 @@ Manchester CS Final Year Project（Jia jimmy）的 **Baseline** 可运行骨架�
 
 ## 工具
 
-1. `get_calendar_events` — 查日历（mock 或 Google selected）  
-2. `create_calendar_event` — 创建事件（须先确认；Google 写入 primary）  
+1. `get_calendar_events` / `create_calendar_event` — 日历（创建须确认）  
+2. `search_emails` / `read_email` — Outlook 或 mock 邮件（只读）  
 3. `search_files` / `read_file` — 本地笔记  
-4. `get_personal_context` — `data/personal/profile.md`  
+4. `get_personal_context` — 个人偏好  
 5. `request_user_confirmation` — 写操作前请求确认  
 
 Web 聊天支持多轮 `history`（确认 → 创建）。见 [docs/application-calendar-write-v1.md](docs/application-calendar-write-v1.md)。

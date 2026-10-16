@@ -22,6 +22,7 @@ from src.config import (
     effective_today,
     effective_tomorrow,
     get_calendar_backend,
+    get_mail_backend,
     require_openai_api_key,
 )
 
@@ -37,6 +38,10 @@ async def lifespan(_app: FastAPI):
     try:
         backend = get_calendar_backend()
         print(f"[OK] CALENDAR_BACKEND={backend}")
+    except RuntimeError as exc:
+        print(f"[WARN] {exc}")
+    try:
+        print(f"[OK] MAIL_BACKEND={get_mail_backend()}")
     except RuntimeError as exc:
         print(f"[WARN] {exc}")
     yield
@@ -94,10 +99,16 @@ def health() -> dict:
         backend = get_calendar_backend()
     except RuntimeError:
         pass
+    mail = "none"
+    try:
+        mail = get_mail_backend()
+    except RuntimeError:
+        pass
     return {
         "ok": True,
         "has_openai_api_key": has_key,
         "calendar_backend": backend,
+        "mail_backend": mail,
         "effective_today": effective_today(),
         "effective_tomorrow": effective_tomorrow(),
     }

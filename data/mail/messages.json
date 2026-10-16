@@ -1,0 +1,28 @@
+{
+  "messages": [
+    {
+      "id": "mock-mail-001",
+      "subject": "FYP meeting follow-up",
+      "from": "mentor.example@manchester.ac.uk",
+      "received": "2026-10-15T09:30:00+01:00",
+      "body_preview": "Please bring your proposal update to tomorrow's FYP meeting.",
+      "body": "Hi Jimmy,\n\nPlease bring your proposal update to tomorrow's FYP meeting in Kilburn.\nWe should discuss multi-tool chaining and next evaluation steps.\n\nBest,\nMentor"
+    },
+    {
+      "id": "mock-mail-002",
+      "subject": "COMP34111 lab reminder",
+      "from": "comp34111@manchester.ac.uk",
+      "received": "2026-10-14T16:00:00+01:00",
+      "body_preview": "Remember the drop-in lab this week.",
+      "body": "Reminder: COMP34111 drop-in laboratory sessions run this week. Bring your laptop."
+    },
+    {
+      "id": "mock-mail-003",
+      "subject": "Library notice",
+      "from": "library@manchester.ac.uk",
+      "received": "2026-10-13T11:00:00+01:00",
+      "body_preview": "Your book is due next week.",
+      "body": "This is a routine library notice about loan due dates."
+    }
+  ]
+}

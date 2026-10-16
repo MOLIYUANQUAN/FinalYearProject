@@ -17,11 +17,15 @@
 - BMAN30021 Marketing
 - Other CS modules as on the university timetable calendar (`Mr Zepeng Jia`)
 
+## Email
+- Student mail is University Outlook (Microsoft 365), not Gmail
+- Prefer searching mail for FYP / mentor / module codes when preparing meetings
+
 ## Autonomy / Approval
-- Allowed without asking: read calendar, search/read local notes, draft briefs
+- Allowed without asking: read calendar, read mail, search/read local notes, draft briefs
 - Must ask before doing: create/change/delete calendar events, send email, share files externally, any irreversible action
 - If unsure whether an action is risky, ask
 
 ## Working style
 - Busy term days: prioritize lectures/labs chronologically, then evening project blocks
-- FYP mentor meetings: always pull proposal + recent notes into the brief
+- FYP mentor meetings: pull proposal + recent notes + relevant mail into the brief

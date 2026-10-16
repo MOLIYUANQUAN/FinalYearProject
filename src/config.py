@@ -14,6 +14,8 @@ CALENDAR_PATH = DATA_DIR / "calendar.json"
 NOTES_DIR = DATA_DIR / "notes"
 PERSONAL_DIR = DATA_DIR / "personal"
 PROFILE_PATH = PERSONAL_DIR / "profile.md"
+MAIL_DIR = DATA_DIR / "mail"
+MAIL_MOCK_PATH = MAIL_DIR / "messages.json"
 STATIC_DIR = ROOT_DIR / "static"
 SECRETS_DIR = ROOT_DIR / "secrets"
 
@@ -26,6 +28,7 @@ DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
 # calendar backend: mock | google
 GOOGLE_CREDENTIALS_PATH = SECRETS_DIR / "credentials.json"
 GOOGLE_TOKEN_PATH = SECRETS_DIR / "google_token.json"
+OUTLOOK_TOKEN_PATH = SECRETS_DIR / "outlook_token.json"
 
 
 def load_env() -> None:
@@ -47,6 +50,27 @@ def get_google_calendar_id() -> str:
     """Google 日历选择：selected（默认，网页勾选的全部）| primary | 具体 calendarId。"""
     load_env()
     return (os.getenv("GOOGLE_CALENDAR_ID") or "selected").strip() or "selected"
+
+
+def get_mail_backend() -> str:
+    """邮件后端：none（默认关闭）| mock | outlook。"""
+    load_env()
+    value = (os.getenv("MAIL_BACKEND") or "none").strip().lower()
+    if value not in {"none", "mock", "outlook"}:
+        raise RuntimeError(
+            f"无效 MAIL_BACKEND={value!r}。请使用 none、mock 或 outlook。"
+        )
+    return value
+
+
+def get_outlook_client_id() -> str:
+    load_env()
+    return (os.getenv("OUTLOOK_CLIENT_ID") or "").strip()
+
+
+def get_outlook_tenant() -> str:
+    load_env()
+    return (os.getenv("OUTLOOK_TENANT") or "organizations").strip() or "organizations"
 
 
 def effective_today() -> str:
