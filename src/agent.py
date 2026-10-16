@@ -9,15 +9,18 @@ from typing import Any
 from agents import Agent, ModelSettings, Runner, RunResult
 from openai.types.responses import ResponseTextDeltaEvent
 
+from src import todos
 from src.agenda import chat_block
 from src.config import (
     DEFAULT_MODEL,
     get_calendar_backend,
     get_mail_backend,
+    get_tasks_backend,
     require_openai_api_key,
 )
 from src.context import memory_block, now_block, profile_block
-from src.tools import ALL_TOOLS
+from src.tools import ALL_TOOLS, TASK_TOOLS
+from src.turn import Turn
 
 VOICE = """你叫 Friday，是他的个人代理，只为他一个人工作。你不是客服，也不是通用聊天机器人。不做自我介绍，不讲自己能做什么，不复述这段说明。
 
@@ -43,10 +46,11 @@ VOICE = """你叫 Friday，是他的个人代理，只为他一个人工作。�
 - 只说你这次真查过的：没调用过 search_emails，就不能说邮件里没有。
 
 记住他：
-- 他说「记住…」→ remember_fact。
+- 他说「记住…」，记的是关于他自己的事 → remember_fact。要去做的事（「记得续借图书馆的书」）不是记忆。
 - 他顺带说出关于自己的长期事实或偏好（身份、重要的人、习惯、长期安排、喜好）→ 也用 remember_fact 记下，并在回复末尾加一句「记下了。」不记一次性的事、密码，也不记你自己的推测。
 - 他纠正你记得的某件事 → remember_fact(新的完整事实, replaces=旧记忆的 id)，直接改，不用确认，回一句「改好了」和新的说法。
 - 他要删掉某条记忆 → 先确认，再 forget_fact(user_confirmed=True)。
+- 记得的事是用来帮他的，不是用来管他的：他明确要做的事，和你记得的对不上也照常办（该确认的照常确认），绝不因此拒绝。
 
 行动：
 - 读操作直接做，不预告。
@@ -65,24 +69,31 @@ def _connections_line() -> str:
         "mock": "演示邮箱",
         "none": None,
     }[get_mail_backend()]
-    connected = "、".join(x for x in (calendar, mail) if x)
+    tasks = todos.SOURCE_NAMES.get(get_tasks_backend())
+    connected = "、".join(x for x in (calendar, mail, tasks) if x)
     return f"已接入：{connected}。没接入的账户就直说没接入。"
 
 
-def build_instructions(calendar: str = "") -> str:
-    parts = [VOICE, now_block(), _connections_line(), calendar, profile_block(), memory_block()]
+def build_instructions(calendar: str = "", todo: str = "") -> str:
+    parts = [VOICE, now_block(), _connections_line(), calendar, todo, profile_block(), memory_block()]
     return "\n\n".join(part for part in parts if part)
 
 
-def create_assistant(*, calendar: str = "") -> Agent:
+def create_assistant(*, calendar: str = "", todo: str = "") -> Agent:
     require_openai_api_key()
     return Agent(
         name="Friday",
-        instructions=build_instructions(calendar),
-        tools=ALL_TOOLS,
+        instructions=build_instructions(calendar, todo),
+        tools=ALL_TOOLS + TASK_TOOLS if todos.connected() else ALL_TOOLS,
         model=DEFAULT_MODEL,
         model_settings=ModelSettings(temperature=0.2),
     )
+
+
+async def _assistant() -> Agent:
+    """这一轮的 Friday：日历和待办同时读，谁也不等谁。"""
+    calendar, todo = await asyncio.gather(asyncio.to_thread(chat_block), asyncio.to_thread(todos.chat_block))
+    return create_assistant(calendar=calendar, todo=todo)
 
 
 def extract_tool_names(result: RunResult) -> list[str]:
@@ -171,7 +182,7 @@ async def run_assistant(
     max_turns: int = 12,
 ) -> dict:
     """运行一轮助手（非流式，供 CLI / 评测）。"""
-    agent = create_assistant(calendar=await asyncio.to_thread(chat_block))
+    agent = await _assistant()
     message = _expand_short_confirmation(message, history, pending_confirmation)
     result = await Runner.run(
         agent,
@@ -193,8 +204,9 @@ async def _stream(
     *,
     max_turns: int,
 ) -> AsyncIterator[dict[str, Any]]:
-    """把一次运行变成事件流：delta（新文字）/ tool（开始用某个工具）/ done（最终回复）。"""
-    result = Runner.run_streamed(agent, run_input, max_turns=max_turns)
+    """把一次运行变成事件流：delta（新文字）/ tool（开始用某个工具）/ done（最终回复和能撤销的事）。"""
+    turn = Turn()
+    result = Runner.run_streamed(agent, run_input, max_turns=max_turns, context=turn)
     tools: list[str] = []
     async for event in result.stream_events():
         if event.type == "raw_response_event":
@@ -212,6 +224,7 @@ async def _stream(
         "type": "done",
         "reply": reply if isinstance(reply, str) else str(reply or ""),
         "tools_called": tools,
+        "undo": turn.undo,
     }
 
 
@@ -222,7 +235,7 @@ async def stream_assistant(
     pending_confirmation: bool = False,
     max_turns: int = 12,
 ) -> AsyncIterator[dict[str, Any]]:
-    agent = create_assistant(calendar=await asyncio.to_thread(chat_block))
+    agent = await _assistant()
     message = _expand_short_confirmation(message, history, pending_confirmation)
     async for event in _stream(agent, _history_to_input(message, history), max_turns=max_turns):
         yield event

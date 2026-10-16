@@ -34,6 +34,8 @@ GOOGLE_CREDENTIALS_PATH = SECRETS_DIR / "credentials.json"
 GOOGLE_TOKEN_PATH = SECRETS_DIR / "google_token.json"
 GMAIL_TOKEN_PATH = SECRETS_DIR / "gmail_token.json"
 OUTLOOK_TOKEN_PATH = SECRETS_DIR / "outlook_token.json"
+GOOGLE_TASKS_TOKEN_PATH = SECRETS_DIR / "google_tasks_token.json"
+TASKS_PATH = DATA_DIR / "tasks.json"
 
 
 def load_env() -> None:
@@ -65,6 +67,15 @@ def get_mail_backend() -> str:
         raise RuntimeError(
             f"无效 MAIL_BACKEND={value!r}。请使用 none、mock、gmail 或 outlook。"
         )
+    return value
+
+
+def get_tasks_backend() -> str:
+    """待办后端：none（默认，没接入就完全不出现）| mock | google。"""
+    load_env()
+    value = (os.getenv("TASKS_BACKEND") or "none").strip().lower()
+    if value not in {"none", "mock", "google"}:
+        raise RuntimeError(f"无效 TASKS_BACKEND={value!r}。请使用 none、mock 或 google。")
     return value
 
 

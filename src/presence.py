@@ -1,4 +1,4 @@
-"""打开时的「今天」：服务端读真实日历，原样排成卡片，再算出此刻最该说的那一句。全程不经过模型。"""
+"""打开时的「今天」：服务端读真实日历和待办，原样排成卡片，再算出此刻最该说的那一句。全程不经过模型。"""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from collections.abc import AsyncIterator
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from src import agenda
+from src import agenda, todos
 from src.agenda import Timed, day_label, title, when
 from src.config import effective_now
 from src.context import greeting, his_name, weekday_zh
@@ -73,8 +73,21 @@ def _all_day_rows(titles: list[str]) -> list[dict[str, Any]]:
     return [{"time": "全天", "title": name, "where": "", "now": False} for name in titles]
 
 
-def _sections(now: datetime, timed: list[Timed], all_day: list[tuple[date, str]]) -> list[dict[str, Any]]:
-    """他眼前的卡片：今天还剩的、明天的；两天都空就给下一件。"""
+def _task_section(tasks: list[dict[str, Any]], today: date) -> dict[str, Any] | None:
+    """待办里过了截止的、今天和明天截止的；别的不占卡片。"""
+    rows = []
+    for task, due in todos.ordered(tasks):
+        if due is None or due > today + timedelta(days=1):
+            continue
+        word = "今天" if due == today else "明天" if due > today else f"过了 {(today - due).days} 天"
+        rows.append({"time": word, "title": task["title"], "where": "", "now": False})
+    return {"label": "待办", "meta": "", "rows": rows, "empty": ""} if rows else None
+
+
+def _sections(
+    now: datetime, timed: list[Timed], all_day: list[tuple[date, str]], tasks: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """他眼前的卡片：今天还剩的、明天的；两天都空就给下一件；最后是快到期的待办。"""
     today = now.date()
     tomorrow = today + timedelta(days=1)
     remaining = [(s, e, ev) for s, e, ev in timed if s.date() == today and (e or s) > now]
@@ -105,11 +118,34 @@ def _sections(now: datetime, timed: list[Timed], all_day: list[tuple[date, str]]
             )
         else:
             sections.append({"label": "到下周日", "meta": "", "rows": [], "empty": "都没有安排"})
-    return sections
+    due = _task_section(tasks, today)
+    return sections + [due] if due else sections
 
 
-def _say(now: datetime, timed: list[Timed], all_day: list[tuple[date, str]]) -> str:
-    """此刻最该说的那一句：挑哪件、相差多久都在这里算好，原样给他看。"""
+def _names(titles: list[str]) -> str:
+    return "、".join(titles) if len(titles) <= 3 else f"{'、'.join(titles[:2])} 等 {len(titles)} 件"
+
+
+def _due_clause(now: datetime, tasks: list[dict[str, Any]]) -> str:
+    """今天截止的待办；傍晚以后，也提一句明天截止的。"""
+    today = now.date()
+    pairs = todos.ordered(tasks)
+    due = [task["title"] for task, day in pairs if day == today]
+    if due:
+        return _spaced(f"今天截止：{_names(due)}。")
+    due = [task["title"] for task, day in pairs if day == today + timedelta(days=1)]
+    return _spaced(f"明天截止：{_names(due)}。") if due and now.hour >= 17 else ""
+
+
+def _say(now: datetime, timed: list[Timed], all_day: list[tuple[date, str]], tasks: list[dict[str, Any]]) -> str:
+    """此刻最该说的那一句：马上要开始的课先说，其次是今天截止的待办，再是日历上的判断。"""
+    sentence, urgent = _calendar_say(now, timed, all_day)
+    due = _due_clause(now, tasks)
+    return sentence + due if urgent else due + sentence
+
+
+def _calendar_say(now: datetime, timed: list[Timed], all_day: list[tuple[date, str]]) -> tuple[str, bool]:
+    """日历上此刻最该说的那件，和它是不是马上就要发生。挑哪件、相差多久都在这里算好。"""
     today = now.date()
     tomorrow = today + timedelta(days=1)
     current = next(((s, e, ev) for s, e, ev in timed if e and s <= now < e), None)
@@ -121,9 +157,9 @@ def _say(now: datetime, timed: list[Timed], all_day: list[tuple[date, str]]) -> 
         gap = soon[0] - current[1]
         between = "紧接着是" if gap <= timedelta(0) else f"隔 {_span(gap)}就是"
         left = _span(current[1] - now)
-        return _spaced(f"{spoken(current[2])}还剩 {left}，结束后{between}{spoken(soon[2])}{_there(soon[2])}。")
+        return _spaced(f"{spoken(current[2])}还剩 {left}，结束后{between}{spoken(soon[2])}{_there(soon[2])}。"), True
     if soon and soon[0].date() == today and soon[0] - now <= timedelta(hours=1):
-        return _spaced(f"{spoken(soon[2])} {_span(soon[0] - now)}后开始{_there(soon[2])}。")
+        return _spaced(f"{spoken(soon[2])} {_span(soon[0] - now)}后开始{_there(soon[2])}。"), True
 
     if current:
         status = f"眼下的{spoken(current[2])}还剩 {_span(current[1] - now)}。"
@@ -133,23 +169,23 @@ def _say(now: datetime, timed: list[Timed], all_day: list[tuple[date, str]]) -> 
         status = "今天后面都空着。"
     for day, name in all_day:
         if today <= day <= tomorrow and IMPORTANT.search(name):
-            return _spaced(f"{_day_word(day, today)}全天：{name}。{status}")
+            return _spaced(f"{_day_word(day, today)}全天：{name}。{status}"), False
     for start, _, event in upcoming:
         if start.date() <= tomorrow and IMPORTANT.search(title(event)):
             when_said = f"{_day_word(start.date(), today)}{_clock(start)}"
-            return _spaced(f"最要紧的是{when_said}：{spoken(event)}{_there(event)}。{status}")
+            return _spaced(f"最要紧的是{when_said}：{spoken(event)}{_there(event)}。{status}"), False
 
     if current:
         left = _span(current[1] - now)
         if soon and soon[0].date() == today:
-            return _spaced(f"{spoken(current[2])}还剩 {left}，之后空到{_clock(soon[0])}。")
-        return _spaced(f"{spoken(current[2])}还剩 {left}，之后今天就没别的了。")
+            return _spaced(f"{spoken(current[2])}还剩 {left}，之后空到{_clock(soon[0])}。"), False
+        return _spaced(f"{spoken(current[2])}还剩 {left}，之后今天就没别的了。"), False
     if soon is None:
-        return "一直到下周日都没有安排。"
+        return "一直到下周日都没有安排。", False
     if soon[0].date() == today:
-        return _spaced(f"接下来 {_span(soon[0] - now)}都空着。{_clock(soon[0])}：{spoken(soon[2])}。")
+        return _spaced(f"接下来 {_span(soon[0] - now)}都空着。{_clock(soon[0])}：{spoken(soon[2])}。"), False
     if soon[0].date() == tomorrow:
-        return _spaced(f"今天后面都空着。明天{_clock(soon[0])}：{spoken(soon[2])}。")
+        return _spaced(f"今天后面都空着。明天{_clock(soon[0])}：{spoken(soon[2])}。"), False
     gap = (soon[0].date() - today).days
     free_days = {(today + timedelta(days=i)).weekday() for i in range(gap)}
     sunday = agenda.this_sunday(today)
@@ -162,30 +198,40 @@ def _say(now: datetime, timed: list[Timed], all_day: list[tuple[date, str]]) -> 
     else:
         head = "这几天都空着"
     next_day = agenda.weekday_word(soon[0].date(), today)
-    return _spaced(f"{head}。{next_day}{_clock(soon[0])}：{spoken(soon[2])}。")
+    return _spaced(f"{head}。{next_day}{_clock(soon[0])}：{spoken(soon[2])}。"), False
 
 
-def today_view(now: datetime, events: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], str]:
-    """同一份日历：他眼前的卡片，和此刻最该说的那一句。"""
+def today_view(
+    now: datetime, events: list[dict[str, Any]], tasks: list[dict[str, Any]] | None = None
+) -> tuple[list[dict[str, Any]], str]:
+    """同一份日历和待办：他眼前的卡片，和此刻最该说的那一句。"""
     timed, all_day = agenda.split(events)
-    return _sections(now, timed, all_day), _say(now, timed, all_day)
+    tasks = tasks or []
+    return _sections(now, timed, all_day, tasks), _say(now, timed, all_day, tasks)
+
+
+def _reason(exc: BaseException, fallback: str) -> str:
+    return str(exc).splitlines()[0] if isinstance(exc, RuntimeError) else fallback
 
 
 async def presence_input() -> tuple[dict[str, Any], str]:
-    """返回（卡片，那一句）；日历没读到时卡片上写原因，那一句为空。"""
+    """返回（卡片，那一句）；日历没读到时卡片上写原因，那一句为空。日历和待办同时读。"""
     now = effective_now()
     name = his_name()
     card: dict[str, Any] = {"hello": f"{greeting(now)}，{name}" if name else greeting(now), "sections": [], "error": ""}
 
-    try:
-        events, _ = await asyncio.to_thread(agenda.read, CARD_FRESH_S)
-    except RuntimeError as exc:
-        card["error"] = str(exc).splitlines()[0]
+    calendar, todo = await asyncio.gather(
+        asyncio.to_thread(agenda.read, CARD_FRESH_S),
+        asyncio.to_thread(todos.read, CARD_FRESH_S),
+        return_exceptions=True,
+    )
+    if isinstance(calendar, BaseException):
+        card["error"] = _reason(calendar, "日历这次没读到。")
         return card, ""
-    except Exception:  # noqa: BLE001
-        card["error"] = "日历这次没读到。"
-        return card, ""
-    card["sections"], say = today_view(now, events)
+    tasks = [] if isinstance(todo, BaseException) else todo[0]
+    card["sections"], say = today_view(now, calendar[0], tasks)
+    if isinstance(todo, BaseException):
+        card["sections"].append({"label": "待办", "meta": "", "rows": [], "empty": _reason(todo, "这次没读到。")})
     return card, say
 
 

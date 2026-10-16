@@ -16,6 +16,7 @@ def remember_fact(content: str, tags: str = "", replaces: str = "") -> dict[str,
     他说「记住…」、或顺带说出关于自己的长期事实/偏好时调用。
     他纠正一条已有记忆时，用 replaces 传旧记忆的 id，新事实直接替换旧的（纠正不需要确认）。
     不要写入密码、一次性的事、或你自己的推测。
+    要去做的事（「记得买牛奶」「提醒我交房租」）不是关于他的事实，不用这个工具：有 add_task 就用 add_task。
 
     Args:
         content: 一句完整的事实，脱离上下文也能看懂。

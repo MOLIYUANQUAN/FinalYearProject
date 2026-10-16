@@ -247,6 +247,7 @@
       color: var(--soft);
       border-color: var(--line);
     }
+    .actions .hint { margin-left: 0; }
     .details {
       margin-top: 6px;
       font-family: var(--mono);
@@ -333,6 +334,8 @@
       search_memory: "回想",
       remember_fact: "记下",
       forget_fact: "忘掉",
+      add_task: "记下",
+      complete_task: "划掉",
     };
 
     const logEl = document.getElementById("log");
@@ -477,6 +480,33 @@
       div.appendChild(bar);
     }
 
+    // 记下或划掉的待办不先问他，只在下面放一个「撤销」：直接撤回，不经过模型
+    function addUndo(div, m) {
+      const bar = el("div", "actions");
+      const b = el("button", "secondary", "撤销");
+      b.type = "button";
+      b.onclick = async () => {
+        b.disabled = true;
+        try {
+          const res = await fetch("/api/undo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ items: m.undo }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.detail || "没撤销成功。");
+          m.undone = true;
+          m.content += "（已撤销）";
+          saveSession();
+          bar.replaceChildren(el("span", "hint", "已撤销"));
+        } catch (e) {
+          bar.replaceChildren(el("span", "hint", (e && e.message) || String(e)));
+        }
+      };
+      bar.append(b);
+      div.appendChild(bar);
+    }
+
     function clearActions() {
       logEl.querySelectorAll(".actions").forEach((el) => el.remove());
     }
@@ -487,7 +517,9 @@
         const div = addMessage(m.role === "user" ? "user" : "bot", m.agenda ? null : m.content);
         if (m.agenda) drawToday(div, m.agenda).innerHTML = render(m.content);
         if (m.tools && m.tools.length) addDetails(div, m.tools);
-        if (m.needsConfirm && i === session.messages.length - 1) addConfirm(div);
+        const last = i === session.messages.length - 1;
+        if (m.needsConfirm && last) addConfirm(div);
+        if (m.undo && m.undo.length && !m.undone && last) addUndo(div, m);
       });
       scrollDown();
     }
@@ -537,7 +569,7 @@
             text = "";
             showTyping(view.el, HINTS[ev.name]);
           } else if (ev.type === "done") {
-            result = { reply: ev.reply || text, tools: ev.tools_called || [] };
+            result = { reply: ev.reply || text, tools: ev.tools_called || [], undo: ev.undo || [] };
           } else if (ev.type === "error") {
             throw new Error(ev.message);
           }
@@ -547,12 +579,14 @@
       return result;
     }
 
-    function finish(div, reply, tools) {
+    function finish(div, reply, tools, undo = []) {
       div.innerHTML = render(reply);
       const needsConfirm = tools.includes("request_user_confirmation");
+      const m = { role: "assistant", content: reply, tools, needsConfirm, undo };
       if (tools.length) addDetails(div, tools);
       if (needsConfirm) addConfirm(div);
-      session.messages.push({ role: "assistant", content: reply, tools, needsConfirm });
+      if (undo.length) addUndo(div, m);
+      session.messages.push(m);
       saveSession();
       scrollDown();
     }
@@ -639,12 +673,12 @@
       const div = addMessage("bot");
       showTyping(div);
       try {
-        const { reply, tools } = await stream(
+        const { reply, tools, undo } = await stream(
           "/api/chat/stream",
           { message, history, pending_confirmation: pending },
           { el: div },
         );
-        finish(div, reply, tools);
+        finish(div, reply, tools, undo);
       } catch (e) {
         fail(div, e);
       } finally {

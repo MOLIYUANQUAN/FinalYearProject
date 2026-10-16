@@ -4,6 +4,10 @@ from .files import read_file, search_files
 from .mail import modify_email, read_email, search_emails, send_email
 from .memory import forget_fact, remember_fact, search_memory
 from .personal import get_personal_context
+from .tasks import add_task, complete_task
+
+# 待办接入了才给模型：没接入时它连「待办」这个词都不该提
+TASK_TOOLS = [add_task, complete_task]
 
 ALL_TOOLS = [
     get_calendar_events,
@@ -35,5 +39,8 @@ __all__ = [
     "search_memory",
     "forget_fact",
     "request_user_confirmation",
+    "add_task",
+    "complete_task",
     "ALL_TOOLS",
+    "TASK_TOOLS",
 ]

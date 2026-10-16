@@ -21,7 +21,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from src import agenda, usage_log
+from src import agenda, todos, usage_log
 from src.agent import run_assistant, stream_assistant
 from src.presence import stream_presence
 from src.config import (
@@ -31,6 +31,7 @@ from src.config import (
     effective_tomorrow,
     get_calendar_backend,
     get_mail_backend,
+    get_tasks_backend,
     require_openai_api_key,
 )
 from src.context import weekday_zh
@@ -65,6 +66,10 @@ async def lifespan(_app: FastAPI):
         print(f"[WARN] {exc}")
     try:
         print(f"[OK] MAIL_BACKEND={get_mail_backend()}")
+    except RuntimeError as exc:
+        print(f"[WARN] {exc}")
+    try:
+        print(f"[OK] TASKS_BACKEND={get_tasks_backend()}")
     except RuntimeError as exc:
         print(f"[WARN] {exc}")
     _warm = asyncio.create_task(asyncio.to_thread(_warm_calendar)) if backend == "google" else None
@@ -209,6 +214,27 @@ def calendar_warm() -> Response:
     """窗口被叫回时先把日历读好：他打完字，这一轮就不用再等日历。"""
     agenda.refresh_soon()
     return Response(status_code=204)
+
+
+class UndoItem(BaseModel):
+    kind: str = Field(..., pattern="^(task_added|task_completed|task_due_changed)$")
+    id: str = Field(..., min_length=1)
+    due: str | None = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+
+class UndoRequest(BaseModel):
+    items: list[UndoItem] = Field(..., min_length=1)
+
+
+@app.post("/api/undo")
+def undo(body: UndoRequest) -> dict:
+    """他点了「撤销」：直接撤回刚才那一步，不经过模型。"""
+    try:
+        todos.undo([item.model_dump() for item in body.items])
+    except Exception as exc:  # noqa: BLE001
+        reason = str(exc).splitlines()[0] if isinstance(exc, RuntimeError) else "待办这次没连上"
+        raise HTTPException(status_code=502, detail=f"没撤销成功：{reason}") from exc
+    return {"ok": True}
 
 
 @app.post("/api/chat/stream")

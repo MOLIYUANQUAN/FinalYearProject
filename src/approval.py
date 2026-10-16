@@ -22,6 +22,9 @@ TOOL_POLICIES: dict[str, ToolPolicy] = {
     "request_user_confirmation": "allow",
     "create_calendar_event": "require_confirmation",
     "send_email": "require_confirmation",
+    # 待办只进他自己的清单、随时能撤回：直接做，页面给「撤销」
+    "add_task": "allow",
+    "complete_task": "allow",
 }
 
 WRITE_ACTION_TYPES = {
