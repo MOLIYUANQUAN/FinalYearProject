@@ -8,7 +8,8 @@ Manchester CS Final Year Project（Jia jimmy）的 **Baseline** 可运行骨架�
 **复现与验收说明：** [docs/baseline-v1.md](docs/baseline-v1.md)  
 **Evaluation 对照证据：** [docs/evaluation/](docs/evaluation/)  
 **真实日历（可选）：** [docs/google-calendar-setup.md](docs/google-calendar-setup.md) — 默认仍为 mock  
-**Application Calendar 说明：** [docs/application-calendar-v1.md](docs/application-calendar-v1.md)
+**Application Calendar 说明：** [docs/application-calendar-v1.md](docs/application-calendar-v1.md)  
+**Personal 薄层：** [docs/application-personal-v1.md](docs/application-personal-v1.md)
 
 ## 成功标准
 
@@ -29,11 +30,13 @@ Manchester CS Final Year Project（Jia jimmy）的 **Baseline** 可运行骨架�
 - FastAPI + 单页静态 HTML
 - 本地数据：`data/calendar.json`、`data/notes/*.md`
 
-## 工具（仅此三个）
+## 工具
 
-1. `get_calendar_events` — 按日期/时段查本地日历  
+1. `get_calendar_events` — 查日历（mock 或 Google selected）  
 2. `search_files` — 在 `data/notes/` 关键词搜索  
 3. `read_file` — 读取笔记全文  
+4. `get_personal_context` — 读取 `data/personal/profile.md`  
+5. `request_user_confirmation` — 写操作前请求确认  
 
 ## 「明天」如何解析（重要）
 

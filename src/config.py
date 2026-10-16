@@ -12,6 +12,8 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT_DIR / "data"
 CALENDAR_PATH = DATA_DIR / "calendar.json"
 NOTES_DIR = DATA_DIR / "notes"
+PERSONAL_DIR = DATA_DIR / "personal"
+PROFILE_PATH = PERSONAL_DIR / "profile.md"
 STATIC_DIR = ROOT_DIR / "static"
 SECRETS_DIR = ROOT_DIR / "secrets"
 
