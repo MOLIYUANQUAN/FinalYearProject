@@ -297,7 +297,11 @@
         const data = await res.json().catch(() => ({}));
         thinking.remove();
         if (!res.ok) {
-          append("error", data.detail || ("就绪失败：" + res.status));
+          const hint =
+            res.status === 404
+              ? "开场接口不存在：请停掉旧服务后重新运行 .\\scripts\\start.ps1，再 Ctrl+F5。"
+              : (data.detail || ("就绪失败：" + res.status));
+          append("error", hint);
           return;
         }
         // 开场不把系统提示塞进可见 user 气泡；历史只保留助手态势
