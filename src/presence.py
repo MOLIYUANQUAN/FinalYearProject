@@ -60,7 +60,9 @@ def _clock(moment: datetime) -> str:
 def _spaced(text: str) -> str:
     """中文和英文、数字之间留一个空格。"""
     text = re.sub(r"([\u4e00-\u9fff])([A-Za-z0-9])", r"\1 \2", text)
-    return re.sub(r"([A-Za-z0-9])([\u4e00-\u9fff])", r"\1 \2", text)
+    text = re.sub(r"([A-Za-z])([\u4e00-\u9fff])", r"\1 \2", text)
+    # 数字和后面的「点」「分钟」之间用不换行空格：换行时不会把「6 点」拆成两行
+    return re.sub(r"([0-9]) ?([\u4e00-\u9fff])", "\\1\u00a0\\2", text)
 
 
 def _row(event: dict[str, Any], start: datetime, end: datetime | None, *, now: bool = False) -> dict[str, Any]:
