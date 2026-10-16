@@ -207,7 +207,7 @@
     /** @type {{role: string, content: string}[]} */
     const history = [];
 
-    function append(role, text, extra) {
+    function append(role, text, extra, actions) {
       const div = document.createElement("div");
       div.className = "msg " + role;
       div.textContent = text;
@@ -216,6 +216,20 @@
         t.className = "tools";
         t.textContent = extra;
         div.appendChild(t);
+      }
+      if (actions && actions.length) {
+        const bar = document.createElement("div");
+        bar.className = "tools";
+        actions.forEach((a) => {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.textContent = a.label;
+          b.style.marginRight = "8px";
+          b.style.marginTop = "8px";
+          b.onclick = () => chat(a.message);
+          bar.appendChild(b);
+        });
+        div.appendChild(bar);
       }
       logEl.appendChild(div);
       logEl.scrollTop = logEl.scrollHeight;
@@ -265,7 +279,14 @@
         const tools = (data.tools_called || []).length
           ? "工具调用：" + data.tools_called.join(" → ")
           : "工具调用：（无）";
-        append("bot", data.reply, tools);
+        const needsConfirm = (data.tools_called || []).includes("request_user_confirmation");
+        const actions = needsConfirm
+          ? [
+              { label: "确认创建", message: "确认" },
+              { label: "取消", message: "取消，先不要创建。" },
+            ]
+          : null;
+        append("bot", data.reply, tools, actions);
       } catch (e) {
         thinking.remove();
         append("error", "网络或服务错误：" + e.message);
@@ -298,7 +319,7 @@
     });
 
     refreshHealth();
-    append("system", "试试上方三条 Demo，或直接输入问题。");
+    append("system", "多轮对话已开启。创建日程时会出现「确认创建」按钮；请硬刷新页面（Ctrl+F5）以免用到旧缓存。");
   </script>
 </body>
 </html>

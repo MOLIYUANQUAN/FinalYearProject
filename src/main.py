@@ -72,7 +72,14 @@ class ChatResponse(BaseModel):
 
 @app.get("/")
 def index() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+    # 避免浏览器缓存旧 JS（否则多轮 history / 确认闭环会失效）
+    return FileResponse(
+        STATIC_DIR / "index.html",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "Pragma": "no-cache",
+        },
+    )
 
 
 @app.get("/api/health")

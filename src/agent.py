@@ -98,6 +98,43 @@ def _history_to_input(
     return items
 
 
+_CONFIRM_REPLIES = {
+    "确认",
+    "同意",
+    "创建吧",
+    "确认创建",
+    "好的",
+    "可以",
+    "ok",
+    "OK",
+    "yes",
+    "Yes",
+}
+
+
+def _expand_short_confirmation(
+    message: str,
+    history: list[dict[str, str]] | None,
+) -> str:
+    """短回复「确认」时补全上下文，避免模型装作不知道在确认什么。"""
+    text = message.strip()
+    if text not in _CONFIRM_REPLIES or not history:
+        return message
+    last_assistant = next(
+        (h["content"] for h in reversed(history) if h.get("role") == "assistant"),
+        "",
+    )
+    if not last_assistant:
+        return message
+    if "创建" not in last_assistant and "确认" not in last_assistant:
+        return message
+    return (
+        f"{text}。请根据你上一轮提出的方案立刻执行："
+        f"调用 create_calendar_event(..., user_confirmed=True)。"
+        f"不要再追问「确认什么」。上一轮你说：{last_assistant}"
+    )
+
+
 async def run_assistant(
     message: str,
     *,
@@ -106,6 +143,7 @@ async def run_assistant(
 ) -> dict:
     """运行一轮助手；可带多轮 history 以支持确认闭环。"""
     agent = create_assistant()
+    message = _expand_short_confirmation(message, history)
     result = await Runner.run(
         agent,
         _history_to_input(message, history),
