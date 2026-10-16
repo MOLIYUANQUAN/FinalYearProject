@@ -616,11 +616,12 @@
       if (ready) await presence();
     }
 
-    // 叫回窗口：光标回到输入框；放久了，开场换成此刻的
+    // 叫回窗口：光标回到输入框；放久了，开场换成此刻的；否则趁他打字先把日历读好
     async function onReturn() {
       if (document.visibilityState !== "visible" || busy || !session) return;
       input.focus();
       if (!ready || expired(session) || onlyStaleOpener(session)) await startOver();
+      else fetch("/api/calendar/warm", { method: "POST" }).catch(() => {});
     }
 
     async function ask(message) {

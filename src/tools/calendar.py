@@ -6,6 +6,7 @@ from typing import Any
 
 from agents import function_tool
 
+from src import agenda
 from src.calendar_providers import get_calendar_provider
 from src.calendar_providers.common import TimeOfDay, is_background_span
 
@@ -86,7 +87,7 @@ def create_calendar_event(
         return {"ok": False, "error": "create_not_supported"}
 
     try:
-        return create(
+        created = create(
             title=title,
             start=start,
             end=end,
@@ -95,3 +96,5 @@ def create_calendar_event(
         )
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": "create_failed", "message": str(exc)}
+    agenda.forget()
+    return created

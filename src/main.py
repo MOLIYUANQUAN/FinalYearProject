@@ -16,12 +16,12 @@ if str(ROOT) not in sys.path:
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from src import usage_log
+from src import agenda, usage_log
 from src.agent import run_assistant, stream_assistant, stream_presence
 from src.config import (
     STATIC_DIR,
@@ -201,6 +201,13 @@ async def presence_stream() -> StreamingResponse:
     """打开时的「今天」：真实日历排成的卡片，加一句此刻最该知道的话。"""
     _require_key()
     return _sse("presence", stream_presence())
+
+
+@app.post("/api/calendar/warm", status_code=204)
+def calendar_warm() -> Response:
+    """窗口被叫回时先把日历读好：他打完字，这一轮就不用再等日历。"""
+    agenda.refresh_soon()
+    return Response(status_code=204)
 
 
 @app.post("/api/chat/stream")

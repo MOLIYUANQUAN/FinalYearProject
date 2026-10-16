@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from typing import Any
 
 from agents import Agent, ModelSettings, Runner, RunResult
 from openai.types.responses import ResponseTextDeltaEvent
 
+from src.agenda import chat_block
 from src.config import (
     DEFAULT_MODEL,
     PRESENCE_MODEL,
@@ -34,7 +36,7 @@ VOICE = """你叫 Friday，是他的个人代理，只为他一个人工作。�
 
 事实：
 - 日程、邮件、文件内容只能来自工具结果或下面给出的数据。没有就说没有，读不到就说读不到；绝不编造时间、地点、人名或邮件内容。
-- 说他哪天有什么安排之前，必须有这次对话里读到的日历结果；档案里的习惯不是日程。
+- 说他哪天有什么安排，只能依据下面的「日历」或 get_calendar_events 的结果；档案里的习惯不是日程。
 - 搜到的东西和问题无关时，直说没找到相关的，不要把无关结果当答案。
 
 记住他：
@@ -64,17 +66,18 @@ def _connections_line() -> str:
     return f"已接入：{connected}。没接入的账户就直说没接入。"
 
 
-def build_instructions() -> str:
-    return "\n\n".join(
-        [VOICE, now_block(), _connections_line(), profile_block(), memory_block()]
-    )
+def build_instructions(calendar: str = "") -> str:
+    parts = [VOICE, now_block(), _connections_line(), calendar, profile_block(), memory_block()]
+    return "\n\n".join(part for part in parts if part)
 
 
-def create_assistant(*, tools: list[Any] | None = None, model: str = DEFAULT_MODEL) -> Agent:
+def create_assistant(
+    *, tools: list[Any] | None = None, model: str = DEFAULT_MODEL, calendar: str = ""
+) -> Agent:
     require_openai_api_key()
     return Agent(
         name="Friday",
-        instructions=build_instructions(),
+        instructions=build_instructions(calendar),
         tools=ALL_TOOLS if tools is None else tools,
         model=model,
         model_settings=ModelSettings(temperature=0.2),
@@ -167,7 +170,7 @@ async def run_assistant(
     max_turns: int = 12,
 ) -> dict:
     """运行一轮助手（非流式，供 CLI / 评测）。"""
-    agent = create_assistant()
+    agent = create_assistant(calendar=await asyncio.to_thread(chat_block))
     message = _expand_short_confirmation(message, history, pending_confirmation)
     result = await Runner.run(
         agent,
@@ -218,7 +221,7 @@ async def stream_assistant(
     pending_confirmation: bool = False,
     max_turns: int = 12,
 ) -> AsyncIterator[dict[str, Any]]:
-    agent = create_assistant()
+    agent = create_assistant(calendar=await asyncio.to_thread(chat_block))
     message = _expand_short_confirmation(message, history, pending_confirmation)
     async for event in _stream(agent, _history_to_input(message, history), max_turns=max_turns):
         yield event
