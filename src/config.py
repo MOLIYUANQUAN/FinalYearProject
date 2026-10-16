@@ -16,6 +16,8 @@ PERSONAL_DIR = DATA_DIR / "personal"
 PROFILE_PATH = PERSONAL_DIR / "profile.md"
 MAIL_DIR = DATA_DIR / "mail"
 MAIL_MOCK_PATH = MAIL_DIR / "messages.json"
+MEMORY_DIR = DATA_DIR / "memory"
+MEMORY_FACTS_PATH = MEMORY_DIR / "facts.json"
 STATIC_DIR = ROOT_DIR / "static"
 SECRETS_DIR = ROOT_DIR / "secrets"
 

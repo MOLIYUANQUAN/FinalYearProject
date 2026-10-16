@@ -22,9 +22,13 @@
 - Integration demo uses personal Gmail (read/modify/send)
 - Search mail for FYP / mentor when preparing meetings
 
+## Memory
+- Dynamic facts go to local memory tools (remember_fact / search_memory), not only this profile file
+- Prefer recalling mentor email / standing preferences from memory when preparing meetings
+
 ## Autonomy / Approval
-- Allowed without asking: read calendar, read mail, mark mail read, search/read local notes, draft briefs
-- Must ask before doing: create calendar events, send email, archive/trash mail, share files, any irreversible action
+- Allowed without asking: read calendar, read mail, mark mail read, search/read notes, remember facts, draft briefs
+- Must ask before doing: create calendar events, send email, archive/trash mail, forget memory, share files
 - If unsure whether an action is risky, ask
 
 ## Working style

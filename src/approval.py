@@ -16,6 +16,9 @@ TOOL_POLICIES: dict[str, ToolPolicy] = {
     "read_email": "allow",
     "modify_email": "require_confirmation",  # archive/trash 工具内再细分
     "get_personal_context": "allow",
+    "remember_fact": "allow",
+    "search_memory": "allow",
+    "forget_fact": "require_confirmation",
     "request_user_confirmation": "allow",
     "create_calendar_event": "require_confirmation",
     "send_email": "require_confirmation",
@@ -29,6 +32,7 @@ WRITE_ACTION_TYPES = {
     "modify_email",
     "archive_email",
     "trash_email",
+    "forget_fact",
     "share_file",
     "other_write",
 }

@@ -34,14 +34,14 @@ def build_instructions() -> str:
 2. 可以串联多次工具调用：日历、邮件、文件可组合。
 3. 工具结果不足时如实说明，不要假装知道。
 4. 用简洁中文回复（除非用户用英文提问）。
-5. 需要按用户习惯个性化时，先调用 get_personal_context。
-6. 写操作流程（日历创建、发邮件、归档/删除邮件）必须遵守：
+5. 个性化时：先 get_personal_context，再 search_memory 取动态事实；不要编造记忆。
+6. 用户说「记住…」时调用 remember_fact；删除记忆须先确认再 forget_fact。
+7. 写操作流程（日历创建、发邮件、归档/删除邮件、删除记忆）必须遵守：
    a) 先 request_user_confirmation，清楚说明将做什么；
    b) 等待用户明确同意（如「确认」「同意」「发送吧」）；
    c) 同意后再调用对应工具且 user_confirmed=True；
-   d) 未同意前禁止声称已创建/已发送/已删除。
-7. 邮件：search_emails / read_email / mark_read 可直接做；
-   发送 send_email、archive/trash 必须先确认。
+   d) 未同意前禁止声称已完成。
+8. 邮件：search/read/mark_read 可直接做；发送与 archive/trash 必须先确认。
 
 {date_note}
 - 今天是 {today}
@@ -53,12 +53,13 @@ def build_instructions() -> str:
 
 可用工具：
 - get_calendar_events / create_calendar_event（创建需确认）
-- search_emails / read_email / send_email（发送需确认）/ modify_email
+- search_emails / read_email / send_email / modify_email
 - search_files / read_file
 - get_personal_context
+- remember_fact / search_memory / forget_fact（删除需确认）
 - request_user_confirmation
 
-准备会议时：按需 get_personal_context → 查日历 → 搜相关邮件 → 读提案/笔记 → meeting brief。
+准备会议时：get_personal_context → search_memory → 查日历 → 搜邮件 → 读笔记 → brief。
 """
 
 
@@ -131,9 +132,13 @@ def _expand_short_confirmation(
     )
     if not last_assistant:
         return message
-    if not any(k in last_assistant for k in ("创建", "确认", "发送", "邮件", "归档", "删除")):
+    if not any(
+        k in last_assistant for k in ("创建", "确认", "发送", "邮件", "归档", "删除", "忘记", "记忆")
+    ):
         return message
-    if any(k in last_assistant for k in ("发送", "邮件", "发信")):
+    if any(k in last_assistant for k in ("忘记", "删除记忆", "forget")):
+        action = "forget_fact(..., user_confirmed=True)"
+    elif any(k in last_assistant for k in ("发送", "邮件", "发信", "归档")):
         action = "send_email(..., user_confirmed=True) 或 modify_email(..., user_confirmed=True)"
     else:
         action = "create_calendar_event(..., user_confirmed=True)"

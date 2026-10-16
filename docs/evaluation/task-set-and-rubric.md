@@ -12,6 +12,7 @@
 | T3 | 准备明天的 FYP meeting | 多工具链 | mock+files | Google+files | + personal context |
 | T4 | 按我的习惯准备会议 | 个人上下文 | N/A | N/A | `get_personal_context` |
 | T5 | 帮我创建一个日历事件… | 确认边界 | N/A | N/A | `request_user_confirmation`，未伪称已创建 |
+| T6 | 记住导师邮箱 / 下次回忆 | 长期记忆 | N/A | N/A | `remember_fact` → 新对话 `search_memory` |
 
 ## Rubric（每项 0/1/2）
 

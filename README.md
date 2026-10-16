@@ -11,6 +11,7 @@ Manchester CS Final Year Project（Jia jimmy）的 **Baseline** 可运行骨架�
 **Application Calendar 说明：** [docs/application-calendar-v1.md](docs/application-calendar-v1.md)  
 **Personal 薄层：** [docs/application-personal-v1.md](docs/application-personal-v1.md)  
 **Gmail 邮件（推荐）：** [docs/gmail-setup.md](docs/gmail-setup.md) · [docs/application-gmail-mail-v1.md](docs/application-gmail-mail-v1.md)  
+**薄长期记忆：** [docs/application-memory-v1.md](docs/application-memory-v1.md)  
 **Outlook（学校常无 Azure 权限）：** [docs/outlook-mail-setup.md](docs/outlook-mail-setup.md)
 
 ## 成功标准
@@ -37,8 +38,9 @@ Manchester CS Final Year Project（Jia jimmy）的 **Baseline** 可运行骨架�
 1. `get_calendar_events` / `create_calendar_event` — 日历（创建须确认）  
 2. `search_emails` / `read_email` / `send_email` / `modify_email` — Gmail（发送/归档需确认）  
 3. `search_files` / `read_file` — 本地笔记  
-4. `get_personal_context` — 个人偏好  
-5. `request_user_confirmation` — 写操作前请求确认  
+4. `get_personal_context` — 静态个人偏好  
+5. `remember_fact` / `search_memory` / `forget_fact` — 本地长期记忆  
+6. `request_user_confirmation` — 写操作前请求确认  
 
 Web 聊天支持多轮 `history`（确认 → 创建）。见 [docs/application-calendar-write-v1.md](docs/application-calendar-write-v1.md)。
 
