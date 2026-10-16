@@ -81,14 +81,19 @@ cp .env.example .env
 
 ### 3. 打开
 
-双击仓库根目录的 **`Friday.cmd`**：Friday 在独立窗口里打开，先开口告诉你此刻最该知道的事。服务已经在跑且代码没变就不重启；窗口已经开着就直接拿到最前面。
+第一次运行一下，桌面和开始菜单里就有 Friday，开机后它会在后台准备好：
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\open_agent.py              # 同上（命令行）
-.\.venv\Scripts\python.exe scripts\open_agent.py --no-window  # 只确保服务在跑
-.\.venv\Scripts\python.exe scripts\open_agent.py --restart    # 强制重启服务
-.\.venv\Scripts\python.exe scripts\open_agent.py --stop       # 停止
-.\.venv\Scripts\python.exe scripts\usage_report.py            # Tuesday test：最近 7 天用了几天、首字多快
+.\.venv\Scripts\python.exe scripts\install_shortcuts.py
+```
+
+之后按 **Ctrl+Alt+F**：Friday 在独立窗口里出现，先开口告诉你此刻最该知道的事；它在最前面时再按一次就收起。也可以点桌面上的 Friday，或者双击仓库里的 `Friday.cmd`。服务在跑且代码没变就直接用，代码变了才换新进程。
+
+```powershell
+.\.venv\Scripts\python.exe scripts\install_shortcuts.py --remove  # 撤掉快捷方式和开机常驻
+.\.venv\Scripts\python.exe scripts\open_agent.py --restart        # 强制重启服务
+.\.venv\Scripts\python.exe scripts\open_agent.py --stop           # 停掉服务和快捷键
+.\.venv\Scripts\python.exe scripts\usage_report.py                # Tuesday test：最近 7 天用了几天、首字多快
 ```
 
 ### 4. 可选 CLI 三条 Demo
