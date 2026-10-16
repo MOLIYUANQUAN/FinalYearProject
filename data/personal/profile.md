@@ -4,6 +4,7 @@
 - Name: Jimmy (Zepeng Jia)
 - Role: University of Manchester CS Year 3, doing FYP
 - FYP: Personal AI Assistant (single-agent + tools)
+- FYP supervisor / mentor: Wang Zhipeng (王志鹏)
 
 ## Preferences
 - Prefer short Chinese replies; lead with the answer
