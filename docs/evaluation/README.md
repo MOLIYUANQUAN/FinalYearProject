@@ -8,6 +8,7 @@
 | [baseline-v1-checklist.md](baseline-v1-checklist.md) | Baseline | 人工验收清单 |
 | [application-calendar-v1-runs.json](application-calendar-v1-runs.json) | Application | Google 日历 Demo 轨迹 |
 | [application-calendar-v1-checklist.md](application-calendar-v1-checklist.md) | Application | Google 日历验收 |
+| [task-set-and-rubric.md](task-set-and-rubric.md) | Evaluation | 固定任务集与评分维度 |
 
 ```bash
 # Baseline（建议 CALENDAR_BACKEND=mock）
