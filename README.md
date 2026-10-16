@@ -2,7 +2,7 @@
 
 Manchester CS FYP（Jimmy）：**单一 Personal Agent** — 认识你、盯住生活碎片、带主见回应。
 
-> **计划与进度（先读这个）：** [docs/plan.md](docs/plan.md) · **产品北星：** [docs/product-north-star.md](docs/product-north-star.md)  
+> **计划与进度（先读这个）：** [docs/plan.md](docs/plan.md) · **工程记录：** [docs/engineering-log.md](docs/engineering-log.md)  
 > 成功标准是 Tuesday test（普通周二愿不愿意打开），不是 Demo 分数。评测扩写 / 合 `main` / 新 tag 在爱用门禁通过前冻结。
 
 **学术路线：** Baseline → Application → Evaluation（证据见 [docs/evaluation/](docs/evaluation/)，当前冻结）  

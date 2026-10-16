@@ -2,7 +2,7 @@
 
 本目录存放各阶段可复现的运行证据，供报告对比使用。
 
-> **冻结说明（产品门禁）：** 在 [product-north-star.md](../product-north-star.md) 的 Tuesday test 通过前，不新增评测任务、不合 `main`、不打新 milestone tag。现有 baseline / calendar / application-layer 证据保留不动。
+> **冻结说明（产品门禁）：** 在 [plan.md](../plan.md) 的周二测试通过前（细节见[工程记录](../engineering-log.md#评测冻结)），不新增评测任务、不合 `main`、不打新 milestone tag。现有 baseline / calendar / application-layer 证据保留不动。
 
 | 文件 | 阶段 | 说明 |
 |------|------|------|
