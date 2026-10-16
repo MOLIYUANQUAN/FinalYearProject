@@ -168,8 +168,11 @@ def _sse(kind: str, events: AsyncIterator[dict[str, Any]]) -> StreamingResponse:
         ok = True
         try:
             async for event in events:
-                if event["type"] == "delta" and first_token_ms is None:
+                # 开场的安排卡片和文字一样，是他最先看到的内容
+                if event["type"] in ("delta", "agenda") and first_token_ms is None:
                     first_token_ms = int((time.perf_counter() - started) * 1000)
+                if event["type"] == "agenda" and event.get("error"):
+                    ok = False
                 elif event["type"] == "done":
                     tools = list(event.get("tools_called") or [])
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
@@ -195,7 +198,7 @@ def _sse(kind: str, events: AsyncIterator[dict[str, Any]]) -> StreamingResponse:
 
 @app.post("/api/presence/stream")
 async def presence_stream() -> StreamingResponse:
-    """打开时的第一句话：此刻 + 今明两天的真实日历。"""
+    """打开时的「今天」：真实日历排成的卡片，加一句此刻最该知道的话。"""
     _require_key()
     return _sse("presence", stream_presence())
 

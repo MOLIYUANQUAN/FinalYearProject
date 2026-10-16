@@ -10,8 +10,10 @@ TimeOfDay = Literal["morning", "afternoon", "evening", "all"]
 
 def hour_from_iso(iso: str) -> int:
     # 支持带 Z / 偏移的 ISO；取本地展示用的小时
-    normalized = iso.replace("Z", "+00:00")
-    return datetime.fromisoformat(normalized).hour
+    value = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    if value.tzinfo is not None:
+        value = value.astimezone()
+    return value.hour
 
 
 def in_time_of_day(start_iso: str, time_of_day: TimeOfDay | str) -> bool:

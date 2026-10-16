@@ -15,6 +15,7 @@ from src.config import (
 
 # 读日历列表 + 读写事件；比旧版 readonly 更大，升级后需重新授权
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
+SIGN_IN_AGAIN = "Google 日历需要重新登录：运行 scripts\\auth_google_calendar.py。"
 
 # 日历列表几乎不变，每次都拉一遍要多等一个来回
 CALENDAR_LIST_TTL_S = 600
@@ -172,8 +173,12 @@ def _resolve_calendars(service, setting: str) -> list[dict[str, str]]:
 
 
 def _event_datetime(payload: dict[str, Any]) -> str | None:
+    # 导入的课表给的是 UTC（…Z）：一律换成本地钟点，否则夏令时里每节课都早一小时
     if payload.get("dateTime"):
-        return str(payload["dateTime"])
+        moment = datetime.fromisoformat(str(payload["dateTime"]).replace("Z", "+00:00"))
+        if moment.tzinfo is not None:
+            moment = moment.astimezone().replace(tzinfo=None)
+        return moment.isoformat(timespec="minutes")
     if payload.get("date"):
         return f"{payload['date']}T00:00:00"
     return None
@@ -184,7 +189,7 @@ def _scopes_sufficient(creds) -> bool:
     return set(SCOPES).issubset(granted)
 
 
-def _build_service():
+def _build_service(*, interactive: bool = False):
     try:
         from google.auth.transport.requests import Request
         from google.oauth2.credentials import Credentials
@@ -211,9 +216,10 @@ def _build_service():
             GOOGLE_TOKEN_PATH.unlink(missing_ok=True)
 
     if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token and _scopes_sufficient(creds):
-            creds.refresh(Request())
-        else:
+        if not _refresh(creds, Request):
+            if not interactive:
+                # 服务在后台跑：绝不突然弹出授权页，只告诉他怎么重新登录
+                raise RuntimeError(SIGN_IN_AGAIN)
             flow = InstalledAppFlow.from_client_secrets_file(
                 str(GOOGLE_CREDENTIALS_PATH), SCOPES
             )
@@ -222,6 +228,19 @@ def _build_service():
         GOOGLE_TOKEN_PATH.write_text(creds.to_json(), encoding="utf-8")
 
     return build("calendar", "v3", credentials=creds, cache_discovery=False)
+
+
+def _refresh(creds, request_class) -> bool:
+    """用刷新令牌续上授权；令牌被撤销或过期（测试状态的应用 7 天就过期）时返回 False。"""
+    from google.auth.exceptions import RefreshError
+
+    if not (creds and creds.expired and creds.refresh_token):
+        return False
+    try:
+        creds.refresh(request_class())
+    except RefreshError:
+        return False
+    return True
 
 
 def warm_up() -> None:
@@ -238,7 +257,7 @@ def warm_up() -> None:
 
 def ensure_google_login() -> str:
     """触发一次 OAuth（读写事件权限）。"""
-    _build_service()
+    _build_service(interactive=True)
     return (
         f"Google Calendar authorized (events read/write). Token saved to {GOOGLE_TOKEN_PATH}"
     )

@@ -10,6 +10,7 @@ from openai.types.responses import ResponseTextDeltaEvent
 
 from src.config import (
     DEFAULT_MODEL,
+    PRESENCE_MODEL,
     get_calendar_backend,
     get_mail_backend,
     require_openai_api_key,
@@ -69,13 +70,13 @@ def build_instructions() -> str:
     )
 
 
-def create_assistant(*, tools: list[Any] | None = None) -> Agent:
+def create_assistant(*, tools: list[Any] | None = None, model: str = DEFAULT_MODEL) -> Agent:
     require_openai_api_key()
     return Agent(
         name="Friday",
         instructions=build_instructions(),
         tools=ALL_TOOLS if tools is None else tools,
-        model=DEFAULT_MODEL,
+        model=model,
         model_settings=ModelSettings(temperature=0.2),
     )
 
@@ -224,7 +225,12 @@ async def stream_assistant(
 
 
 async def stream_presence() -> AsyncIterator[dict[str, Any]]:
-    """打开时的第一句话：日历由服务端读好，模型不用工具、一轮说完。"""
-    prompt = await presence_input()
-    async for event in _stream(create_assistant(tools=[]), prompt, max_turns=2):
+    """打开时的「今天」：先把读到的安排交给页面，模型不用工具、一轮说完那句判断。"""
+    card, prompt = await presence_input()
+    yield {"type": "agenda", **card}
+    if prompt is None:
+        # 日历没读到：卡片上已经说了，不再让模型复述一遍
+        yield {"type": "done", "reply": "", "tools_called": []}
+        return
+    async for event in _stream(create_assistant(tools=[], model=PRESENCE_MODEL), prompt, max_turns=2):
         yield event

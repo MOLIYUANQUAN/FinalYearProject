@@ -11,18 +11,46 @@
   <link rel="manifest" href="/static/manifest.json" />
   <style>
     :root {
+      color-scheme: light dark;
       --bg: #f3f0ea;
+      --glow-a: #e4efe9;
+      --glow-b: #efe6d8;
       --ink: #1c1a16;
       --soft: #5c574e;
       --muted: #8f897d;
       --line: #e2dccf;
       --panel: #fffcf7;
       --accent: #0f5c4c;
+      --brand: #0f5c4c;
+      --focus-line: #b9cfc6;
+      --focus-ring: rgba(15, 92, 76, 0.08);
       --danger: #8b2e2e;
+      --danger-bg: #f7e4e4;
+      --danger-line: #e2bcbc;
       --user: #e9e3d7;
       --radius: 12px;
       --font: "IBM Plex Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei UI", "Segoe UI", sans-serif;
       --mono: "IBM Plex Mono", "SF Mono", ui-monospace, monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #151412;
+        --glow-a: #16211e;
+        --glow-b: #211c16;
+        --ink: #ebe6dc;
+        --soft: #bdb6a8;
+        --muted: #8a8478;
+        --line: #2d2a25;
+        --panel: #1d1b18;
+        --accent: #63c2a8;
+        --brand: #16735f;
+        --focus-line: #3d6a5e;
+        --focus-ring: rgba(99, 194, 168, 0.14);
+        --danger: #eaa0a0;
+        --danger-bg: #331f1f;
+        --danger-line: #553131;
+        --user: #2a2722;
+      }
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
@@ -31,8 +59,8 @@
       font-family: var(--font);
       color: var(--ink);
       background:
-        radial-gradient(1200px 500px at 10% -10%, #e4efe9 0%, transparent 55%),
-        radial-gradient(900px 400px at 100% 0%, #efe6d8 0%, transparent 50%),
+        radial-gradient(1200px 500px at 10% -10%, var(--glow-a) 0%, transparent 55%),
+        radial-gradient(900px 400px at 100% 0%, var(--glow-b) 0%, transparent 50%),
         var(--bg);
     }
     main {
@@ -76,6 +104,8 @@
       flex: 1;
       min-height: 0;
       overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--line) transparent;
       display: flex;
       flex-direction: column;
       gap: 14px;
@@ -103,13 +133,78 @@
     .msg.error {
       align-self: stretch;
       max-width: none;
-      background: #f7e4e4;
-      border: 1px solid #e2bcbc;
+      background: var(--danger-bg);
+      border: 1px solid var(--danger-line);
       color: var(--danger);
       padding: 10px 13px;
       border-radius: var(--radius);
     }
     .msg a { color: var(--accent); }
+    .msg.today {
+      align-self: stretch;
+      max-width: none;
+      padding: 15px 18px 14px;
+      white-space: normal;
+    }
+    .today .hello {
+      margin-bottom: 10px;
+      font-size: 1.02rem;
+      font-weight: 600;
+    }
+    .today section + section { margin-top: 10px; }
+    .today h3 {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 0 2px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+    }
+    .today .row {
+      display: grid;
+      grid-template-columns: 6.6em minmax(0, 1fr);
+      column-gap: 10px;
+      padding: 3px 0;
+      line-height: 1.5;
+    }
+    .today time {
+      color: var(--soft);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .today .row.now time { color: var(--accent); font-weight: 600; }
+    .today .tag {
+      margin-left: 8px;
+      color: var(--accent);
+      font-size: 0.78rem;
+    }
+    .today .where {
+      display: block;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .today .empty {
+      margin: 0;
+      padding: 3px 0;
+      color: var(--muted);
+    }
+    .today .say {
+      margin-top: 12px;
+      padding-top: 11px;
+      border-top: 1px solid var(--line);
+      white-space: pre-wrap;
+    }
+    .today .say:empty { display: none; }
+    .today .say.failed { color: var(--danger); }
+    @media (prefers-reduced-motion: no-preference) {
+      .msg, .today > * { animation: rise 0.2s ease-out; }
+      @keyframes rise { from { opacity: 0; transform: translateY(3px); } }
+    }
     .typing {
       display: inline-flex;
       gap: 4px;
@@ -142,8 +237,8 @@
       font-size: 0.9rem;
       padding: 6px 14px;
       border-radius: 8px;
-      border: 1px solid var(--accent);
-      background: var(--accent);
+      border: 1px solid var(--brand);
+      background: var(--brand);
       color: #fff;
       cursor: pointer;
     }
@@ -186,8 +281,8 @@
       outline: none;
     }
     #input:focus {
-      border-color: #b9cfc6;
-      box-shadow: 0 0 0 3px rgba(15, 92, 76, 0.08);
+      border-color: var(--focus-line);
+      box-shadow: 0 0 0 3px var(--focus-ring);
     }
     #send {
       font: inherit;
@@ -196,7 +291,7 @@
       padding: 0 18px;
       border: none;
       border-radius: var(--radius);
-      background: var(--accent);
+      background: var(--brand);
       color: #fff;
       cursor: pointer;
     }
@@ -224,6 +319,7 @@
   <script>
     const STORE_KEY = "pa.session.v1";
     const IDLE_MS = 2 * 60 * 60 * 1000;
+    const CARD_FRESH_MS = 15 * 60 * 1000;
     const HISTORY_LIMIT = 20;
     const HINTS = {
       get_calendar_events: "看日历",
@@ -256,12 +352,21 @@
     }
 
     // 同一天、两小时内回来算同一次会话；否则重新开场
+    function expired(s) {
+      const sameDay = new Date(s.startedAt).toDateString() === new Date().toDateString();
+      return !sameDay || Date.now() - s.lastActiveAt > IDLE_MS;
+    }
+
+    // 只看了开场、还没聊：开场过了一刻钟就换成此刻的
+    function onlyStaleOpener(s) {
+      const [first, ...rest] = s.messages;
+      return !rest.length && !!first && first.role === "assistant" && Date.now() - (first.at || 0) > CARD_FRESH_MS;
+    }
+
     function loadSession() {
       try {
         const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
-        if (!s || !Array.isArray(s.messages)) return null;
-        const sameDay = new Date(s.startedAt).toDateString() === new Date().toDateString();
-        if (!sameDay || Date.now() - s.lastActiveAt > IDLE_MS) return null;
+        if (!s || !Array.isArray(s.messages) || expired(s)) return null;
         return s;
       } catch (e) {
         return null;
@@ -301,6 +406,41 @@
       logEl.appendChild(div);
       scrollDown();
       return div;
+    }
+
+    function el(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text) node.textContent = text;
+      return node;
+    }
+
+    // 卡片上的安排是服务端读到的原样数据，不经过模型；返回写那句判断的位置
+    function drawToday(div, card) {
+      div.className = "msg bot today";
+      div.replaceChildren(el("div", "hello", card.hello));
+      if (card.error) div.append(el("p", "empty", card.error));
+      for (const section of card.sections || []) {
+        const box = el("section");
+        // 空的日子只占一行、退到后面；版面留给真要去的事
+        const head = el("h3");
+        head.append(el("span", "", section.label));
+        const side = section.rows.length ? section.meta : section.empty;
+        if (side) head.append(el("span", "", side));
+        box.append(head);
+        for (const row of section.rows) {
+          const line = el("div", row.now ? "row now" : "row");
+          const what = el("div", "what", row.title);
+          if (row.now) what.append(el("span", "tag", "进行中"));
+          if (row.where) what.append(el("span", "where", row.where));
+          line.append(el("time", "", row.time), what);
+          box.append(line);
+        }
+        div.append(box);
+      }
+      const say = el("div", "say");
+      div.append(say);
+      return say;
     }
 
     function showTyping(div, hint) {
@@ -344,7 +484,8 @@
     function renderSession() {
       logEl.innerHTML = "";
       session.messages.forEach((m, i) => {
-        const div = addMessage(m.role === "user" ? "user" : "bot", m.content);
+        const div = addMessage(m.role === "user" ? "user" : "bot", m.agenda ? null : m.content);
+        if (m.agenda) drawToday(div, m.agenda).innerHTML = render(m.content);
         if (m.tools && m.tools.length) addDetails(div, m.tools);
         if (m.needsConfirm && i === session.messages.length - 1) addConfirm(div);
       });
@@ -356,7 +497,8 @@
       return !!(last && last.role === "assistant" && last.needsConfirm);
     }
 
-    async function stream(url, payload, div) {
+    // view.el 是正在写字的位置；开场的卡片到了以后它会换成卡片里那句判断
+    async function stream(url, payload, view) {
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -384,13 +526,16 @@
           buffer = buffer.slice(cut + 2);
           if (!frame.startsWith("data: ")) continue;
           const ev = JSON.parse(frame.slice(6));
-          if (ev.type === "delta") {
+          if (ev.type === "agenda") {
+            view.onAgenda(ev);
+            scrollDown();
+          } else if (ev.type === "delta") {
             text += ev.text;
-            div.innerHTML = render(text);
+            view.el.innerHTML = render(text);
             scrollDown();
           } else if (ev.type === "tool") {
             text = "";
-            showTyping(div, HINTS[ev.name]);
+            showTyping(view.el, HINTS[ev.name]);
           } else if (ev.type === "done") {
             result = { reply: ev.reply || text, tools: ev.tools_called || [] };
           } else if (ev.type === "error") {
@@ -426,15 +571,56 @@
       setBusy(true);
       const div = addMessage("bot");
       showTyping(div);
+      const view = {
+        el: div,
+        card: null,
+        onAgenda(card) {
+          view.card = card;
+          view.el = drawToday(div, card);
+          showTyping(view.el);
+        },
+      };
       try {
-        const { reply } = await stream("/api/presence/stream", {}, div);
-        finish(div, reply, []);
+        const { reply } = await stream("/api/presence/stream", {}, view);
+        if (!view.card) {
+          finish(div, reply, []);
+          return;
+        }
+        view.el.innerHTML = render(reply);
+        session.messages.push({ role: "assistant", content: reply, tools: [], agenda: view.card, at: Date.now() });
+        saveSession();
+        scrollDown();
       } catch (e) {
-        fail(div, e);
+        if (!view.card) {
+          fail(div, e);
+          return;
+        }
+        // 安排已经在了：那句判断没出来，就在卡片里说一声，卡片照样留着
+        view.el.classList.add("failed");
+        view.el.textContent = (e && e.message) || String(e);
+        session.messages.push({ role: "assistant", content: "", tools: [], agenda: view.card, at: Date.now() });
+        saveSession();
       } finally {
         setBusy(false);
         input.focus();
       }
+    }
+
+    async function startOver() {
+      setBusy(true);
+      session = freshSession();
+      saveSession();
+      logEl.innerHTML = "";
+      ready = await checkHealth();
+      setBusy(false);
+      if (ready) await presence();
+    }
+
+    // 叫回窗口：光标回到输入框；放久了，开场换成此刻的
+    async function onReturn() {
+      if (document.visibilityState !== "visible" || busy || !session) return;
+      input.focus();
+      if (!ready || expired(session) || onlyStaleOpener(session)) await startOver();
     }
 
     async function ask(message) {
@@ -455,7 +641,7 @@
         const { reply, tools } = await stream(
           "/api/chat/stream",
           { message, history, pending_confirmation: pending },
-          div,
+          { el: div },
         );
         finish(div, reply, tools);
       } catch (e) {
@@ -507,22 +693,19 @@
     });
 
     newChatBtn.addEventListener("click", () => {
-      if (busy) return;
-      session = freshSession();
-      saveSession();
-      logEl.innerHTML = "";
-      if (ready) presence();
+      if (!busy) startOver();
     });
 
+    document.addEventListener("visibilitychange", onReturn);
+    window.addEventListener("focus", onReturn);
+
     (async () => {
-      ready = await checkHealth();
       session = loadSession();
-      if (session && session.messages.length) {
+      if (session && session.messages.length && !onlyStaleOpener(session)) {
         renderSession();
+        ready = await checkHealth();
       } else {
-        session = freshSession();
-        saveSession();
-        if (ready) await presence();
+        await startOver();
       }
       input.focus();
     })();
