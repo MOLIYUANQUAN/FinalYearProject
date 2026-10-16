@@ -1,9 +1,10 @@
-"""打开时的「今天」：服务端读真实日历，原样排成卡片；再挑出此刻最该说的一件事，模型只把它说成一句话。"""
+"""打开时的「今天」：服务端读真实日历，原样排成卡片，再算出此刻最该说的那一句。全程不经过模型。"""
 
 from __future__ import annotations
 
 import asyncio
 import re
+from collections.abc import AsyncIterator
 from datetime import date, datetime, timedelta
 from typing import Any
 
@@ -42,9 +43,24 @@ def _place(event: dict[str, Any]) -> str:
     return "在线" if "://" in place else place[:60]
 
 
-def _at(event: dict[str, Any]) -> str:
+def _there(event: dict[str, Any]) -> str:
+    """要赶过去的地方；线上的不用说。"""
     place = _place(event)
-    return f"（{place}）" if place else ""
+    return f"，在{place}" if place and place != "在线" else ""
+
+
+def _clock(moment: datetime) -> str:
+    """说出口的钟点：「中午 12 点」「下午 3 点半」「晚上 7:15」。"""
+    hour, minute = moment.hour, moment.minute
+    period = "凌晨" if hour < 5 else "上午" if hour < 12 else "中午" if hour < 13 else "下午" if hour < 18 else "晚上"
+    tail = "点" if minute == 0 else "点半" if minute == 30 else f":{minute:02d}"
+    return f"{period}{hour - 12 if hour > 12 else hour or 12}{tail}"
+
+
+def _spaced(text: str) -> str:
+    """中文和英文、数字之间留一个空格。"""
+    text = re.sub(r"([\u4e00-\u9fff])([A-Za-z0-9])", r"\1 \2", text)
+    return re.sub(r"([A-Za-z0-9])([\u4e00-\u9fff])", r"\1 \2", text)
 
 
 def _row(event: dict[str, Any], start: datetime, end: datetime | None, *, now: bool = False) -> dict[str, Any]:
@@ -90,78 +106,71 @@ def _sections(now: datetime, timed: list[Timed], all_day: list[tuple[date, str]]
     return sections
 
 
-def _focus(now: datetime, timed: list[Timed], all_day: list[tuple[date, str]]) -> str:
-    """此刻最该说的一件事。挑哪件、相差多久都在这里算好，模型只负责说成一句话。"""
+def _say(now: datetime, timed: list[Timed], all_day: list[tuple[date, str]]) -> str:
+    """此刻最该说的那一句：挑哪件、相差多久都在这里算好，原样给他看。"""
     today = now.date()
     tomorrow = today + timedelta(days=1)
     current = next(((s, e, ev) for s, e, ev in timed if e and s <= now < e), None)
     upcoming = [(s, e, ev) for s, e, ev in timed if s > now]
     soon = upcoming[0] if upcoming else None
-
-    if soon is None:
-        free = "一直到下周日都没有安排"
-    elif soon[0].date() == today:
-        free = f"现在到 {soon[0]:%H:%M} 都空着（{_span(soon[0] - now)}）"
-    elif soon[0].date() == tomorrow:
-        free = "今天后面都空着"
-    else:
-        gap = (soon[0].date() - today).days
-        free_days = {(today + timedelta(days=i)).weekday() for i in range(gap)}
-        if {5, 6} <= free_days and gap <= 3:
-            head = "整个周末都空着"
-        elif gap == 2:
-            head = "今天和明天都空着"
-        else:
-            head = "这几天都空着"
-        free = f"{head}，一直到{agenda.weekday_word(soon[0].date(), today)} {soon[0]:%H:%M}"
+    spoken = agenda.spoken
 
     if current and soon and soon[0] - current[1] <= timedelta(minutes=15):
         gap = soon[0] - current[1]
-        between = "紧接着" if gap <= timedelta(0) else f"只隔 {_span(gap)}"
-        return (
-            f"{title(current[2])}还剩 {_span(current[1] - now)}，"
-            f"结束后{between}就是{title(soon[2])}{_at(soon[2])}"
-        )
+        between = "紧接着是" if gap <= timedelta(0) else f"隔 {_span(gap)}就是"
+        left = _span(current[1] - now)
+        return _spaced(f"{spoken(current[2])}还剩 {left}，结束后{between}{spoken(soon[2])}{_there(soon[2])}。")
     if soon and soon[0].date() == today and soon[0] - now <= timedelta(hours=1):
-        return f"{title(soon[2])} {_span(soon[0] - now)}后开始{_at(soon[2])}"
+        return _spaced(f"{spoken(soon[2])} {_span(soon[0] - now)}后开始{_there(soon[2])}。")
+
+    if current:
+        status = f"眼下的{spoken(current[2])}还剩 {_span(current[1] - now)}。"
+    elif soon and soon[0].date() == today:
+        status = f"{_clock(soon[0])}前都空着。"
+    else:
+        status = "今天后面都空着。"
     for day, name in all_day:
         if today <= day <= tomorrow and IMPORTANT.search(name):
-            return f"{_day_word(day, today)}全天：{name}；{free}"
+            return _spaced(f"{_day_word(day, today)}全天：{name}。{status}")
     for start, _, event in upcoming:
         if start.date() <= tomorrow and IMPORTANT.search(title(event)):
-            return f"接下来最要紧的是{_day_word(start.date(), today)} {start:%H:%M} 的{title(event)}{_at(event)}；{free}"
-    if soon and soon[0].date() == today:
-        return f"{free}，之后是{title(soon[2])}"
-    if soon and soon[0].date() == tomorrow:
-        return f"{free}；明天第一件是 {soon[0]:%H:%M} 的{title(soon[2])}"
-    if soon:
-        return f"{free} 的{title(soon[2])}"
-    return free
+            when_said = f"{_day_word(start.date(), today)}{_clock(start)}"
+            return _spaced(f"最要紧的是{when_said}：{spoken(event)}{_there(event)}。{status}")
 
-
-def _prompt(now: datetime, focus: str) -> str:
-    return "\n".join(
-        [
-            f"【此刻】{now.date().isoformat()} {weekday_zh(now)} {now:%H:%M}",
-            f"【要说的事】{focus}",
-            "",
-            "他刚打开你，卡片上已经列着他的安排和问候。把【要说的事】说成一句自然的话（不超过 30 个字），"
-            "像熟悉他的人随口一提。小建议只在真用得上时加（比如现在出发、提前准备要交的东西），用不上就不加。",
-            "- 只说这一件事，不加别的事实；数字只能用上面写好的。",
-            "- 说日子用「今天」「明天」或星期几；时间可以说成「下午 3 点」这样。",
-            "- 不问候，不叫名字，不要问问题，不用 Markdown。",
-        ]
-    )
+    if current:
+        left = _span(current[1] - now)
+        if soon and soon[0].date() == today:
+            return _spaced(f"{spoken(current[2])}还剩 {left}，之后空到{_clock(soon[0])}。")
+        return _spaced(f"{spoken(current[2])}还剩 {left}，之后今天就没别的了。")
+    if soon is None:
+        return "一直到下周日都没有安排。"
+    if soon[0].date() == today:
+        return _spaced(f"接下来 {_span(soon[0] - now)}都空着。{_clock(soon[0])}：{spoken(soon[2])}。")
+    if soon[0].date() == tomorrow:
+        return _spaced(f"今天后面都空着。明天{_clock(soon[0])}：{spoken(soon[2])}。")
+    gap = (soon[0].date() - today).days
+    free_days = {(today + timedelta(days=i)).weekday() for i in range(gap)}
+    sunday = agenda.this_sunday(today)
+    if {5, 6} <= free_days and gap <= 3:
+        head = "整个周末都空着"
+    elif gap == 2:
+        head = "今天和明天都空着"
+    elif soon[0].date() > sunday > today:
+        head = "这周后面都空着"
+    else:
+        head = "这几天都空着"
+    next_day = agenda.weekday_word(soon[0].date(), today)
+    return _spaced(f"{head}。{next_day}{_clock(soon[0])}：{spoken(soon[2])}。")
 
 
 def today_view(now: datetime, events: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], str]:
-    """同一份日历：他眼前的卡片，和此刻最该说的那件事。"""
+    """同一份日历：他眼前的卡片，和此刻最该说的那一句。"""
     timed, all_day = agenda.split(events)
-    return _sections(now, timed, all_day), _focus(now, timed, all_day)
+    return _sections(now, timed, all_day), _say(now, timed, all_day)
 
 
-async def presence_input() -> tuple[dict[str, Any], str | None]:
-    """返回（卡片，给模型的提示）：卡片立刻画出来，那句话随后流进来。日历没读到就没有那句话。"""
+async def presence_input() -> tuple[dict[str, Any], str]:
+    """返回（卡片，那一句）；日历没读到时卡片上写原因，那一句为空。"""
     now = effective_now()
     name = his_name()
     card: dict[str, Any] = {"hello": f"{greeting(now)}，{name}" if name else greeting(now), "sections": [], "error": ""}
@@ -170,9 +179,18 @@ async def presence_input() -> tuple[dict[str, Any], str | None]:
         events, _ = await asyncio.to_thread(agenda.read, CARD_FRESH_S)
     except RuntimeError as exc:
         card["error"] = str(exc).splitlines()[0]
-        return card, None
+        return card, ""
     except Exception:  # noqa: BLE001
         card["error"] = "日历这次没读到。"
-        return card, None
-    card["sections"], focus = today_view(now, events)
-    return card, _prompt(now, focus)
+        return card, ""
+    card["sections"], say = today_view(now, events)
+    return card, say
+
+
+async def stream_presence() -> AsyncIterator[dict[str, Any]]:
+    """和对话一样的事件流：先是卡片，再是那一句。"""
+    card, say = await presence_input()
+    yield {"type": "agenda", **card}
+    if say:
+        yield {"type": "delta", "text": say}
+    yield {"type": "done", "reply": say, "tools_called": []}

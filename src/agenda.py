@@ -18,6 +18,18 @@ FRESH_S = 300
 # 大学课表的标题形如「COMP34111/LECTURE1A/」：课程代码 / 类型加分组 / 附加信息
 COURSE_CODE = re.compile(r"[A-Z]{4}\d[0-9A-Z]{4}")
 KIND_NAMES = {"LABORATORY": "Lab"}
+# 说出口时课的类型用中文：「AI and Games 讲座」
+SPOKEN_KINDS = {
+    "Lecture": "讲座",
+    "Lab": "实验课",
+    "Lab Drop-In": "实验答疑",
+    "Seminar": "研讨课",
+    "Tutorial": "辅导课",
+    "Drop-In": "答疑",
+    "Online Drop-In": "线上答疑",
+    "Examples": "例题课",
+    "Online Examples": "线上例题课",
+}
 
 Timed = tuple[datetime, datetime | None, dict[str, Any]]
 
@@ -112,6 +124,15 @@ def title(event: dict[str, Any]) -> str:
     words = [_word(re.sub(r"\d+[A-Z]?$", "", kind))]
     words += [_word(part) for part in extra if re.fullmatch(r"[A-Z][A-Z -]+", part)]
     return f"{module_names().get(code, code)} · {' '.join(words)}"
+
+
+def spoken(event: dict[str, Any]) -> str:
+    """说出口的名字：「AI and Games 讲座」；不是课表的就用原标题。"""
+    name = title(event)
+    module, sep, kind = name.partition(" · ")
+    if not sep:
+        return name
+    return f"{module} {SPOKEN_KINDS.get(kind, kind)}"
 
 
 def where(event: dict[str, Any]) -> str:

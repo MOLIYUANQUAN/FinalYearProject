@@ -12,13 +12,11 @@ from openai.types.responses import ResponseTextDeltaEvent
 from src.agenda import chat_block
 from src.config import (
     DEFAULT_MODEL,
-    PRESENCE_MODEL,
     get_calendar_backend,
     get_mail_backend,
     require_openai_api_key,
 )
 from src.context import memory_block, now_block, profile_block
-from src.presence import presence_input
 from src.tools import ALL_TOOLS
 
 VOICE = """你叫 Friday，是他的个人代理，只为他一个人工作。你不是客服，也不是通用聊天机器人。不做自我介绍，不讲自己能做什么，不复述这段说明。
@@ -76,15 +74,13 @@ def build_instructions(calendar: str = "") -> str:
     return "\n\n".join(part for part in parts if part)
 
 
-def create_assistant(
-    *, tools: list[Any] | None = None, model: str = DEFAULT_MODEL, calendar: str = ""
-) -> Agent:
+def create_assistant(*, calendar: str = "") -> Agent:
     require_openai_api_key()
     return Agent(
         name="Friday",
         instructions=build_instructions(calendar),
-        tools=ALL_TOOLS if tools is None else tools,
-        model=model,
+        tools=ALL_TOOLS,
+        model=DEFAULT_MODEL,
         model_settings=ModelSettings(temperature=0.2),
     )
 
@@ -229,16 +225,4 @@ async def stream_assistant(
     agent = create_assistant(calendar=await asyncio.to_thread(chat_block))
     message = _expand_short_confirmation(message, history, pending_confirmation)
     async for event in _stream(agent, _history_to_input(message, history), max_turns=max_turns):
-        yield event
-
-
-async def stream_presence() -> AsyncIterator[dict[str, Any]]:
-    """打开时的「今天」：先把读到的安排交给页面，模型不用工具、一轮说完那句判断。"""
-    card, prompt = await presence_input()
-    yield {"type": "agenda", **card}
-    if prompt is None:
-        # 日历没读到：卡片上已经说了，不再让模型复述一遍
-        yield {"type": "done", "reply": "", "tools_called": []}
-        return
-    async for event in _stream(create_assistant(tools=[], model=PRESENCE_MODEL), prompt, max_turns=2):
         yield event

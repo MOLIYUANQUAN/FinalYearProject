@@ -28,8 +28,6 @@ MOCK_TOMORROW = "2026-10-13"
 MOCK_NOW_TIME = "09:00"
 
 DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
-# 开场那句话：mini 会把「明天下午」说成「下午」，这一句用更稳的模型
-PRESENCE_MODEL = os.getenv("OPENAI_PRESENCE_MODEL", "gpt-4.1")
 
 # calendar backend: mock | google
 GOOGLE_CREDENTIALS_PATH = SECRETS_DIR / "credentials.json"

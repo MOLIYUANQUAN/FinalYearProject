@@ -22,7 +22,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src import agenda, usage_log
-from src.agent import run_assistant, stream_assistant, stream_presence
+from src.agent import run_assistant, stream_assistant
+from src.presence import stream_presence
 from src.config import (
     STATIC_DIR,
     effective_now,
