@@ -20,3 +20,4 @@ __pycache__/
 data/memory/facts.json
 data/usage/
 data/logs/
+data/browser/

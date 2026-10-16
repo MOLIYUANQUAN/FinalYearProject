@@ -87,7 +87,7 @@ cp .env.example .env
 .\.venv\Scripts\python.exe scripts\install_shortcuts.py
 ```
 
-之后按 **Ctrl+Alt+F**：Friday 在独立窗口里出现，先开口告诉你此刻最该知道的事；它在最前面时再按一次就收起。也可以点桌面上的 Friday，或者双击仓库里的 `Friday.cmd`。服务在跑且代码没变就直接用，代码变了才换新进程。
+之后按 **Ctrl+Alt+F**：Friday 在独立窗口里出现，先开口告诉你此刻最该知道的事；它在最前面时再按一次就收起。也可以点桌面上的 Friday，或者双击仓库里的 `Friday.cmd`。服务在跑且代码没变就直接用，代码变了才换新进程。窗口用自己的浏览器资料（`data/browser/`，不进 Git），不带主浏览器的扩展。
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\install_shortcuts.py --remove  # 撤掉快捷方式和开机常驻
