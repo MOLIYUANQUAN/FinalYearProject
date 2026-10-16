@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 from src import agenda
-from src.agenda import LOOKAHEAD_DAYS, Timed, day_label, title, when
+from src.agenda import Timed, day_label, title, when
 from src.config import effective_now
 from src.context import greeting, his_name, weekday_zh
 
@@ -86,7 +86,7 @@ def _sections(now: datetime, timed: list[Timed], all_day: list[tuple[date, str]]
                 {"label": f"下一件 · {day_label(start.date())}", "meta": "", "rows": [_row(event, start, end)], "empty": ""}
             )
         else:
-            sections.append({"label": f"之后 {LOOKAHEAD_DAYS - 2} 天", "meta": "", "rows": [], "empty": "都没有安排"})
+            sections.append({"label": "到下周日", "meta": "", "rows": [], "empty": "都没有安排"})
     return sections
 
 
@@ -99,15 +99,21 @@ def _focus(now: datetime, timed: list[Timed], all_day: list[tuple[date, str]]) -
     soon = upcoming[0] if upcoming else None
 
     if soon is None:
-        free = f"接下来 {LOOKAHEAD_DAYS - 2} 天都没有安排"
+        free = "一直到下周日都没有安排"
     elif soon[0].date() == today:
         free = f"现在到 {soon[0]:%H:%M} 都空着（{_span(soon[0] - now)}）"
     elif soon[0].date() == tomorrow:
         free = "今天后面都空着"
     else:
-        free_days = {(today + timedelta(days=i)).weekday() for i in range((soon[0].date() - today).days)}
-        head = "整个周末都空着" if {5, 6} <= free_days else "今天和明天都空着"
-        free = f"{head}，一直到{weekday_zh(soon[0])} {soon[0]:%H:%M}"
+        gap = (soon[0].date() - today).days
+        free_days = {(today + timedelta(days=i)).weekday() for i in range(gap)}
+        if {5, 6} <= free_days and gap <= 3:
+            head = "整个周末都空着"
+        elif gap == 2:
+            head = "今天和明天都空着"
+        else:
+            head = "这几天都空着"
+        free = f"{head}，一直到{agenda.weekday_word(soon[0].date(), today)} {soon[0]:%H:%M}"
 
     if current and soon and soon[0] - current[1] <= timedelta(minutes=15):
         gap = soon[0] - current[1]

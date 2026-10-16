@@ -27,7 +27,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if not USAGE_LOG_PATH.is_file():
-        print("还没有使用记录：打开 Personal Agent 用几天再来看。")
+        print("还没有使用记录：用 Friday 几天再来看。")
         return
 
     by_day: dict[str, list[dict]] = defaultdict(list)

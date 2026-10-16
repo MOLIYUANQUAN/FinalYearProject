@@ -1,4 +1,4 @@
-"""今天起几天的安排：读一次，开场卡片和每轮对话共用。时间是本地钟点，课表标题写成人话。"""
+"""今天到下周日的安排：读一次，开场卡片和每轮对话共用。时间是本地钟点，课表标题写成人话。"""
 
 from __future__ import annotations
 
@@ -13,7 +13,6 @@ from src.calendar_providers.common import is_background_span
 from src.config import effective_now
 from src.context import module_names, weekday_zh
 
-LOOKAHEAD_DAYS = 8
 # 对话里用的日历最多旧 5 分钟；窗口被叫回时会先在后台读好
 FRESH_S = 300
 # 大学课表的标题形如「COMP34111/LECTURE1A/」：课程代码 / 类型加分组 / 附加信息
@@ -34,15 +33,25 @@ _lock = threading.Lock()
 _snapshot: _Snapshot | None = None
 
 
+def this_sunday(today: date) -> date:
+    return today + timedelta(days=6 - today.weekday())
+
+
+def last_day(today: date) -> date:
+    """读到下周日：问「这周」「下周」，看到的都是整周。"""
+    return this_sunday(today) + timedelta(days=7)
+
+
 def read(max_age_s: float = FRESH_S) -> tuple[list[dict[str, Any]], datetime]:
-    """今天起 LOOKAHEAD_DAYS 天的事件和读到的时刻：够新就用上次的，否则现读；同一时间只读一次。"""
+    """今天到下周日的事件和读到的时刻：够新就用上次的，否则现读；同一时间只读一次。"""
     global _snapshot
     with _lock:
         today = effective_now().date()
         snap = _snapshot
         if snap and snap.day == today and time.monotonic() - snap.taken <= max_age_s:
             return snap.events, snap.read_at
-        result = get_calendar_provider().query_events(date=today.isoformat(), days=LOOKAHEAD_DAYS)
+        days = (last_day(today) - today).days + 1
+        result = get_calendar_provider().query_events(date=today.isoformat(), days=days)
         _snapshot = _Snapshot(today, effective_now(), time.monotonic(), list(result.get("events") or []))
         return _snapshot.events, _snapshot.read_at
 
@@ -138,12 +147,44 @@ def _chat_day(day: date, today: date) -> str:
         return f"今天 {label} {weekday_zh(day)}"
     if day == today + timedelta(days=1):
         return f"明天 {label} {weekday_zh(day)}"
-    this_sunday = today + timedelta(days=6 - today.weekday())
-    return f"{label} {'下' if day > this_sunday else ''}{weekday_zh(day)}"
+    return f"{label} {weekday_word(day, today)}"
+
+
+def weekday_word(day: date, today: date) -> str:
+    """这周以外的日子说「下周X」，免得「周四」指哪一个说不清。"""
+    return f"{'下' if day > this_sunday(today) else ''}{weekday_zh(day)}"
+
+
+def _days(now: datetime, timed: list[Timed], all_day: list[tuple[date, str]], first: date, last: date) -> tuple[int, list[str]]:
+    """一段日子：还没结束的几项，和每天一段的文字。"""
+    count = 0
+    lines: list[str] = []
+    day = first
+    while day <= last:
+        rows = [f"- 全天 {name}" for d, name in all_day if d == day]
+        finished = []
+        for start, end, event in timed:
+            if start.date() != day:
+                continue
+            place = where(event)
+            line = f"{when(start, end)} {title(event)}{f'（{place}）' if place else ''}"
+            if (end or start) <= now:
+                finished.append(line)
+            else:
+                rows.append(f"- {line}{'（进行中）' if start <= now else ''}")
+        count += len(rows)
+        # 结束了的单独一行：问「还有什么」时不会把它们当成还没上的
+        empty = "后面没有安排了" if finished else "没有安排"
+        lines.append(f"{_chat_day(day, now.date())}：{f'{len(rows)} 项' if rows else empty}")
+        lines.extend(rows)
+        if finished:
+            lines.append("- 已结束：" + "；".join(finished))
+        day += timedelta(days=1)
+    return count, lines
 
 
 def chat_block() -> str:
-    """每轮对话自带的日历：今天起每天一段，空的日子也写出来，免得它去猜。"""
+    """每轮对话自带的日历：今天到下周日，每天一段，空的日子也写出来；每周还有几项也数好，它不用自己数。"""
     now = effective_now()
     try:
         events, read_at = read()
@@ -152,19 +193,18 @@ def chat_block() -> str:
         return f"日历：这次没读到（{reason}）。问到安排时用 get_calendar_events 再试一次，还读不到就直说。"
 
     timed, all_day = split(events)
-    lines = [
-        f"日历（今天起 {LOOKAHEAD_DAYS} 天，{read_at:%H:%M} 读的）：这就是他的日历，"
-        "问这几天的安排直接用，不用再查；要看备注、链接或更远的日子，再用 get_calendar_events。"
-    ]
-    for offset in range(LOOKAHEAD_DAYS):
-        day = now.date() + timedelta(days=offset)
-        rows = [f"- 全天 {name}" for d, name in all_day if d == day]
-        for start, end, event in timed:
-            if start.date() != day:
-                continue
-            place = where(event)
-            state = "（已结束）" if (end or start) <= now else "（进行中）" if start <= now else ""
-            rows.append(f"- {when(start, end)} {title(event)}{f'（{place}）' if place else ''}{state}")
-        lines.append(f"{_chat_day(day, now.date())}：{'' if rows else '没有安排'}")
-        lines.extend(rows)
-    return "\n".join(lines)
+    today = now.date()
+    sunday, monday, end = this_sunday(today), this_sunday(today) + timedelta(days=1), last_day(today)
+    this_count, this_week = _days(now, timed, all_day, today, sunday)
+    next_count, next_week = _days(now, timed, all_day, monday, end)
+    return "\n".join(
+        [
+            f"日历（今天到下周日，{read_at:%H:%M} 读的）：这就是他的日历，问这些天的安排直接用，不用再查；"
+            "要看备注、链接，或这些天里没有他问的事，再用 get_calendar_events 往后查。"
+            "问有几项、几节，就用下面写好的数，不要自己数；同一时间的两项也是两项。",
+            f"【这周，到 {sunday.month}月{sunday.day}日 周日：还有 {this_count} 项】",
+            *this_week,
+            f"【下周，{monday.month}月{monday.day}日–{end.month}月{end.day}日：共 {next_count} 项】",
+            *next_week,
+        ]
+    )
