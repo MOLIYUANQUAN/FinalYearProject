@@ -35,6 +35,7 @@ def build_instructions() -> str:
 3. 工具结果不足时如实说明，不要假装知道。
 4. 用简洁中文回复（除非用户用英文提问）。
 5. 个性化时：先 get_personal_context，再 search_memory 取动态事实；不要编造记忆。
+   问身份/导师/偏好时两者都要查；search_memory 可用中文或英文关键词（如「导师」「mentor」）。
 6. 用户说「记住…」时调用 remember_fact；删除记忆须先确认再 forget_fact。
 7. 写操作流程（日历创建、发邮件、归档/删除邮件、删除记忆）必须遵守：
    a) 先 request_user_confirmation，清楚说明将做什么；

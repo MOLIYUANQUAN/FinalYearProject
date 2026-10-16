@@ -29,7 +29,7 @@ def search_memory(query: str, top: int = 5) -> dict[str, Any]:
     在个性化回答、准备会议、需要导师邮箱/偏好等时先检索，不要编造。
 
     Args:
-        query: 检索词，如 mentor email、FYP、偏好。
+        query: 检索词，中英文均可，如 导师、mentor email、FYP、偏好。
         top: 返回条数，默认 5。
     """
     return memory_store.search_facts(query=query, top=top)

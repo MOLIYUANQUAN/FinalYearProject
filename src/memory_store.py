@@ -31,6 +31,54 @@ def _save(facts: list[dict[str, Any]]) -> None:
     )
 
 
+# 薄检索用的中英别名：中文问句常整段无空格，需扩成可匹配英文事实的词
+_QUERY_ALIASES: dict[str, tuple[str, ...]] = {
+    "导师": ("mentor", "supervisor", "导师"),
+    "老师": ("mentor", "supervisor", "老师"),
+    "导师是谁": ("mentor", "supervisor", "导师"),
+    "supervisor": ("mentor", "supervisor", "导师"),
+    "mentor": ("mentor", "supervisor", "导师"),
+    "偏好": ("preference", "prefer", "偏好"),
+    "邮箱": ("email", "mail", "邮箱"),
+    "邮件": ("email", "mail", "邮件"),
+    "课表": ("timetable", "calendar", "course", "课表"),
+    "日历": ("calendar", "schedule", "日历"),
+    "fyp": ("fyp", "final year", "毕业设计"),
+}
+
+
+def _query_tokens(q: str) -> list[str]:
+    """把查询拆成可匹配词：空白分词 + 中文子串 + 别名扩展。"""
+    raw = (q or "").strip().lower()
+    if not raw:
+        return []
+
+    tokens: list[str] = []
+    for t in re.split(r"\s+", raw):
+        if t:
+            tokens.append(t)
+
+    for m in re.finditer(r"[\u4e00-\u9fff]+", raw):
+        run = m.group(0)
+        tokens.append(run)
+        if len(run) >= 2:
+            for i in range(len(run) - 1):
+                tokens.append(run[i : i + 2])
+
+    for alias, expansions in _QUERY_ALIASES.items():
+        if alias in raw:
+            tokens.extend(expansions)
+
+    # 保序去重
+    seen: set[str] = set()
+    out: list[str] = []
+    for t in tokens:
+        if t and t not in seen:
+            seen.add(t)
+            out.append(t)
+    return out
+
+
 def remember_fact(content: str, tags: str = "") -> dict[str, Any]:
     text = (content or "").strip()
     if not text:
@@ -72,7 +120,7 @@ def search_facts(query: str, top: int = 5) -> dict[str, Any]:
         hits = facts[:top]
     else:
         scored: list[tuple[int, str, dict[str, Any]]] = []
-        tokens = [t for t in re.split(r"\s+", q) if t]
+        tokens = _query_tokens(q)
         for fact in facts:
             blob = " ".join(
                 [
