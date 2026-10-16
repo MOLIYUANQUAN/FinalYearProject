@@ -14,6 +14,7 @@ TOOL_POLICIES: dict[str, ToolPolicy] = {
     "read_file": "allow",
     "get_personal_context": "allow",
     "request_user_confirmation": "allow",
+    "create_calendar_event": "require_confirmation",
 }
 
 WRITE_ACTION_TYPES = {

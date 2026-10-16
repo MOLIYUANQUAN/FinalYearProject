@@ -76,4 +76,6 @@ CALENDAR_BACKEND=mock
 ## 安全
 
 - 不要把 `secrets/`、`.env` 推到 GitHub  
-- 本集成仅为 **readonly** scope，不会修改你的日历  
+- 当前 scope 为完整 `calendar`（可读列表 + 可在主日历创建事件）  
+- 创建事件前 Agent 必须先请求你确认；写入只针对 **primary**，不会改导入课表  
+- 若从旧版 readonly 升级，请重新运行 `python scripts/auth_google_calendar.py`

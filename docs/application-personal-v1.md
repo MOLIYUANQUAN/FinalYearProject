@@ -8,7 +8,8 @@
 | 能力 | 实现 | 说明 |
 |------|------|------|
 | Personal Context | `data/personal/profile.md` + `get_personal_context` | 本地文件，不是 memory DB |
-| Approval | `request_user_confirmation` + `src/approval.py` | 写操作前必须确认；本阶段无真正写工具 |
+| Approval | `request_user_confirmation` + `src/approval.py` | 写操作前必须确认 |
+| Calendar write | `create_calendar_event`（确认后） | 见 [application-calendar-write-v1.md](application-calendar-write-v1.md) |
 
 ## 工具列表
 

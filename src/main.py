@@ -5,7 +5,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-# 允许以 `python -m src.main` 或 `uvicorn src.main:app` 从仓库根运行
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -44,14 +43,23 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="Personal AI Assistant — Baseline v1",
-    version="0.1.0",
+    title="Personal AI Assistant",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
 
+class ChatTurn(BaseModel):
+    role: str = Field(..., pattern="^(user|assistant)$")
+    content: str = Field(..., min_length=1)
+
+
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, description="用户自然语言输入")
+    history: list[ChatTurn] = Field(
+        default_factory=list,
+        description="此前多轮对话（不含本轮 message），用于确认闭环",
+    )
 
 
 class ChatResponse(BaseModel):
@@ -99,9 +107,14 @@ async def chat(body: ChatRequest) -> ChatResponse:
     if not message:
         raise HTTPException(status_code=400, detail="消息不能为空")
 
+    history = [{"role": t.role, "content": t.content.strip()} for t in body.history]
+    # 限制历史长度，避免上下文过长
+    if len(history) > 20:
+        history = history[-20:]
+
     try:
-        result = await run_assistant(message)
-    except Exception as exc:  # noqa: BLE001 — 演示用：把上游错误清晰返回
+        result = await run_assistant(message, history=history)
+    except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"助手运行失败: {exc}") from exc
 
     return ChatResponse(
@@ -113,7 +126,6 @@ async def chat(body: ChatRequest) -> ChatResponse:
     )
 
 
-# 静态资源（CSS/JS 若后续拆分）
 if STATIC_DIR.is_dir():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 

@@ -1,4 +1,4 @@
-"""Google Calendar 只读 provider（OAuth Desktop）。"""
+"""Google Calendar provider（读 selected 日历 + 写 primary 事件）。"""
 
 from __future__ import annotations
 
@@ -12,7 +12,12 @@ from src.config import (
     get_google_calendar_id,
 )
 
-SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
+# 读日历列表 + 读写事件；比旧版 readonly 更大，升级后需重新授权
+SCOPES = ["https://www.googleapis.com/auth/calendar"]
+
+
+def _local_tz():
+    return datetime.now().astimezone().tzinfo
 
 
 class GoogleCalendarProvider:
@@ -21,7 +26,7 @@ class GoogleCalendarProvider:
     def query_events(self, date: str, time_of_day: TimeOfDay | str = "all") -> dict[str, Any]:
         service = _build_service()
         calendars = _resolve_calendars(service, get_google_calendar_id())
-        day_start = datetime.fromisoformat(f"{date}T00:00:00").astimezone()
+        day_start = datetime.fromisoformat(f"{date}T00:00:00").replace(tzinfo=_local_tz())
         day_end = day_start + timedelta(days=1)
 
         events: list[dict[str, Any]] = []
@@ -67,21 +72,62 @@ class GoogleCalendarProvider:
             "events": events,
         }
 
+    def create_event(
+        self,
+        *,
+        title: str,
+        start: str,
+        end: str,
+        location: str | None = None,
+        notes: str | None = None,
+    ) -> dict[str, Any]:
+        """在主日历创建事件（写入只用 primary，避免改到导入课表）。"""
+        service = _build_service()
+        body: dict[str, Any] = {
+            "summary": title,
+            "start": _to_event_time(start),
+            "end": _to_event_time(end),
+        }
+        if location:
+            body["location"] = location
+        if notes:
+            body["description"] = notes
+
+        created = (
+            service.events()
+            .insert(calendarId="primary", body=body)
+            .execute()
+        )
+        return {
+            "ok": True,
+            "source": self.name,
+            "calendar_id": "primary",
+            "id": created.get("id"),
+            "title": created.get("summary"),
+            "start": _event_datetime(created.get("start") or {}),
+            "end": _event_datetime(created.get("end") or {}),
+            "html_link": created.get("htmlLink"),
+        }
+
+
+def _to_event_time(iso: str) -> dict[str, str]:
+    """接受 YYYY-MM-DDTHH:MM 或带时区的 ISO，写成 Google dateTime。"""
+    normalized = iso.strip().replace("Z", "+00:00")
+    if len(normalized) == 16:  # YYYY-MM-DDTHH:MM
+        normalized = normalized + ":00"
+    dt = datetime.fromisoformat(normalized)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_local_tz())
+    return {"dateTime": dt.isoformat()}
+
 
 def _resolve_calendars(service, setting: str) -> list[dict[str, str]]:
-    """解析要查询的日历列表。
-
-    - selected / all：Google 界面里勾选的日历（含导入课表）
-    - primary：仅主日历
-    - 其他：当作单个 calendarId
-    """
     value = (setting or "selected").strip().lower()
     listed = service.calendarList().list().execute().get("items") or []
 
     if value in {"selected", "all"}:
         chosen = []
         for item in listed:
-            # selected=True 对应网页勾选；primary 始终纳入
             if item.get("selected") or item.get("primary"):
                 chosen.append(
                     {
@@ -91,7 +137,6 @@ def _resolve_calendars(service, setting: str) -> list[dict[str, str]]:
                 )
         if chosen:
             return chosen
-        # 兜底：至少主日历
         return [{"id": "primary", "summary": "primary"}]
 
     if value == "primary":
@@ -108,9 +153,13 @@ def _event_datetime(payload: dict[str, Any]) -> str | None:
     if payload.get("dateTime"):
         return str(payload["dateTime"])
     if payload.get("date"):
-        # 全天事件：用当天 00:00 本地表示，便于时段过滤
         return f"{payload['date']}T00:00:00"
     return None
+
+
+def _scopes_sufficient(creds) -> bool:
+    granted = set(creds.scopes or [])
+    return set(SCOPES).issubset(granted)
 
 
 def _build_service():
@@ -134,15 +183,19 @@ def _build_service():
     creds = None
     if GOOGLE_TOKEN_PATH.is_file():
         creds = Credentials.from_authorized_user_file(str(GOOGLE_TOKEN_PATH), SCOPES)
+        if creds and not _scopes_sufficient(creds):
+            # 旧 token 只有 readonly，需要重新授权
+            creds = None
+            GOOGLE_TOKEN_PATH.unlink(missing_ok=True)
 
     if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
+        if creds and creds.expired and creds.refresh_token and _scopes_sufficient(creds):
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
                 str(GOOGLE_CREDENTIALS_PATH), SCOPES
             )
-            creds = flow.run_local_server(port=0)
+            creds = flow.run_local_server(port=0, prompt="consent")
         GOOGLE_TOKEN_PATH.parent.mkdir(parents=True, exist_ok=True)
         GOOGLE_TOKEN_PATH.write_text(creds.to_json(), encoding="utf-8")
 
@@ -150,6 +203,8 @@ def _build_service():
 
 
 def ensure_google_login() -> str:
-    """触发一次 OAuth（供 scripts/auth_google_calendar.py 使用）。"""
+    """触发一次 OAuth（读写事件权限）。"""
     _build_service()
-    return f"Google Calendar authorized. Token saved to {GOOGLE_TOKEN_PATH}"
+    return (
+        f"Google Calendar authorized (events read/write). Token saved to {GOOGLE_TOKEN_PATH}"
+    )

@@ -194,7 +194,7 @@
       <button id="send" type="submit">发送</button>
     </form>
 
-    <footer>工具：get_calendar_events · search_files · read_file · get_personal_context · request_user_confirmation。见 README。</footer>
+    <footer>工具：日历读/写（需确认）· 文件 · personal context · confirmation。多轮对话已开启，可先确认再创建日程。</footer>
   </main>
 
   <script>
@@ -204,6 +204,8 @@
     const send = document.getElementById("send");
     const keyStatus = document.getElementById("keyStatus");
     const dateChip = document.getElementById("dateChip");
+    /** @type {{role: string, content: string}[]} */
+    const history = [];
 
     function append(role, text, extra) {
       const div = document.createElement("div");
@@ -249,7 +251,7 @@
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message }),
+          body: JSON.stringify({ message, history }),
         });
         const data = await res.json().catch(() => ({}));
         thinking.remove();
@@ -257,6 +259,9 @@
           append("error", data.detail || ("请求失败：" + res.status));
           return;
         }
+        history.push({ role: "user", content: message });
+        history.push({ role: "assistant", content: data.reply });
+        if (history.length > 20) history.splice(0, history.length - 20);
         const tools = (data.tools_called || []).length
           ? "工具调用：" + data.tools_called.join(" → ")
           : "工具调用：（无）";

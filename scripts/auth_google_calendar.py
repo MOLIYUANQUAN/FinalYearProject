@@ -17,6 +17,7 @@ def main() -> None:
     load_env()
     print(f"credentials: {GOOGLE_CREDENTIALS_PATH}")
     print(f"token will be saved to: {GOOGLE_TOKEN_PATH}")
+    print("Requested scope: calendar (read calendars + create/edit events)")
     msg = ensure_google_login()
     print(msg)
     print("Next: set CALENDAR_BACKEND=google in .env and restart the app.")

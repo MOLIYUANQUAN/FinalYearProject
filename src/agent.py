@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from agents import Agent, ModelSettings, Runner, RunResult
 
 from src.config import (
@@ -30,26 +32,28 @@ def build_instructions() -> str:
 2. 可以串联多次工具调用：先查日历，再搜索/读取相关文件，最后综合回答。
 3. 工具结果不足时如实说明，不要假装知道。
 4. 用简洁中文回复（除非用户用英文提问）。
-5. 需要按用户习惯个性化（会议 brief、优先级、确认边界）时，先调用 get_personal_context。
-6. 任何写操作或对外发送（改日程、发邮件等）之前，必须先调用 request_user_confirmation，
-   向用户展示确认请求并等待同意；在同意前不得声称已完成。当前阶段没有真正的写工具，
-   若用户要求写操作：调用 request_user_confirmation，说明将如何做，并等待确认。
+5. 需要按用户习惯个性化时，先调用 get_personal_context。
+6. 创建/修改日历等写操作流程（必须遵守）：
+   a) 先 request_user_confirmation，说明标题与起止时间；
+   b) 等待用户在对话中明确同意（如「确认」「同意」「创建吧」）；
+   c) 仅在同意后调用 create_calendar_event(..., user_confirmed=True)；
+   d) 用户未同意前，禁止 user_confirmed=True，也禁止声称已创建。
 
 {date_note}
 - 今天是 {today}
 - 「明天」= {tomorrow}
-- 调用 get_calendar_events 时，date 必须传 YYYY-MM-DD（例如明天 → {tomorrow}）
+- 调用日历工具时，日期用 YYYY-MM-DD；时间用 YYYY-MM-DDTHH:MM（24小时制）
 - afternoon = 12:00–17:00；morning = 05:00–12:00；evening = 17:00 之后
 - 当前日历后端：{backend}
 
 可用工具：
-- get_calendar_events：查日历（mock 或 Google；google 时含勾选的导入课表）
+- get_calendar_events：查日历
+- create_calendar_event：创建事件（需先确认）
 - search_files / read_file：本地笔记
-- get_personal_context：个人偏好与 approval 边界
+- get_personal_context：个人偏好
 - request_user_confirmation：写操作前请求确认
 
-准备会议时：先 get_personal_context（如需要），再查日历，再搜索/阅读相关提案或笔记，
-最后输出 meeting brief（时间地点、目的、项目摘要、建议讨论点）。
+准备会议时：按需 get_personal_context → 查日历 → 读相关文件 → 输出 meeting brief。
 """
 
 
@@ -65,7 +69,6 @@ def create_assistant() -> Agent:
 
 
 def extract_tool_names(result: RunResult) -> list[str]:
-    """从 RunResult 提取本轮调用过的工具名（去重保序）。"""
     names: list[str] = []
     for item in result.new_items:
         name = getattr(item, "tool_name", None)
@@ -77,10 +80,37 @@ def extract_tool_names(result: RunResult) -> list[str]:
     return names
 
 
-async def run_assistant(message: str, *, max_turns: int = 10) -> dict:
-    """运行一轮助手，返回回复与工具调用列表。"""
+def _history_to_input(
+    message: str,
+    history: list[dict[str, str]] | None,
+) -> str | list[dict[str, Any]]:
+    """把多轮历史打成 Agents SDK 可接受的 input。"""
+    if not history:
+        return message
+    items: list[dict[str, Any]] = []
+    for turn in history:
+        role = (turn.get("role") or "").strip()
+        content = (turn.get("content") or "").strip()
+        if role not in {"user", "assistant"} or not content:
+            continue
+        items.append({"role": role, "content": content})
+    items.append({"role": "user", "content": message})
+    return items
+
+
+async def run_assistant(
+    message: str,
+    *,
+    history: list[dict[str, str]] | None = None,
+    max_turns: int = 12,
+) -> dict:
+    """运行一轮助手；可带多轮 history 以支持确认闭环。"""
     agent = create_assistant()
-    result = await Runner.run(agent, message, max_turns=max_turns)
+    result = await Runner.run(
+        agent,
+        _history_to_input(message, history),
+        max_turns=max_turns,
+    )
     reply = result.final_output
     if not isinstance(reply, str):
         reply = str(reply)
