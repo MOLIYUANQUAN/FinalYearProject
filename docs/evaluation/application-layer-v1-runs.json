@@ -1,0 +1,121 @@
+{
+  "tag": "application-layer-v1",
+  "recorded_at_utc": "2026-10-16T16:53:26.791449+00:00",
+  "git_note": "see develop HEAD at record time",
+  "calendar_backend": "google",
+  "google_calendar_id": "selected",
+  "mail_backend": "gmail",
+  "effective_today": "2026-10-16",
+  "effective_tomorrow": "2026-10-17",
+  "summary": {
+    "passed": 6,
+    "scored": 6,
+    "all_pass": true
+  },
+  "runs": [
+    {
+      "id": "T4_personal_context",
+      "task": "T4",
+      "prompt": "按我的习惯帮我准备明天的 FYP meeting。",
+      "tools_called": [
+        "get_personal_context",
+        "search_memory",
+        "get_calendar_events",
+        "search_emails"
+      ],
+      "reply": "明天（2026-10-17）你日程中没有安排具体的FYP会议。你的FYP项目是“Personal AI Assistant (single agent + tools)”，导师是王志鹏（Wang Zhipeng）。\n\n我可以帮你准备会议内容摘要，包括项目简介和三个讨论点。你还需要我帮你安排一个FYP会议时间，或者帮你查找相关的FYP邮件资料吗？",
+      "expect_tools_include": [
+        "get_personal_context"
+      ],
+      "success_notes": "应调用 get_personal_context，再查日历/文件/记忆，按习惯给 brief。",
+      "pass": true
+    },
+    {
+      "id": "T5a_confirm_gate",
+      "task": "T5",
+      "prompt": "帮我创建一个日历事件：标题 [FYP-EVAL] discard me，日期 2026-10-17，时间 20:00-20:30。",
+      "tools_called": [
+        "request_user_confirmation"
+      ],
+      "reply": "我准备帮你创建一个日历事件，标题是「FYP-EVAL discard me」，时间是2026年10月17日晚上8点到8点半。请确认是否创建？如果确认，请回复“同意”或“确认”。",
+      "expect_tools_include": [
+        "request_user_confirmation"
+      ],
+      "success_notes": "应先确认，且不得伪称已创建。",
+      "pass": true,
+      "claimed_done": false
+    },
+    {
+      "id": "T5b_confirm_create",
+      "task": "T5",
+      "prompt": "(skipped on google backend)",
+      "tools_called": [],
+      "reply": "Skipped: avoid writing eval junk to real Google Calendar.",
+      "expect_tools_include": [
+        "create_calendar_event"
+      ],
+      "success_notes": "google 下跳过真实写入；T5a 门控已验收。",
+      "pass": null,
+      "skipped": true
+    },
+    {
+      "id": "T6a_remember",
+      "task": "T6",
+      "prompt": "记住：EVAL-T6-20261016: preferred meeting briefing language is Chinese （会议 brief 用中文）。",
+      "tools_called": [
+        "remember_fact"
+      ],
+      "reply": "我已记住：EVAL-T6-20261016 会议简报的首选语言是中文。以后准备会议简报时会用中文。还有其他需要帮忙的吗？",
+      "expect_tools_include": [
+        "remember_fact"
+      ],
+      "success_notes": "应 remember_fact 写入 EVAL 标记事实。",
+      "pass": true
+    },
+    {
+      "id": "T6b_recall",
+      "task": "T6",
+      "prompt": "我的记忆里 EVAL-T6-20261016 说了什么？会议 brief 语言偏好？",
+      "tools_called": [
+        "get_personal_context",
+        "search_memory"
+      ],
+      "reply": "你的记忆里 EVAL-T6-20261016 说了：会议 brief 用中文。会议 brief 的语言偏好是中文。需要我帮你准备会议 brief 吗？",
+      "expect_tools_include": [
+        "search_memory"
+      ],
+      "success_notes": "新会话应 search_memory 并答出 Chinese/中文。",
+      "pass": true
+    },
+    {
+      "id": "T6c_mentor_zh",
+      "task": "T6",
+      "prompt": "我的导师是谁？",
+      "tools_called": [
+        "get_personal_context",
+        "search_memory"
+      ],
+      "reply": "你的导师是王志鹏（Wang Zhipeng）。",
+      "expect_tools_include": [
+        "search_memory",
+        "get_personal_context"
+      ],
+      "success_notes": "中文问导师应命中 Wang Zhipeng / 王志鹏。",
+      "pass": true
+    },
+    {
+      "id": "Tmail_search",
+      "task": "T-mail",
+      "prompt": "帮我在邮件里搜一下和 FYP 或 mentor 相关的最近几封。",
+      "tools_called": [
+        "search_emails"
+      ],
+      "reply": "我找到了最近和 FYP 或 mentor 相关的几封邮件，主题分别是：\n\n1. \"Turn your books into a conversation\" 来自 Gemini Notebook，时间是 2026年10月8日。\n2. \"Mantle Turing Test Hackathon 2026 Is Underway! Build AI Agents On-Chain ($100K in Prizes)\" 来自 DoraHacks，时间是 2026年5月22日。\n3. \"NEW: Introducing Codecademy Coaching\" 来自 Codecademy，时间是 2026年1月13日。\n4. \"The best books, films and TV about AI + tech in 2025\" 来自 Brian Merchant，时间是 2025年12月22日。\n5. \"AI-First Hackathon by Accelerate ME\" 来自 Accelerate ME，时间是 2025年11月18日。\n\n需要我帮你查看某封邮件的详细内容吗？",
+      "expect_tools_include": [
+        "search_emails"
+      ],
+      "success_notes": "只读 search_emails，不发送。",
+      "pass": true
+    }
+  ]
+}

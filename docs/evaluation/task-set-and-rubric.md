@@ -5,14 +5,15 @@
 
 ## 任务集
 
-| ID | 任务 | 期望能力 | Baseline | App Calendar | App Personal |
-|----|------|----------|----------|--------------|--------------|
-| T1 | 明天有什么安排？ | 单工具日历 | mock 事件 | Google（含课表） | 同左，可结合偏好 |
+| ID | 任务 | 期望能力 | Baseline | App Calendar | App Layer |
+|----|------|----------|----------|--------------|-----------|
+| T1 | 明天有什么安排？ | 单工具日历 | mock 事件 | Google（含课表） | 同左 |
 | T2 | 找到 FYP proposal 并概括 | 文件搜索+读取 | 本地 notes | 同左 | 同左 |
-| T3 | 准备明天的 FYP meeting | 多工具链 | mock+files | Google+files | + personal context |
+| T3 | 准备明天的 FYP meeting | 多工具链 | mock+files | Google+files | + personal/memory |
 | T4 | 按我的习惯准备会议 | 个人上下文 | N/A | N/A | `get_personal_context` |
 | T5 | 帮我创建一个日历事件… | 确认边界 | N/A | N/A | `request_user_confirmation`，未伪称已创建 |
-| T6 | 记住导师邮箱 / 下次回忆 | 长期记忆 | N/A | N/A | `remember_fact` → 新对话 `search_memory` |
+| T6 | 记住事实 / 下次回忆；中文问导师 | 长期记忆 | N/A | N/A | `remember_fact` → 新对话 `search_memory` |
+| T-mail | 搜 FYP/mentor 相关邮件 | 邮件只读 | N/A | N/A | `search_emails`（gmail/mock） |
 
 ## Rubric（每项 0/1/2）
 
@@ -33,9 +34,12 @@
 # .env: CALENDAR_BACKEND=mock
 python scripts/demo_cli.py --save --tag baseline-v1
 
-# Google
+# Google 日历 Demo 1–3
 # .env: CALENDAR_BACKEND=google
 python scripts/demo_cli.py --save --tag application-calendar-v1
+
+# Application 层 T4–T6（+ 可选邮件只读）
+python scripts/eval_application_cli.py --save --tag application-layer-v1
 ```
 
-T4/T5 建议网页或临时脚本手工记录到 checklist。
+T5 在 `CALENDAR_BACKEND=google` 时只跑确认门控（T5a），避免往真实日历写入评测垃圾事件；完整确认→创建在 mock 下验收。

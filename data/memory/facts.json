@@ -1,6 +1,18 @@
 {
   "facts": [
     {
+      "id": "mem-ab542701e1",
+      "content": "EVAL-T6-20261016: preferred meeting briefing language is Chinese （会议 brief 用中文）",
+      "tags": [
+        "meeting",
+        "briefing",
+        "language",
+        "preference"
+      ],
+      "created_at": "2026-10-16T16:53:15.254456+00:00",
+      "updated_at": "2026-10-16T16:53:15.254467+00:00"
+    },
+    {
       "id": "mem-mentor-001",
       "content": "My FYP supervisor/mentor is Wang Zhipeng (王志鹏). 我的 FYP 导师是 Wang Zhipeng（王志鹏）。",
       "tags": [
