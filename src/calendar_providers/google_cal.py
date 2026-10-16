@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -15,6 +16,10 @@ from src.config import (
 # 读日历列表 + 读写事件；比旧版 readonly 更大，升级后需重新授权
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
+# 日历列表几乎不变，每次都拉一遍要多等一个来回
+CALENDAR_LIST_TTL_S = 600
+_calendar_cache: dict[str, tuple[float, list[dict[str, str]]]] = {}
+
 
 def _local_tz():
     return datetime.now().astimezone().tzinfo
@@ -23,11 +28,16 @@ def _local_tz():
 class GoogleCalendarProvider:
     name = "google"
 
-    def query_events(self, date: str, time_of_day: TimeOfDay | str = "all") -> dict[str, Any]:
+    def query_events(
+        self,
+        date: str,
+        time_of_day: TimeOfDay | str = "all",
+        days: int = 1,
+    ) -> dict[str, Any]:
         service = _build_service()
-        calendars = _resolve_calendars(service, get_google_calendar_id())
-        day_start = datetime.fromisoformat(f"{date}T00:00:00").replace(tzinfo=_local_tz())
-        day_end = day_start + timedelta(days=1)
+        calendars = _calendars(service)
+        range_start = datetime.fromisoformat(f"{date}T00:00:00").replace(tzinfo=_local_tz())
+        range_stop = range_start + timedelta(days=max(1, days))
 
         events: list[dict[str, Any]] = []
         for cal in calendars:
@@ -35,11 +45,11 @@ class GoogleCalendarProvider:
                 service.events()
                 .list(
                     calendarId=cal["id"],
-                    timeMin=day_start.isoformat(),
-                    timeMax=day_end.isoformat(),
+                    timeMin=range_start.isoformat(),
+                    timeMax=range_stop.isoformat(),
                     singleEvents=True,
                     orderBy="startTime",
-                    maxResults=50,
+                    maxResults=250,
                 )
                 .execute()
             )
@@ -58,6 +68,7 @@ class GoogleCalendarProvider:
                         "end": end,
                         "location": item.get("location"),
                         "notes": item.get("description"),
+                        "all_day": "dateTime" not in (item.get("start") or {}),
                     }
                 )
                 event["calendar"] = cal["summary"]
@@ -68,6 +79,7 @@ class GoogleCalendarProvider:
             "source": self.name,
             "calendars": [c["summary"] for c in calendars],
             "date": date,
+            "days": max(1, days),
             "time_of_day": time_of_day,
             "events": events,
         }
@@ -119,6 +131,16 @@ def _to_event_time(iso: str) -> dict[str, str]:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=_local_tz())
     return {"dateTime": dt.isoformat()}
+
+
+def _calendars(service) -> list[dict[str, str]]:
+    setting = get_google_calendar_id()
+    cached = _calendar_cache.get(setting)
+    if cached and time.monotonic() - cached[0] < CALENDAR_LIST_TTL_S:
+        return cached[1]
+    calendars = _resolve_calendars(service, setting)
+    _calendar_cache[setting] = (time.monotonic(), calendars)
+    return calendars
 
 
 def _resolve_calendars(service, setting: str) -> list[dict[str, str]]:
@@ -200,6 +222,18 @@ def _build_service():
         GOOGLE_TOKEN_PATH.write_text(creds.to_json(), encoding="utf-8")
 
     return build("calendar", "v3", credentials=creds, cache_discovery=False)
+
+
+def warm_up() -> None:
+    """服务启动时先备好客户端和日历列表；只在已经授权过时做，绝不弹出授权页。"""
+    if not GOOGLE_TOKEN_PATH.is_file():
+        return
+    from google.oauth2.credentials import Credentials
+
+    creds = Credentials.from_authorized_user_file(str(GOOGLE_TOKEN_PATH), SCOPES)
+    if not _scopes_sufficient(creds) or not (creds.valid or creds.refresh_token):
+        return
+    _calendars(_build_service())
 
 
 def ensure_google_login() -> str:

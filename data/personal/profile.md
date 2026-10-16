@@ -1,37 +1,24 @@
-# Personal Profile — Jimmy
+# Jimmy
 
-## Identity
-- Name: Jimmy (Zepeng Jia)
-- Role: University of Manchester CS Year 3, doing FYP
-- FYP: Personal AI Assistant (single-agent + tools)
-- FYP supervisor / mentor: Wang Zhipeng (王志鹏)
+## Who he is
+- Jimmy (Zepeng Jia), Computer Science Year 3 at the University of Manchester
+- Final Year Project: building a Personal AI Agent — this assistant
+- FYP supervisor: Wang Zhipeng (王志鹏)
 
-## Preferences
-- Prefer short Chinese replies; lead with the answer
-- Schedule answers should use real calendar tools (include imported course timetable)
+## How he likes answers
+- Short, in Chinese, answer first
 - Afternoon = 12:00–17:00; evening starts at 17:00
-- When preparing meetings: give time/place, project summary, 3 discussion points
+- For a meeting: time and place, where things stand, 3 discussion points — drawing on the proposal, recent notes and related mail
 
-## Courses (term context)
-- COMP34111 AI and Games
-- COMP33511 User Experience
-- BMAN30021 Marketing
-- Other CS modules as on the university timetable calendar (`Mr Zepeng Jia`)
+## Term
+- Modules include COMP34111 AI and Games, COMP33511 User Experience, BMAN30021 Marketing
+- The full timetable is the imported university calendar (`Mr Zepeng Jia`)
+- On busy days: lectures and labs first, in time order; evenings are for project work
 
-## Email
-- University Outlook exists, but Azure app registration is blocked for students
-- Integration demo uses personal Gmail (read/modify/send)
-- Search mail for FYP / mentor when preparing meetings
+## Accounts
+- Personal Gmail is connected
+- University Outlook is not connected
 
-## Memory
-- Dynamic facts go to local memory tools (remember_fact / search_memory), not only this profile file
-- Prefer recalling mentor email / standing preferences from memory when preparing meetings
-
-## Autonomy / Approval
-- Allowed without asking: read calendar, read mail, mark mail read, search/read notes, remember facts, draft briefs
-- Must ask before doing: create calendar events, send email, archive/trash mail, forget memory, share files
-- If unsure whether an action is risky, ask
-
-## Working style
-- Busy term days: prioritize lectures/labs chronologically, then evening project blocks
-- FYP mentor meetings: pull proposal + recent notes + relevant mail into the brief
+## What needs his OK
+- Fine without asking: reading calendar, mail and notes; marking mail read; remembering what he tells you; drafting
+- Ask once first: creating events, sending mail, archiving or trashing mail, deleting memories

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from typing import Any, Literal
 
 TimeOfDay = Literal["morning", "afternoon", "evening", "all"]
@@ -28,7 +28,7 @@ def in_time_of_day(start_iso: str, time_of_day: TimeOfDay | str) -> bool:
 
 
 def normalize_event(event: dict[str, Any]) -> dict[str, Any]:
-    return {
+    normalized = {
         "id": event.get("id"),
         "title": event.get("title"),
         "start": event.get("start"),
@@ -36,3 +36,23 @@ def normalize_event(event: dict[str, Any]) -> dict[str, Any]:
         "location": event.get("location"),
         "notes": event.get("notes"),
     }
+    if event.get("all_day"):
+        normalized["all_day"] = True
+    return normalized
+
+
+def range_end(start_date: str, days: int) -> str:
+    """[start_date, range_end) 的右端，YYYY-MM-DD。"""
+    return (date.fromisoformat(start_date) + timedelta(days=days)).isoformat()
+
+
+def is_background_span(event: dict[str, Any]) -> bool:
+    """跨多天的全天事件（教学周期、学期）只是背景，不是某一天的安排。"""
+    if not event.get("all_day"):
+        return False
+    try:
+        start = date.fromisoformat(str(event.get("start"))[:10])
+        end = date.fromisoformat(str(event.get("end"))[:10])
+    except ValueError:
+        return False
+    return end - start > timedelta(days=1)

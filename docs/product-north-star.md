@@ -15,6 +15,28 @@
 6. **Earn action** — 读自动，写/发确认一次  
 7. **Tuesday test** — 普通周二愿不愿意打开？不愿意 = 未完成  
 
+## 体验的四个时刻
+
+1. **打开** — 双击 `Personal Agent.cmd`，它先开口：此刻最该知道的事。日历由服务端直接读，回答边想边出字。  
+2. **问** — 它本来就认识你：此刻时间、档案、记得的事每一轮都在上下文里，不靠模型「想起来去查」。  
+3. **说一次** — 顺口提到的长期事实它会记下；纠正一次就改对。记忆只存在本机（`data/memory/facts.json` 不进 Git）。  
+4. **做事** — 写/发确认一次；只有它真在等确认时，「好的」才算同意。  
+
+刷新页面不丢对话；同一天两小时内回来算同一次会话，否则重新开场。
+
+## 每天怎么开
+
+双击仓库根目录的 `Personal Agent.cmd`：会重启本地服务（避免旧进程跑旧代码）并打开浏览器。  
+命令行：`.\.venv\Scripts\python.exe scripts\open_agent.py`；只重启：`--no-browser`；停止：`--stop`。服务日志在 `data/logs/`。
+
+## 门禁怎么看
+
+```powershell
+.\.venv\Scripts\python.exe scripts\usage_report.py
+```
+
+最近 7 天每天打开几次、聊了几条、等第一个字多久、出错几次。只记元数据、不记对话内容，数据在本机 `data/usage/`。
+
 ## 爱用门禁（先于评测）
 
 连续一个普通周期主动打开，且：关系成立、少当自己的秘书、品味利落、零幻觉。  
@@ -22,14 +44,4 @@
 **在 Tuesday test 通过前：不扩写评测任务、不合 `main`、不打新 milestone tag。**  
 现有 [evaluation/](evaluation/) 证据冻结，报告需要时再摘。
 
-## 每天怎么开
-
-```bash
-# Windows（仓库根目录）
-.\scripts\start.ps1
-
-# 或
-.\.venv\Scripts\python.exe -m src.main
-```
-
-打开 [http://127.0.0.1:8765](http://127.0.0.1:8765) — 应直接看到「认识你」的个人态势，而不是 Demo 按钮墙。
+解冻时注意：档案和记忆改为每轮注入后，模型不再需要调用 `get_personal_context` / `search_memory`，T4、T6b、T6c 的「是否调用某工具」判据要改成看回答是否忠实、是否体现档案与记忆。

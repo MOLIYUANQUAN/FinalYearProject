@@ -1,4 +1,4 @@
-"""日历数据源：mock（默认）或 google（只读）。"""
+"""日历数据源：mock（演示）或 google（真实日历）。"""
 
 from __future__ import annotations
 
@@ -10,7 +10,9 @@ from src.config import get_calendar_backend
 class CalendarProvider(Protocol):
     name: str
 
-    def query_events(self, date: str, time_of_day: str = "all") -> dict[str, Any]:
+    def query_events(
+        self, date: str, time_of_day: str = "all", days: int = 1
+    ) -> dict[str, Any]:
         ...
 
 

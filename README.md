@@ -79,17 +79,16 @@ cp .env.example .env
 - 页面健康检查显示「缺少 OPENAI_API_KEY」；
 - `/api/chat` 返回 **503** 与中文错误说明。
 
-### 3. 启动
+### 3. 打开
+
+双击仓库根目录的 **`Personal Agent.cmd`**：重启本地服务并打开 <http://127.0.0.1:8765>，它会先开口告诉你此刻最该知道的事。
 
 ```powershell
-# Windows 一键
-.\scripts\start.ps1
-
-# 或
-.\.venv\Scripts\python.exe -m src.main
+.\.venv\Scripts\python.exe scripts\open_agent.py              # 同上（命令行）
+.\.venv\Scripts\python.exe scripts\open_agent.py --no-browser # 只重启服务
+.\.venv\Scripts\python.exe scripts\open_agent.py --stop       # 停止
+.\.venv\Scripts\python.exe scripts\usage_report.py            # Tuesday test：最近 7 天用了几天、首字多快
 ```
-
-浏览器打开：<http://127.0.0.1:8765> — 应直接看到个人态势（认识你 + 今天），无 Demo 按钮墙。
 
 ### 4. 可选 CLI 三条 Demo
 

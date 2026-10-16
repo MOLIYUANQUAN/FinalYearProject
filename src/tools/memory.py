@@ -10,23 +10,24 @@ from src import memory_store
 
 
 @function_tool
-def remember_fact(content: str, tags: str = "") -> dict[str, Any]:
-    """把关于用户的事实或偏好写入长期记忆（本地）。
+def remember_fact(content: str, tags: str = "", replaces: str = "") -> dict[str, Any]:
+    """把关于他的长期事实或偏好写入记忆（只存本机）。
 
-    当用户说「记住…」「以后用…」时调用。不要写入敏感密码。
+    他说「记住…」、或顺带说出关于自己的长期事实/偏好时调用。
+    他纠正一条已有记忆时，用 replaces 传旧记忆的 id，新事实直接替换旧的（纠正不需要确认）。
+    不要写入密码、一次性的事、或你自己的推测。
 
     Args:
-        content: 要记住的事实（一句话，完整可检索）。
-        tags: 可选标签，逗号或空格分隔，如 fyp,mentor,email。
+        content: 一句完整的事实，脱离上下文也能看懂。
+        tags: 可选标签，逗号分隔，如 fyp,mentor。
+        replaces: 被纠正的旧记忆 id（「你记得的事」里方括号中的 id）；不是纠正就留空。
     """
-    return memory_store.remember_fact(content=content, tags=tags)
+    return memory_store.remember_fact(content=content, tags=tags, replaces=replaces)
 
 
 @function_tool
 def search_memory(query: str, top: int = 5) -> dict[str, Any]:
-    """按关键词检索长期记忆中的事实。
-
-    在个性化回答、准备会议、需要导师邮箱/偏好等时先检索，不要编造。
+    """在更早的记忆里按关键词检索。最近的记忆已经在你的上下文里，只有那里找不到时才用。
 
     Args:
         query: 检索词，中英文均可，如 导师、mentor email、FYP、偏好。
@@ -38,10 +39,10 @@ def search_memory(query: str, top: int = 5) -> dict[str, Any]:
 @function_tool
 def forget_fact(fact_id: str, user_confirmed: bool = False) -> dict[str, Any]:
     """删除一条长期记忆。必须先 request_user_confirmation，用户同意后
-    以 user_confirmed=True 调用。
+    以 user_confirmed=True 调用。纠正记忆请用 remember_fact(replaces=...)，不要用这个。
 
     Args:
-        fact_id: search_memory 返回的 id。
+        fact_id: 记忆 id。
         user_confirmed: 用户是否已确认删除。
     """
     if not user_confirmed:

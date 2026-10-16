@@ -7,30 +7,47 @@ from typing import Any
 from agents import function_tool
 
 from src.calendar_providers import get_calendar_provider
-from src.calendar_providers.common import TimeOfDay
+from src.calendar_providers.common import TimeOfDay, is_background_span
+
+MAX_DAYS = 14
 
 
 def query_calendar_events(
     date: str,
     time_of_day: TimeOfDay = "all",
+    days: int = 1,
 ) -> dict[str, Any]:
     """按日期查询日历事件（纯函数，供测试与工具共用）。"""
     provider = get_calendar_provider()
-    return provider.query_events(date=date, time_of_day=time_of_day)
+    result = provider.query_events(
+        date=date,
+        time_of_day=time_of_day,
+        days=min(max(days, 1), MAX_DAYS),
+    )
+    events = list(result.get("events") or [])
+    background = [e for e in events if is_background_span(e)]
+    if background:
+        result["events"] = [e for e in events if not is_background_span(e)]
+        result["background"] = sorted({str(e.get("title")) for e in background})
+    return result
 
 
 @function_tool
 def get_calendar_events(
     date: str,
     time_of_day: TimeOfDay = "all",
+    days: int = 1,
 ) -> dict[str, Any]:
-    """按日期查询日历事件（mock 或 Google）。
+    """读他的日历（含导入的大学课表）。
+
+    返回里的 background 是跨多天的背景（如教学周期、学期），不是那几天的具体安排；他没问起就别提。
 
     Args:
-        date: 具体日期，格式 YYYY-MM-DD（例如 2026-10-13）。相对词如「明天」须先解析成该格式。
+        date: 起始日期，格式 YYYY-MM-DD（例如 2026-10-13）。「明天」「周一」这类说法先换算成具体日期。
         time_of_day: 可选时段过滤：morning / afternoon / evening / all。
+        days: 连续看几天（1–14）。问「这周还有什么」就从今天看到周日，一次查完。
     """
-    return query_calendar_events(date=date, time_of_day=time_of_day)
+    return query_calendar_events(date=date, time_of_day=time_of_day, days=days)
 
 
 @function_tool

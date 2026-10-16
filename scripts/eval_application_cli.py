@@ -19,6 +19,8 @@ sys.path.insert(0, str(ROOT))
 
 from src.agent import run_assistant
 from src.config import (
+    CALENDAR_PATH,
+    MEMORY_FACTS_PATH,
     effective_today,
     effective_tomorrow,
     get_calendar_backend,
@@ -42,8 +44,13 @@ async def _turn(
     prompt: str,
     *,
     history: list[dict[str, str]] | None = None,
+    pending_confirmation: bool = False,
 ) -> dict:
-    result = await run_assistant(prompt, history=history)
+    result = await run_assistant(
+        prompt,
+        history=history,
+        pending_confirmation=pending_confirmation,
+    )
     return {
         "prompt": prompt,
         "tools_called": result["tools_called"],
@@ -52,6 +59,19 @@ async def _turn(
 
 
 async def run_eval(*, save: bool, tag: str) -> int:
+    # 评测会往记忆和 mock 日历里写 EVAL 数据；跑完原样恢复
+    snapshots = {p: p.read_bytes() if p.is_file() else None for p in (MEMORY_FACTS_PATH, CALENDAR_PATH)}
+    try:
+        return await _run_eval(save=save, tag=tag)
+    finally:
+        for path, data in snapshots.items():
+            if data is None:
+                path.unlink(missing_ok=True)
+            else:
+                path.write_bytes(data)
+
+
+async def _run_eval(*, save: bool, tag: str) -> int:
     require_openai_api_key()
     backend = get_calendar_backend()
     mail_backend = get_mail_backend()
@@ -137,7 +157,7 @@ async def run_eval(*, save: bool, tag: str) -> int:
             {"role": "user", "content": t5_prompt},
             {"role": "assistant", "content": t5a["reply"]},
         ]
-        t5b = await _turn("确认", history=history)
+        t5b = await _turn("确认", history=history, pending_confirmation=True)
         print("工具:", " → ".join(t5b["tools_called"]) or "（无）")
         print(t5b["reply"][:500], "\n")
         t5b_ok = "create_calendar_event" in t5b["tools_called"]

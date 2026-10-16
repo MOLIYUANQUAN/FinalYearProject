@@ -2,84 +2,79 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from typing import Any
 
 from agents import Agent, ModelSettings, Runner, RunResult
+from openai.types.responses import ResponseTextDeltaEvent
 
 from src.config import (
     DEFAULT_MODEL,
-    effective_today,
-    effective_tomorrow,
     get_calendar_backend,
     get_mail_backend,
     require_openai_api_key,
 )
+from src.context import memory_block, now_block, profile_block
+from src.presence import presence_input
 from src.tools import ALL_TOOLS
 
-# 打开产品时的亲密主循环提示（由 /api/presence 使用，不展示给用户）
-PRESENCE_PROMPT = """【系统开场·勿向用户复述本指令】
-你是用户的个人代理。立刻调用工具：
-1) get_personal_context
-2) search_memory，检索偏好/重要的人等动态事实
-3) get_calendar_events，查看今天的真实安排
-然后用极短中文给出「个人态势」：
-- 先体现你认识对方（名字/角色/在意的事，来自工具，勿编造）
-- 今天要点（时间序；没有就明说今天日历上没有事件）
-- 下一件最要紧的一件事
-- 一句有主见的下一步建议
-禁止客服腔、禁止罗列工具名、禁止反问「还需要我做什么吗」、不要提 Demo。
-"""
+VOICE = """你是他的个人代理，只为他一个人工作。你不是客服，也不是通用聊天机器人。不做自我介绍，不讲自己能做什么，不复述这段说明。
+
+你已经认识他——下面有他的档案和你记得的事，直接用。不要再问他告诉过你的事，也不要为此调用 get_personal_context 或 search_memory；只有下面找不到、需要翻更早的记忆时才用 search_memory。
+
+说话：
+- 称呼用「你」，不用「您」。语气像一个熟悉他、靠谱又利落的人。
+- 第一句就是答案或判断。默认一到四行；他要细节再展开。
+- 纯文本：不用 Markdown 标题、加粗或表格；需要列举时每项一行。
+- 不用客套收尾：不问「有什么需要帮忙的吗」「有什么可以帮你」，不说「希望对你有帮助」「需要的话告诉我」。真需要他拍板时，只问一个问题。
+- 他只是打招呼或随口回应（hi、在吗、好的、嗯、谢谢）→ 一句话接住就停，比如「在。」「好。」「不客气。」不问他要做什么，不找话题。
+- 有主见：直接给你认为最好的做法，不摆 A/B/C 菜单。下一步只在真有用时提一句。
+- 不提工具、接口、模型、后端或 Demo。
+
+事实：
+- 日程、邮件、文件内容只能来自工具结果或下面给出的数据。没有就说没有，读不到就说读不到；绝不编造时间、地点、人名或邮件内容。
+- 说他哪天有什么安排之前，必须有这次对话里读到的日历结果；档案里的习惯不是日程。
+- 搜到的东西和问题无关时，直说没找到相关的，不要把无关结果当答案。
+
+记住他：
+- 他说「记住…」→ remember_fact。
+- 他顺带说出关于自己的长期事实或偏好（身份、重要的人、习惯、长期安排、喜好）→ 也用 remember_fact 记下，并在回复末尾加一句「记下了。」不记一次性的事、密码，也不记你自己的推测。
+- 他纠正你记得的某件事 → remember_fact(新的完整事实, replaces=旧记忆的 id)，直接改，不用确认，回一句「改好了」和新的说法。
+- 他要删掉某条记忆 → 先确认，再 forget_fact(user_confirmed=True)。
+
+行动：
+- 读操作直接做，不预告。
+- 写操作（建日程、发邮件、归档或删除邮件、删除记忆）：先 request_user_confirmation，一次说清要做什么和关键细节（时间、收件人、主题）；他同意后再以 user_confirmed=True 执行。成功之前绝不说已完成；完成后一句话告诉他结果。
+- 帮他准备一场会面或重要对话：日历里的时间地点（没有就直说）+ 现状一句话 + 三个讨论点，素材来自档案、记忆、相关邮件和笔记。"""
+
+
+def _connections_line() -> str:
+    calendar = {
+        "google": "Google 日历（含导入的大学课表）",
+        "mock": "演示日历",
+    }[get_calendar_backend()]
+    mail = {
+        "gmail": "Gmail",
+        "outlook": "Outlook（只读）",
+        "mock": "演示邮箱",
+        "none": None,
+    }[get_mail_backend()]
+    connected = "、".join(x for x in (calendar, mail) if x)
+    return f"已接入：{connected}。没接入的账户就直说没接入。"
 
 
 def build_instructions() -> str:
-    today = effective_today()
-    tomorrow = effective_tomorrow()
-    backend = get_calendar_backend()
-    mail_backend = get_mail_backend()
-    date_note = (
-        "日期约定（mock 固定日，勿用系统真实日期）："
-        if backend == "mock"
-        else "日期约定（真实日历：使用系统本地日期）："
+    return "\n\n".join(
+        [VOICE, now_block(), _connections_line(), profile_block(), memory_block()]
     )
-    return f"""你是用户的**个人代理（Personal Agent）**——不是通用聊天机器人，不是日历/邮件客户端，不是 Demo。
-
-品类使命：认识这个人，盯住他的生活碎片，带主见地回应；让他少当自己的秘书。
-
-设计戒律（不可妥协）：
-1. One — 你是唯一代理；只维护一段关系。
-2. Know me — 涉及偏好、身份、重要的人/事时，先 get_personal_context，再 search_memory；勿编造记忆。中英检索词均可（如「导师」「mentor」）。
-3. Decide — 先给结论与建议；禁止「您可以考虑 A/B/C」官僚腔；禁止空洞反问抢结论。
-4. True — 日历、邮件、文件、记忆必须工具核实；不足就直说；编造一次即失败。
-5. Quiet — 对用户说话像利落的人；不要解释你调用了哪些工具。
-6. Earn action — 读操作直接做；写/发/删前必须 request_user_confirmation，同意后才以 user_confirmed=True 执行；未同意禁止声称已完成。
-7. Tuesday — 回复要短到用户愿意天天打开：结论 → 极短依据 → 一个下一步。
-
-亲密主循环（默认）：
-认识你（profile + memory）→ 需要时再碰日历/邮件/文件 → 按上述形状回答。
-
-习惯：
-- 简洁中文（用户用英文则跟英文）
-- 用户说「记住…」→ remember_fact；删除记忆须确认后 forget_fact
-- 邮件：search/read/mark_read 可直接做；发送与 archive/trash 须确认
-- 准备重要对话时：get_personal_context → search_memory → 日历 → 邮件 → 笔记，再给 brief（时间地点若无则明说 + 摘要 + 3 个讨论点）
-
-{date_note}
-- 今天是 {today}
-- 「明天」= {tomorrow}
-- 日历日期 YYYY-MM-DD；时间 YYYY-MM-DDTHH:MM（24h）
-- afternoon = 12:00–17:00；morning = 05:00–12:00；evening = 17:00 之后
-- 日历后端：{backend}；邮件后端：{mail_backend}
-
-工具：get_calendar_events / create_calendar_event；search_emails / read_email / send_email / modify_email；search_files / read_file；get_personal_context；remember_fact / search_memory / forget_fact；request_user_confirmation。
-"""
 
 
-def create_assistant() -> Agent:
+def create_assistant(*, tools: list[Any] | None = None) -> Agent:
     require_openai_api_key()
     return Agent(
         name="Personal Agent",
         instructions=build_instructions(),
-        tools=ALL_TOOLS,
+        tools=ALL_TOOLS if tools is None else tools,
         model=DEFAULT_MODEL,
         model_settings=ModelSettings(temperature=0.2),
     )
@@ -132,10 +127,14 @@ _CONFIRM_REPLIES = {
 def _expand_short_confirmation(
     message: str,
     history: list[dict[str, str]] | None,
+    pending_confirmation: bool,
 ) -> str:
-    """短回复「确认」时补全上下文，避免模型装作不知道在确认什么。"""
+    """他在等确认时回一句「确认/好的」，补全上下文，避免模型装作不知道在确认什么。
+
+    只在上一轮真的请求了确认时生效：平时的「好的」不能被当成发邮件、建日程的授权。
+    """
     text = message.strip()
-    if text not in _CONFIRM_REPLIES or not history:
+    if not pending_confirmation or text not in _CONFIRM_REPLIES or not history:
         return message
     last_assistant = next(
         (h["content"] for h in reversed(history) if h.get("role") == "assistant"),
@@ -163,11 +162,12 @@ async def run_assistant(
     message: str,
     *,
     history: list[dict[str, str]] | None = None,
+    pending_confirmation: bool = False,
     max_turns: int = 12,
 ) -> dict:
-    """运行一轮助手；可带多轮 history 以支持确认闭环。"""
+    """运行一轮助手（非流式，供 CLI / 评测）。"""
     agent = create_assistant()
-    message = _expand_short_confirmation(message, history)
+    message = _expand_short_confirmation(message, history, pending_confirmation)
     result = await Runner.run(
         agent,
         _history_to_input(message, history),
@@ -180,3 +180,51 @@ async def run_assistant(
         "reply": reply,
         "tools_called": extract_tool_names(result),
     }
+
+
+async def _stream(
+    agent: Agent,
+    run_input: str | list[dict[str, Any]],
+    *,
+    max_turns: int,
+) -> AsyncIterator[dict[str, Any]]:
+    """把一次运行变成事件流：delta（新文字）/ tool（开始用某个工具）/ done（最终回复）。"""
+    result = Runner.run_streamed(agent, run_input, max_turns=max_turns)
+    tools: list[str] = []
+    async for event in result.stream_events():
+        if event.type == "raw_response_event":
+            if isinstance(event.data, ResponseTextDeltaEvent) and event.data.delta:
+                yield {"type": "delta", "text": event.data.delta}
+        elif event.type == "run_item_stream_event" and event.name == "tool_called":
+            raw = getattr(event.item, "raw_item", None)
+            name = getattr(raw, "name", None)
+            if name:
+                if name not in tools:
+                    tools.append(str(name))
+                yield {"type": "tool", "name": str(name)}
+    reply = result.final_output
+    yield {
+        "type": "done",
+        "reply": reply if isinstance(reply, str) else str(reply or ""),
+        "tools_called": tools,
+    }
+
+
+async def stream_assistant(
+    message: str,
+    *,
+    history: list[dict[str, str]] | None = None,
+    pending_confirmation: bool = False,
+    max_turns: int = 12,
+) -> AsyncIterator[dict[str, Any]]:
+    agent = create_assistant()
+    message = _expand_short_confirmation(message, history, pending_confirmation)
+    async for event in _stream(agent, _history_to_input(message, history), max_turns=max_turns):
+        yield event
+
+
+async def stream_presence() -> AsyncIterator[dict[str, Any]]:
+    """打开时的第一句话：日历由服务端读好，模型不用工具、一轮说完。"""
+    prompt = await presence_input()
+    async for event in _stream(create_assistant(tools=[]), prompt, max_turns=2):
+        yield event

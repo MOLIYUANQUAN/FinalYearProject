@@ -6,20 +6,31 @@ import json
 from typing import Any
 from uuid import uuid4
 
-from src.calendar_providers.common import TimeOfDay, in_time_of_day, normalize_event
+from src.calendar_providers.common import (
+    TimeOfDay,
+    in_time_of_day,
+    normalize_event,
+    range_end,
+)
 from src.config import CALENDAR_PATH
 
 
 class MockCalendarProvider:
     name = "mock"
 
-    def query_events(self, date: str, time_of_day: TimeOfDay | str = "all") -> dict[str, Any]:
+    def query_events(
+        self,
+        date: str,
+        time_of_day: TimeOfDay | str = "all",
+        days: int = 1,
+    ) -> dict[str, Any]:
         raw_events = _load_raw_events()
+        stop = range_end(date, max(1, days))
 
         events = []
         for event in raw_events:
             start = event.get("start") or ""
-            if not start.startswith(date):
+            if not date <= start[:10] < stop:
                 continue
             if not in_time_of_day(start, time_of_day):
                 continue
@@ -29,6 +40,7 @@ class MockCalendarProvider:
         return {
             "source": self.name,
             "date": date,
+            "days": max(1, days),
             "time_of_day": time_of_day,
             "events": events,
         }

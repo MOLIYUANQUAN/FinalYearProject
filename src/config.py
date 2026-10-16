@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -18,12 +18,14 @@ MAIL_DIR = DATA_DIR / "mail"
 MAIL_MOCK_PATH = MAIL_DIR / "messages.json"
 MEMORY_DIR = DATA_DIR / "memory"
 MEMORY_FACTS_PATH = MEMORY_DIR / "facts.json"
+USAGE_LOG_PATH = DATA_DIR / "usage" / "events.jsonl"
 STATIC_DIR = ROOT_DIR / "static"
 SECRETS_DIR = ROOT_DIR / "secrets"
 
 # 演示固定「今天」：仅 mock 后端使用，保证 Demo 可复现。详见 README / docs。
 MOCK_TODAY = "2026-10-12"
 MOCK_TOMORROW = "2026-10-13"
+MOCK_NOW_TIME = "09:00"
 
 DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
 
@@ -87,6 +89,13 @@ def effective_tomorrow() -> str:
     if get_calendar_backend() == "mock":
         return MOCK_TOMORROW
     return (date.today() + timedelta(days=1)).isoformat()
+
+
+def effective_now() -> datetime:
+    """Agent 眼中的「此刻」：mock 固定在 MOCK_TODAY 早上，google 用本地真实时间。"""
+    if get_calendar_backend() == "mock":
+        return datetime.fromisoformat(f"{MOCK_TODAY}T{MOCK_NOW_TIME}")
+    return datetime.now().replace(second=0, microsecond=0)
 
 
 def require_openai_api_key() -> str:

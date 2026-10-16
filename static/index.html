@@ -8,22 +8,21 @@
     :root {
       --bg: #f3f0ea;
       --ink: #1c1a16;
-      --muted: #5c574e;
-      --line: #d8d2c6;
+      --soft: #5c574e;
+      --muted: #8f897d;
+      --line: #e2dccf;
       --panel: #fffcf7;
       --accent: #0f5c4c;
-      --accent-soft: #dceee8;
       --danger: #8b2e2e;
-      --user: #e8e2d6;
-      --bot: #fffcf7;
-      --radius: 10px;
-      --font: "IBM Plex Sans", "Noto Sans SC", "PingFang SC", "Segoe UI", sans-serif;
+      --user: #e9e3d7;
+      --radius: 12px;
+      --font: "IBM Plex Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei UI", "Segoe UI", sans-serif;
       --mono: "IBM Plex Mono", "SF Mono", ui-monospace, monospace;
     }
     * { box-sizing: border-box; }
+    html, body { height: 100%; }
     body {
       margin: 0;
-      min-height: 100vh;
       font-family: var(--font);
       color: var(--ink);
       background:
@@ -32,94 +31,111 @@
         var(--bg);
     }
     main {
-      max-width: 720px;
+      max-width: 680px;
+      height: 100vh;
       margin: 0 auto;
-      padding: 28px 16px 40px;
+      padding: 22px 16px 18px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
-      min-height: 100vh;
+      gap: 14px;
     }
-    header h1 {
-      margin: 0 0 6px;
-      font-size: 1.7rem;
-      letter-spacing: -0.03em;
-    }
-    header p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 0.95rem;
-      line-height: 1.45;
-    }
-    .meta {
+    header {
       display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 10px;
-    }
-    .chip {
-      font-family: var(--mono);
-      font-size: 0.75rem;
-      padding: 4px 8px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      background: var(--panel);
-      color: var(--muted);
-    }
-    .chip.ok { background: var(--accent-soft); color: var(--accent); border-color: #b7d6cc; }
-    .chip.bad { background: #f7e4e4; color: var(--danger); border-color: #e2bcbc; }
-    #log {
-      flex: 1;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 14px;
-      overflow-y: auto;
-      min-height: 360px;
-      max-height: min(58vh, 560px);
-      display: flex;
-      flex-direction: column;
+      align-items: baseline;
+      justify-content: space-between;
       gap: 12px;
     }
+    header h1 {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .right {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    #newChat {
+      font: inherit;
+      color: var(--muted);
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+    }
+    #newChat:hover { color: var(--accent); }
+    #log {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 4px 2px 8px;
+    }
     .msg {
-      max-width: 92%;
-      padding: 10px 12px;
-      border-radius: var(--radius);
-      line-height: 1.55;
+      max-width: 88%;
+      line-height: 1.7;
       white-space: pre-wrap;
       word-break: break-word;
-      border: 1px solid var(--line);
     }
     .msg.user {
       align-self: flex-end;
       background: var(--user);
+      padding: 9px 13px;
+      border-radius: var(--radius);
     }
     .msg.bot {
       align-self: flex-start;
-      background: var(--bot);
-    }
-    .msg.system {
-      align-self: stretch;
-      background: transparent;
-      border-style: dashed;
-      color: var(--muted);
-      font-size: 0.9rem;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      padding: 11px 14px;
+      border-radius: var(--radius);
     }
     .msg.error {
       align-self: stretch;
+      max-width: none;
       background: #f7e4e4;
-      border-color: #e2bcbc;
+      border: 1px solid #e2bcbc;
       color: var(--danger);
+      padding: 10px 13px;
+      border-radius: var(--radius);
     }
-    .actions {
-      margin-top: 8px;
+    .msg a { color: var(--accent); }
+    .typing {
+      display: inline-flex;
+      gap: 4px;
+      align-items: center;
+      height: 1.2em;
+      vertical-align: middle;
     }
+    .typing i {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--muted);
+      opacity: 0.3;
+      animation: pulse 1.2s infinite ease-in-out;
+    }
+    .typing i:nth-child(2) { animation-delay: 0.15s; }
+    .typing i:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes pulse {
+      0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
+      40% { opacity: 0.85; transform: translateY(-2px); }
+    }
+    .hint {
+      margin-left: 8px;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    .actions { margin-top: 10px; display: flex; gap: 8px; }
     .actions button {
       font: inherit;
-      font-size: 0.85rem;
-      padding: 6px 12px;
-      margin-right: 8px;
-      margin-top: 4px;
+      font-size: 0.9rem;
+      padding: 6px 14px;
       border-radius: 8px;
       border: 1px solid var(--accent);
       background: var(--accent);
@@ -127,239 +143,383 @@
       cursor: pointer;
     }
     .actions button.secondary {
-      background: var(--panel);
-      color: var(--ink);
+      background: transparent;
+      color: var(--soft);
       border-color: var(--line);
     }
-    .tools-fold {
-      margin-top: 8px;
+    .details {
+      margin-top: 6px;
       font-family: var(--mono);
       font-size: 0.72rem;
       color: var(--muted);
+      white-space: normal;
     }
-    .tools-fold summary {
+    .details summary {
       cursor: pointer;
       user-select: none;
-      color: var(--muted);
+      list-style: none;
+      opacity: 0.6;
     }
-    .tools-fold summary:hover { color: var(--accent); }
+    .details summary::-webkit-details-marker { display: none; }
+    .details summary:hover { opacity: 1; color: var(--accent); }
     form {
       display: flex;
       gap: 8px;
-      align-items: stretch;
+      align-items: flex-end;
     }
     #input {
       flex: 1;
       font: inherit;
+      line-height: 1.5;
       padding: 12px 14px;
       border-radius: var(--radius);
       border: 1px solid var(--line);
       background: var(--panel);
-      resize: vertical;
+      resize: none;
       min-height: 48px;
-      max-height: 140px;
+      max-height: 160px;
+      outline: none;
+    }
+    #input:focus {
+      border-color: #b9cfc6;
+      box-shadow: 0 0 0 3px rgba(15, 92, 76, 0.08);
     }
     #send {
       font: inherit;
       font-weight: 600;
+      height: 48px;
       padding: 0 18px;
       border: none;
       border-radius: var(--radius);
       background: var(--accent);
       color: #fff;
       cursor: pointer;
-      min-width: 88px;
     }
-    #send:disabled {
-      opacity: 0.55;
-      cursor: not-allowed;
-    }
-    footer {
-      color: var(--muted);
-      font-size: 0.8rem;
-    }
+    #send:disabled { opacity: 0.5; cursor: default; }
   </style>
 </head>
 <body>
   <main>
     <header>
       <h1>Personal Agent</h1>
-      <p>认识你 · 盯住生活碎片 · 带主见回应</p>
-      <div class="meta">
-        <span class="chip" id="keyStatus">检查中…</span>
-        <span class="chip" id="dateChip">—</span>
+      <div class="right">
+        <span id="today"></span>
+        <button type="button" id="newChat">新对话</button>
       </div>
     </header>
 
     <div id="log" role="log" aria-live="polite"></div>
 
     <form id="form">
-      <textarea id="input" rows="2" placeholder="直接说你需要什么" required></textarea>
+      <textarea id="input" rows="1" placeholder="问我，或者告诉我一件事" autocomplete="off"></textarea>
       <button id="send" type="submit">发送</button>
     </form>
-
-    <footer>读操作自动完成；写/发前会请你确认一次。</footer>
   </main>
 
   <script>
+    const STORE_KEY = "pa.session.v1";
+    const IDLE_MS = 2 * 60 * 60 * 1000;
+    const HISTORY_LIMIT = 20;
+    const HINTS = {
+      get_calendar_events: "看日历",
+      create_calendar_event: "写日历",
+      search_emails: "翻邮件",
+      read_email: "读邮件",
+      send_email: "发邮件",
+      modify_email: "整理邮件",
+      search_files: "找笔记",
+      read_file: "读笔记",
+      search_memory: "回想",
+      remember_fact: "记下",
+      forget_fact: "忘掉",
+    };
+
     const logEl = document.getElementById("log");
     const form = document.getElementById("form");
     const input = document.getElementById("input");
-    const send = document.getElementById("send");
-    const keyStatus = document.getElementById("keyStatus");
-    const dateChip = document.getElementById("dateChip");
-    /** @type {{role: string, content: string}[]} */
-    const history = [];
+    const sendBtn = document.getElementById("send");
+    const todayEl = document.getElementById("today");
+    const newChatBtn = document.getElementById("newChat");
 
-    function append(role, text, toolsText, actions) {
+    let session = null;
+    let busy = false;
+    let ready = false;
+
+    function freshSession() {
+      const now = Date.now();
+      return { startedAt: now, lastActiveAt: now, messages: [] };
+    }
+
+    // 同一天、两小时内回来算同一次会话；否则重新开场
+    function loadSession() {
+      try {
+        const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
+        if (!s || !Array.isArray(s.messages)) return null;
+        const sameDay = new Date(s.startedAt).toDateString() === new Date().toDateString();
+        if (!sameDay || Date.now() - s.lastActiveAt > IDLE_MS) return null;
+        return s;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function saveSession() {
+      session.lastActiveAt = Date.now();
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(session)); } catch (e) {}
+    }
+
+    function escapeHtml(s) {
+      return s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    // 模型偶尔仍会输出 Markdown：只做最小渲染，其余按纯文本显示
+    function render(text) {
+      return escapeHtml(text || "")
+        .replace(/^#{1,6}\s+/gm, "")
+        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+        .replace(/^(\s*)[-*•]\s+/gm, "$1· ")
+        .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+    }
+
+    function scrollDown() {
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function addMessage(role, text) {
       const div = document.createElement("div");
       div.className = "msg " + role;
-      div.appendChild(document.createTextNode(text));
-      if (toolsText) {
-        const details = document.createElement("details");
-        details.className = "tools-fold";
-        const summary = document.createElement("summary");
-        summary.textContent = "细节";
-        details.appendChild(summary);
-        const body = document.createElement("div");
-        body.textContent = toolsText;
-        details.appendChild(body);
-        div.appendChild(details);
-      }
-      if (actions && actions.length) {
-        const bar = document.createElement("div");
-        bar.className = "actions";
-        actions.forEach((a) => {
-          const b = document.createElement("button");
-          b.type = "button";
-          b.textContent = a.label;
-          if (a.secondary) b.className = "secondary";
-          b.onclick = () => chat(a.message);
-          bar.appendChild(b);
-        });
-        div.appendChild(bar);
-      }
+      if (text != null) div.innerHTML = render(text);
       logEl.appendChild(div);
-      logEl.scrollTop = logEl.scrollHeight;
+      scrollDown();
       return div;
     }
 
-    function setBusy(busy) {
-      send.disabled = busy;
+    function showTyping(div, hint) {
+      div.innerHTML =
+        '<span class="typing"><i></i><i></i><i></i></span>' +
+        (hint ? '<span class="hint">' + escapeHtml(hint) + "</span>" : "");
     }
 
-    async function refreshHealth() {
+    function addDetails(div, tools) {
+      const d = document.createElement("details");
+      d.className = "details";
+      const s = document.createElement("summary");
+      s.textContent = "细节";
+      const body = document.createElement("div");
+      body.textContent = tools.join(" → ");
+      d.append(s, body);
+      div.appendChild(d);
+    }
+
+    function addConfirm(div) {
+      const bar = document.createElement("div");
+      bar.className = "actions";
+      [
+        ["确认", "确认", false],
+        ["取消", "取消，先不要执行。", true],
+      ].forEach(([label, message, secondary]) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = label;
+        if (secondary) b.className = "secondary";
+        b.onclick = () => ask(message);
+        bar.appendChild(b);
+      });
+      div.appendChild(bar);
+    }
+
+    function clearActions() {
+      logEl.querySelectorAll(".actions").forEach((el) => el.remove());
+    }
+
+    function renderSession() {
+      logEl.innerHTML = "";
+      session.messages.forEach((m, i) => {
+        const div = addMessage(m.role === "user" ? "user" : "bot", m.content);
+        if (m.tools && m.tools.length) addDetails(div, m.tools);
+        if (m.needsConfirm && i === session.messages.length - 1) addConfirm(div);
+      });
+      scrollDown();
+    }
+
+    function awaitingConfirmation() {
+      const last = session.messages[session.messages.length - 1];
+      return !!(last && last.role === "assistant" && last.needsConfirm);
+    }
+
+    async function stream(url, payload, div) {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload || {}),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 404) {
+          throw new Error("本地服务还是旧版本：双击 Personal Agent.cmd 重开，再刷新这页。");
+        }
+        throw new Error(data.detail || "请求失败：" + res.status);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let text = "";
+      let result = null;
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let cut;
+        while ((cut = buffer.indexOf("\n\n")) >= 0) {
+          const frame = buffer.slice(0, cut);
+          buffer = buffer.slice(cut + 2);
+          if (!frame.startsWith("data: ")) continue;
+          const ev = JSON.parse(frame.slice(6));
+          if (ev.type === "delta") {
+            text += ev.text;
+            div.innerHTML = render(text);
+            scrollDown();
+          } else if (ev.type === "tool") {
+            text = "";
+            showTyping(div, HINTS[ev.name]);
+          } else if (ev.type === "done") {
+            result = { reply: ev.reply || text, tools: ev.tools_called || [] };
+          } else if (ev.type === "error") {
+            throw new Error(ev.message);
+          }
+        }
+      }
+      if (!result) throw new Error("连接断了，再试一次。");
+      return result;
+    }
+
+    function finish(div, reply, tools) {
+      div.innerHTML = render(reply);
+      const needsConfirm = tools.includes("request_user_confirmation");
+      if (tools.length) addDetails(div, tools);
+      if (needsConfirm) addConfirm(div);
+      session.messages.push({ role: "assistant", content: reply, tools, needsConfirm });
+      saveSession();
+      scrollDown();
+    }
+
+    function fail(div, err) {
+      div.className = "msg error";
+      div.textContent = (err && err.message) || String(err);
+    }
+
+    function setBusy(on) {
+      busy = on;
+      sendBtn.disabled = on;
+    }
+
+    async function presence() {
+      setBusy(true);
+      const div = addMessage("bot");
+      showTyping(div);
+      try {
+        const { reply } = await stream("/api/presence/stream", {}, div);
+        finish(div, reply, []);
+      } catch (e) {
+        fail(div, e);
+      } finally {
+        setBusy(false);
+        input.focus();
+      }
+    }
+
+    async function ask(message) {
+      if (busy || !ready) return;
+      setBusy(true);
+      clearActions();
+      const pending = awaitingConfirmation();
+      const history = session.messages
+        .filter((m) => m.content && m.content.trim())
+        .slice(-HISTORY_LIMIT)
+        .map((m) => ({ role: m.role, content: m.content }));
+      addMessage("user", message);
+      session.messages.push({ role: "user", content: message });
+      saveSession();
+      const div = addMessage("bot");
+      showTyping(div);
+      try {
+        const { reply, tools } = await stream(
+          "/api/chat/stream",
+          { message, history, pending_confirmation: pending },
+          div,
+        );
+        finish(div, reply, tools);
+      } catch (e) {
+        fail(div, e);
+      } finally {
+        setBusy(false);
+        input.focus();
+      }
+    }
+
+    async function checkHealth() {
       try {
         const res = await fetch("/api/health");
         const data = await res.json();
-        const cal = data.calendar_backend || "mock";
-        const mail = data.mail_backend || "none";
-        dateChip.textContent =
-          cal + (mail !== "none" ? " · " + mail : "") +
-          " · " + data.effective_today + " → " + data.effective_tomorrow;
-        if (data.has_openai_api_key) {
-          keyStatus.textContent = "已就绪";
-          keyStatus.className = "chip ok";
-          return true;
+        if (data.now_label) todayEl.textContent = data.now_label;
+        if (!data.has_openai_api_key) {
+          addMessage("error", "缺少 OPENAI_API_KEY：在 .env 里填好后，双击 Personal Agent.cmd 重开。");
+          return false;
         }
-        keyStatus.textContent = "缺少 API Key";
-        keyStatus.className = "chip bad";
-        append("system", "请在 .env 填入 OPENAI_API_KEY 后重启。");
-        return false;
+        return true;
       } catch (e) {
-        keyStatus.textContent = "无法连接";
-        keyStatus.className = "chip bad";
+        addMessage("error", "连不上本地服务：双击 Personal Agent.cmd 重开。");
         return false;
       }
     }
 
-    function renderReply(data) {
-      history.push({ role: "assistant", content: data.reply });
-      if (history.length > 20) history.splice(0, history.length - 20);
-      const tools = (data.tools_called || []).length
-        ? data.tools_called.join(" → ")
-        : null;
-      const needsConfirm = (data.tools_called || []).includes("request_user_confirmation");
-      const actions = needsConfirm
-        ? [
-            { label: "确认", message: "确认" },
-            { label: "取消", message: "取消，先不要执行。", secondary: true },
-          ]
-        : null;
-      append("bot", data.reply, tools, actions);
-    }
-
-    async function loadPresence() {
-      setBusy(true);
-      const thinking = append("system", "…");
-      try {
-        const res = await fetch("/api/presence", { method: "POST" });
-        const data = await res.json().catch(() => ({}));
-        thinking.remove();
-        if (!res.ok) {
-          const hint =
-            res.status === 404
-              ? "开场接口不存在：请停掉旧服务后重新运行 .\\scripts\\start.ps1，再 Ctrl+F5。"
-              : (data.detail || ("就绪失败：" + res.status));
-          append("error", hint);
-          return;
-        }
-        // 开场不把系统提示塞进可见 user 气泡；历史只保留助手态势
-        renderReply(data);
-      } catch (e) {
-        thinking.remove();
-        append("error", "网络或服务错误：" + e.message);
-      } finally {
-        setBusy(false);
-        input.focus();
-      }
-    }
-
-    async function chat(message) {
-      setBusy(true);
-      append("user", message);
-      const thinking = append("system", "…");
-      try {
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message, history }),
-        });
-        const data = await res.json().catch(() => ({}));
-        thinking.remove();
-        if (!res.ok) {
-          append("error", data.detail || ("请求失败：" + res.status));
-          return;
-        }
-        history.push({ role: "user", content: message });
-        renderReply(data);
-      } catch (e) {
-        thinking.remove();
-        append("error", "网络或服务错误：" + e.message);
-      } finally {
-        setBusy(false);
-        input.focus();
-      }
+    function fitInput() {
+      input.style.height = "auto";
+      input.style.height = Math.min(input.scrollHeight, 160) + "px";
     }
 
     form.addEventListener("submit", (e) => {
       e.preventDefault();
-      const msg = input.value.trim();
-      if (!msg) return;
+      const message = input.value.trim();
+      if (!message || busy) return;
       input.value = "";
-      chat(msg);
+      fitInput();
+      ask(message);
     });
 
+    input.addEventListener("input", fitInput);
+
+    // 中文输入法选词时的回车不算发送
     input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
         e.preventDefault();
         form.requestSubmit();
       }
     });
 
+    newChatBtn.addEventListener("click", () => {
+      if (busy) return;
+      session = freshSession();
+      saveSession();
+      logEl.innerHTML = "";
+      if (ready) presence();
+    });
+
     (async () => {
-      const ok = await refreshHealth();
-      if (ok) await loadPresence();
+      ready = await checkHealth();
+      session = loadSession();
+      if (session && session.messages.length) {
+        renderSession();
+      } else {
+        session = freshSession();
+        saveSession();
+        if (ready) await presence();
+      }
+      input.focus();
     })();
   </script>
 </body>

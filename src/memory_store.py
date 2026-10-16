@@ -79,13 +79,29 @@ def _query_tokens(q: str) -> list[str]:
     return out
 
 
-def remember_fact(content: str, tags: str = "") -> dict[str, Any]:
+def all_facts() -> list[dict[str, Any]]:
+    """全部事实，最近更新的在前。"""
+    facts = _load()
+    facts.sort(key=lambda f: f.get("updated_at") or f.get("created_at") or "", reverse=True)
+    return facts
+
+
+def remember_fact(content: str, tags: str = "", replaces: str = "") -> dict[str, Any]:
     text = (content or "").strip()
     if not text:
         return {"ok": False, "error": "empty_content"}
 
     tag_list = [t.strip().lower() for t in re.split(r"[,，;；\s]+", tags) if t.strip()]
     facts = _load()
+
+    replaced: str | None = None
+    old_id = (replaces or "").strip()
+    if old_id:
+        kept = [f for f in facts if f.get("id") != old_id]
+        if len(kept) != len(facts):
+            replaced = old_id
+            facts = kept
+
     # 简单去重：相同正文不重复添加
     for existing in facts:
         if (existing.get("content") or "").strip() == text:
@@ -93,11 +109,13 @@ def remember_fact(content: str, tags: str = "") -> dict[str, Any]:
                 old = set(existing.get("tags") or [])
                 existing["tags"] = sorted(old | set(tag_list))
                 existing["updated_at"] = _now()
+            if tag_list or replaced:
                 _save(facts)
             return {
                 "ok": True,
                 "action": "updated",
                 "fact": existing,
+                "replaced": replaced,
             }
 
     fact = {
@@ -109,7 +127,12 @@ def remember_fact(content: str, tags: str = "") -> dict[str, Any]:
     }
     facts.insert(0, fact)
     _save(facts)
-    return {"ok": True, "action": "created", "fact": fact}
+    return {
+        "ok": True,
+        "action": "replaced" if replaced else "created",
+        "fact": fact,
+        "replaced": replaced,
+    }
 
 
 def search_facts(query: str, top: int = 5) -> dict[str, Any]:

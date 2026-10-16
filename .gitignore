@@ -15,3 +15,8 @@ __pycache__/
 
 # Cursor local rules/skills — keep on this machine, do not publish
 .cursor/
+
+# What the agent learns about Jimmy while he uses it stays on this machine
+data/memory/facts.json
+data/usage/
+data/logs/
