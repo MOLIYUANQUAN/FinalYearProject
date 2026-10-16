@@ -7,7 +7,8 @@ Manchester CS Final Year Project（Jia jimmy）的 **Baseline** 可运行骨架�
 **固定快照：** Git tag [`baseline-v1`](https://github.com/MOLIYUANQUAN/FinalYearProject/releases/tag/baseline-v1)  
 **复现与验收说明：** [docs/baseline-v1.md](docs/baseline-v1.md)  
 **Evaluation 对照证据：** [docs/evaluation/](docs/evaluation/)  
-**真实日历（可选）：** [docs/google-calendar-setup.md](docs/google-calendar-setup.md) — 默认仍为 mock
+**真实日历（可选）：** [docs/google-calendar-setup.md](docs/google-calendar-setup.md) — 默认仍为 mock  
+**Application Calendar 说明：** [docs/application-calendar-v1.md](docs/application-calendar-v1.md)
 
 ## 成功标准
 

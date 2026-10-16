@@ -12,3 +12,6 @@ __pycache__/
 *.log
 .idea/
 .vscode/
+
+# Cursor local rules/skills — keep on this machine, do not publish
+.cursor/
