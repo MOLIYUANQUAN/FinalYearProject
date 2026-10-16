@@ -35,7 +35,7 @@ Manchester CS Final Year Project（Jia jimmy）的 **Baseline** 可运行骨架�
 ## 工具
 
 1. `get_calendar_events` / `create_calendar_event` — 日历（创建须确认）  
-2. `search_emails` / `read_email` — Outlook 或 mock 邮件（只读）  
+2. `search_emails` / `read_email` / `send_email` / `modify_email` — Gmail（发送/归档需确认）  
 3. `search_files` / `read_file` — 本地笔记  
 4. `get_personal_context` — 个人偏好  
 5. `request_user_confirmation` — 写操作前请求确认  

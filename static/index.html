@@ -282,8 +282,8 @@
         const needsConfirm = (data.tools_called || []).includes("request_user_confirmation");
         const actions = needsConfirm
           ? [
-              { label: "确认创建", message: "确认" },
-              { label: "取消", message: "取消，先不要创建。" },
+              { label: "确认执行", message: "确认" },
+              { label: "取消", message: "取消，先不要执行。" },
             ]
           : null;
         append("bot", data.reply, tools, actions);

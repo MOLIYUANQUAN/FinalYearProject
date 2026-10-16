@@ -35,12 +35,13 @@ def build_instructions() -> str:
 3. 工具结果不足时如实说明，不要假装知道。
 4. 用简洁中文回复（除非用户用英文提问）。
 5. 需要按用户习惯个性化时，先调用 get_personal_context。
-6. 创建/修改日历等写操作流程（必须遵守）：
-   a) 先 request_user_confirmation，说明标题与起止时间；
-   b) 等待用户在对话中明确同意（如「确认」「同意」「创建吧」）；
-   c) 仅在同意后调用 create_calendar_event(..., user_confirmed=True）；
-   d) 用户未同意前，禁止 user_confirmed=True，也禁止声称已创建。
-7. 邮件目前只读：可 search_emails / read_email；禁止声称已发送邮件。
+6. 写操作流程（日历创建、发邮件、归档/删除邮件）必须遵守：
+   a) 先 request_user_confirmation，清楚说明将做什么；
+   b) 等待用户明确同意（如「确认」「同意」「发送吧」）；
+   c) 同意后再调用对应工具且 user_confirmed=True；
+   d) 未同意前禁止声称已创建/已发送/已删除。
+7. 邮件：search_emails / read_email / mark_read 可直接做；
+   发送 send_email、archive/trash 必须先确认。
 
 {date_note}
 - 今天是 {today}
@@ -52,7 +53,7 @@ def build_instructions() -> str:
 
 可用工具：
 - get_calendar_events / create_calendar_event（创建需确认）
-- search_emails / read_email（只读，Outlook 或 mock）
+- search_emails / read_email / send_email（发送需确认）/ modify_email
 - search_files / read_file
 - get_personal_context
 - request_user_confirmation
@@ -130,11 +131,14 @@ def _expand_short_confirmation(
     )
     if not last_assistant:
         return message
-    if "创建" not in last_assistant and "确认" not in last_assistant:
+    if not any(k in last_assistant for k in ("创建", "确认", "发送", "邮件", "归档", "删除")):
         return message
+    if any(k in last_assistant for k in ("发送", "邮件", "发信")):
+        action = "send_email(..., user_confirmed=True) 或 modify_email(..., user_confirmed=True)"
+    else:
+        action = "create_calendar_event(..., user_confirmed=True)"
     return (
-        f"{text}。请根据你上一轮提出的方案立刻执行："
-        f"调用 create_calendar_event(..., user_confirmed=True)。"
+        f"{text}。请根据你上一轮提出的方案立刻执行：调用 {action}。"
         f"不要再追问「确认什么」。上一轮你说：{last_assistant}"
     )
 

@@ -1,14 +1,19 @@
-"""Gmail 只读（复用 Google OAuth Desktop 客户端）。"""
+"""Gmail 读写（复用 Google OAuth Desktop 客户端）。"""
 
 from __future__ import annotations
 
 import base64
 import re
+from email.message import EmailMessage
 from typing import Any
 
 from src.config import GOOGLE_CREDENTIALS_PATH, GMAIL_TOKEN_PATH
 
-SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+# modify: 读/改标签/草稿等；send: 发送
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/gmail.send",
+]
 
 
 class GmailMailProvider:
@@ -62,6 +67,7 @@ class GmailMailProvider:
                     "from": headers.get("from") or "",
                     "received": headers.get("date") or "",
                     "body_preview": (meta.get("snippet") or "")[:240],
+                    "label_ids": meta.get("labelIds") or [],
                 }
             )
 
@@ -103,17 +109,90 @@ class GmailMailProvider:
             "source": self.name,
             "message": {
                 "id": raw.get("id"),
+                "thread_id": raw.get("threadId"),
                 "subject": headers.get("subject") or "(no subject)",
                 "from": headers.get("from") or "",
                 "received": headers.get("date") or "",
                 "body_preview": (raw.get("snippet") or "")[:240],
                 "body": body or (raw.get("snippet") or ""),
+                "label_ids": raw.get("labelIds") or [],
             },
+        }
+
+    def send_message(
+        self,
+        *,
+        to: str,
+        subject: str,
+        body: str,
+        cc: str = "",
+    ) -> dict[str, Any]:
+        service = _build_service()
+        msg = EmailMessage()
+        msg["To"] = to
+        msg["Subject"] = subject
+        if cc:
+            msg["Cc"] = cc
+        msg.set_content(body)
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
+        try:
+            sent = (
+                service.users()
+                .messages()
+                .send(userId="me", body={"raw": raw})
+                .execute()
+            )
+        except Exception as exc:  # noqa: BLE001
+            return {
+                "ok": False,
+                "source": self.name,
+                "error": "gmail_send_failed",
+                "message": str(exc),
+            }
+        return {
+            "ok": True,
+            "source": self.name,
+            "id": sent.get("id"),
+            "thread_id": sent.get("threadId"),
+            "to": to,
+            "subject": subject,
+        }
+
+    def modify_labels(
+        self,
+        *,
+        message_id: str,
+        add_labels: list[str] | None = None,
+        remove_labels: list[str] | None = None,
+    ) -> dict[str, Any]:
+        service = _build_service()
+        body = {
+            "addLabelIds": add_labels or [],
+            "removeLabelIds": remove_labels or [],
+        }
+        try:
+            updated = (
+                service.users()
+                .messages()
+                .modify(userId="me", id=message_id, body=body)
+                .execute()
+            )
+        except Exception as exc:  # noqa: BLE001
+            return {
+                "ok": False,
+                "source": self.name,
+                "error": "gmail_modify_failed",
+                "message": str(exc),
+            }
+        return {
+            "ok": True,
+            "source": self.name,
+            "id": updated.get("id"),
+            "label_ids": updated.get("labelIds") or [],
         }
 
 
 def _extract_body(payload: dict[str, Any]) -> str:
-    """尽量取出 text/plain；否则退化 HTML 去标签。"""
     mime = (payload.get("mimeType") or "").lower()
     data = (payload.get("body") or {}).get("data")
     if data and mime.startswith("text/plain"):
@@ -187,4 +266,4 @@ def _build_service():
 
 def ensure_gmail_login() -> str:
     _build_service()
-    return f"Gmail authorized (readonly). Token saved to {GMAIL_TOKEN_PATH}"
+    return f"Gmail authorized (read/modify/send). Token saved to {GMAIL_TOKEN_PATH}"

@@ -19,11 +19,12 @@
 
 ## Email
 - University Outlook exists, but Azure app registration is blocked for students
-- Integration demo uses personal Gmail (readonly); search for FYP / mentor when useful
+- Integration demo uses personal Gmail (read/modify/send)
+- Search mail for FYP / mentor when preparing meetings
 
 ## Autonomy / Approval
-- Allowed without asking: read calendar, read mail, search/read local notes, draft briefs
-- Must ask before doing: create/change/delete calendar events, send email, share files externally, any irreversible action
+- Allowed without asking: read calendar, read mail, mark mail read, search/read local notes, draft briefs
+- Must ask before doing: create calendar events, send email, archive/trash mail, share files, any irreversible action
 - If unsure whether an action is risky, ask
 
 ## Working style

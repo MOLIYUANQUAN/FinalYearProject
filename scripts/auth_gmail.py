@@ -17,7 +17,7 @@ def main() -> None:
     load_env()
     print(f"credentials: {GOOGLE_CREDENTIALS_PATH}")
     print(f"token will be saved to: {GMAIL_TOKEN_PATH}")
-    print("Scope: gmail.readonly")
+    print("Scopes: gmail.modify + gmail.send (read/modify/send)")
     print("Make sure Gmail API is enabled in the same Google Cloud project.")
     msg = ensure_gmail_login()
     print(msg)

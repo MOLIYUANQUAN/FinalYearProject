@@ -16,11 +16,13 @@
 python scripts/auth_gmail.py
 ```
 
-浏览器登录你的 Gmail 并同意只读邮件权限。生成：
+浏览器登录你的 Gmail，并同意**读取/修改/发送**邮件权限。生成：
 
 ```text
 secrets/gmail_token.json
 ```
+
+若从旧版只读升级，重新运行本脚本（会再次弹授权）。
 
 ## 3. `.env`
 
@@ -34,9 +36,14 @@ MAIL_BACKEND=gmail
 python -m src.main
 ```
 
-试问：「最近和 FYP 相关的邮件有哪些？」
+## 4. 试一试
+
+- 读：「最近和 FYP 相关的邮件有哪些？」
+- 改：标记已读 / 归档（归档会先确认）
+- 发：先确认，再发送（勿对重要联系人随便测）
 
 ## 说明
 
-- 只读（`gmail.readonly`），不发送邮件  
-- 学校邮箱若以后能接，仍保留 `outlook` / `mock` 选项  
+- Scope：`gmail.modify` + `gmail.send`  
+- 发送 / 归档 / 删除：必须先 `request_user_confirmation`  
+- 标记已读：可直接执行  
