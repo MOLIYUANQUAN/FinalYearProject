@@ -2,6 +2,8 @@
 
 本目录存放各阶段可复现的运行证据，供报告对比使用。
 
+> **冻结说明（产品门禁）：** 在 [product-north-star.md](../product-north-star.md) 的 Tuesday test 通过前，不新增评测任务、不合 `main`、不打新 milestone tag。现有 baseline / calendar / application-layer 证据保留不动。
+
 | 文件 | 阶段 | 说明 |
 |------|------|------|
 | [baseline-v1-runs.json](baseline-v1-runs.json) | Baseline | mock 日历 Demo 1–3 |

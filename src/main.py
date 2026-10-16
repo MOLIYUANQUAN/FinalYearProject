@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from src.agent import run_assistant
+from src.agent import PRESENCE_PROMPT, run_assistant
 from src.config import (
     STATIC_DIR,
     effective_today,
@@ -48,8 +48,8 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="Personal AI Assistant",
-    version="0.2.0",
+    title="Personal Agent",
+    version="0.3.0",
     lifespan=lifespan,
 )
 
@@ -114,6 +114,30 @@ def health() -> dict:
     }
 
 
+def _chat_response(result: dict) -> ChatResponse:
+    return ChatResponse(
+        reply=result["reply"],
+        tools_called=result["tools_called"],
+        calendar_backend=get_calendar_backend(),
+        effective_today=effective_today(),
+        effective_tomorrow=effective_tomorrow(),
+    )
+
+
+@app.post("/api/presence", response_model=ChatResponse)
+async def presence() -> ChatResponse:
+    """打开产品时的亲密主循环：认识你 + 今日态势（不暴露系统提示）。"""
+    try:
+        require_openai_api_key()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    try:
+        result = await run_assistant(PRESENCE_PROMPT, history=None)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"助手运行失败: {exc}") from exc
+    return _chat_response(result)
+
+
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(body: ChatRequest) -> ChatResponse:
     try:
@@ -135,13 +159,7 @@ async def chat(body: ChatRequest) -> ChatResponse:
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"助手运行失败: {exc}") from exc
 
-    return ChatResponse(
-        reply=result["reply"],
-        tools_called=result["tools_called"],
-        calendar_backend=get_calendar_backend(),
-        effective_today=effective_today(),
-        effective_tomorrow=effective_tomorrow(),
-    )
+    return _chat_response(result)
 
 
 if STATIC_DIR.is_dir():

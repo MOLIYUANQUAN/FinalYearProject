@@ -1,18 +1,13 @@
-# Personal AI Assistant — Baseline v1
+# Personal Agent
 
-Manchester CS Final Year Project（Jia jimmy）的 **Baseline** 可运行骨架：单一 Personal Assistant Agent + 本地 mock 工具 + 极简 Web 聊天界面。
+Manchester CS FYP（Jimmy）：**单一 Personal Agent** — 认识你、盯住生活碎片、带主见回应。
 
-> 阶段：仅 Baseline（Baseline → Application → Evaluation）。本仓库不包含 memory、数据库、多 Agent、MCP、OAuth、浏览器使用或网页搜索。
+> **产品北星（先读这个）：** [docs/product-north-star.md](docs/product-north-star.md)  
+> 成功标准是 Tuesday test（普通周二愿不愿意打开），不是 Demo 分数。评测扩写 / 合 `main` / 新 tag 在爱用门禁通过前冻结。
 
-**固定快照：** Git tag [`baseline-v1`](https://github.com/MOLIYUANQUAN/FinalYearProject/releases/tag/baseline-v1)  
-**复现与验收说明：** [docs/baseline-v1.md](docs/baseline-v1.md)  
-**Evaluation 对照证据：** [docs/evaluation/](docs/evaluation/)  
-**真实日历（可选）：** [docs/google-calendar-setup.md](docs/google-calendar-setup.md) — 默认仍为 mock  
-**Application Calendar 说明：** [docs/application-calendar-v1.md](docs/application-calendar-v1.md)  
-**Personal 薄层：** [docs/application-personal-v1.md](docs/application-personal-v1.md)  
-**Gmail 邮件（推荐）：** [docs/gmail-setup.md](docs/gmail-setup.md) · [docs/application-gmail-mail-v1.md](docs/application-gmail-mail-v1.md)  
-**薄长期记忆：** [docs/application-memory-v1.md](docs/application-memory-v1.md)  
-**Outlook（学校常无 Azure 权限）：** [docs/outlook-mail-setup.md](docs/outlook-mail-setup.md)
+**学术路线：** Baseline → Application → Evaluation（证据见 [docs/evaluation/](docs/evaluation/)，当前冻结）  
+**Baseline 快照：** tag [`baseline-v1`](https://github.com/MOLIYUANQUAN/FinalYearProject/releases/tag/baseline-v1) · [docs/baseline-v1.md](docs/baseline-v1.md)  
+**接入说明：** [Google Calendar](docs/google-calendar-setup.md) · [Gmail](docs/gmail-setup.md) · [Personal](docs/application-personal-v1.md) · [Memory](docs/application-memory-v1.md)
 
 ## 成功标准
 
@@ -84,16 +79,17 @@ cp .env.example .env
 - 页面健康检查显示「缺少 OPENAI_API_KEY」；
 - `/api/chat` 返回 **503** 与中文错误说明。
 
-### 3. 启动 Web UI
+### 3. 启动
 
-在仓库根目录：
+```powershell
+# Windows 一键
+.\scripts\start.ps1
 
-```bash
-python -m src.main
-# 或：uvicorn src.main:app --host 127.0.0.1 --port 8765
+# 或
+.\.venv\Scripts\python.exe -m src.main
 ```
 
-浏览器打开：<http://127.0.0.1:8765>
+浏览器打开：<http://127.0.0.1:8765> — 应直接看到个人态势（认识你 + 今天），无 Demo 按钮墙。
 
 ### 4. 可选 CLI 三条 Demo
 

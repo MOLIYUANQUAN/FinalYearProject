@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Personal AI Assistant · Baseline v1</title>
+  <title>Personal Agent</title>
   <style>
     :root {
       --bg: #f3f0ea;
@@ -42,8 +42,8 @@
     }
     header h1 {
       margin: 0 0 6px;
-      font-size: 1.55rem;
-      letter-spacing: -0.02em;
+      font-size: 1.7rem;
+      letter-spacing: -0.03em;
     }
     header p {
       margin: 0;
@@ -111,28 +111,38 @@
       border-color: #e2bcbc;
       color: var(--danger);
     }
-    .tools {
+    .actions {
       margin-top: 8px;
-      font-family: var(--mono);
-      font-size: 0.78rem;
-      color: var(--accent);
     }
-    .demos {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-    .demos button {
+    .actions button {
       font: inherit;
       font-size: 0.85rem;
-      padding: 6px 10px;
+      padding: 6px 12px;
+      margin-right: 8px;
+      margin-top: 4px;
       border-radius: 8px;
-      border: 1px solid var(--line);
-      background: var(--panel);
-      color: var(--ink);
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: #fff;
       cursor: pointer;
     }
-    .demos button:hover { border-color: var(--accent); color: var(--accent); }
+    .actions button.secondary {
+      background: var(--panel);
+      color: var(--ink);
+      border-color: var(--line);
+    }
+    .tools-fold {
+      margin-top: 8px;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+    .tools-fold summary {
+      cursor: pointer;
+      user-select: none;
+      color: var(--muted);
+    }
+    .tools-fold summary:hover { color: var(--accent); }
     form {
       display: flex;
       gap: 8px;
@@ -173,28 +183,22 @@
 <body>
   <main>
     <header>
-      <h1>Personal AI Assistant</h1>
-      <p>Personal Agent · 单 Agent · 日历 / 文件 / 个人上下文 · Manchester CS FYP</p>
+      <h1>Personal Agent</h1>
+      <p>认识你 · 盯住生活碎片 · 带主见回应</p>
       <div class="meta">
-        <span class="chip" id="keyStatus">检查 API Key…</span>
-        <span class="chip" id="dateChip">演示今天：—</span>
+        <span class="chip" id="keyStatus">检查中…</span>
+        <span class="chip" id="dateChip">—</span>
       </div>
     </header>
-
-    <div class="demos" aria-label="示例问题">
-      <button type="button" data-q="我明天下午有什么安排？">Demo 1 · 明天下午</button>
-      <button type="button" data-q="找到我的 FYP proposal，告诉我项目在做什么。">Demo 2 · FYP proposal</button>
-      <button type="button" data-q="帮我准备明天的 FYP meeting。">Demo 3 · 会议 brief</button>
-    </div>
 
     <div id="log" role="log" aria-live="polite"></div>
 
     <form id="form">
-      <textarea id="input" rows="2" placeholder="输入问题，例如：我明天下午有什么安排？" required></textarea>
+      <textarea id="input" rows="2" placeholder="直接说你需要什么" required></textarea>
       <button id="send" type="submit">发送</button>
     </form>
 
-    <footer>工具：日历 · Gmail · 文件 · profile · memory · confirmation。多轮对话已开启。</footer>
+    <footer>读操作自动完成；写/发前会请你确认一次。</footer>
   </main>
 
   <script>
@@ -207,25 +211,29 @@
     /** @type {{role: string, content: string}[]} */
     const history = [];
 
-    function append(role, text, extra, actions) {
+    function append(role, text, toolsText, actions) {
       const div = document.createElement("div");
       div.className = "msg " + role;
-      div.textContent = text;
-      if (extra) {
-        const t = document.createElement("div");
-        t.className = "tools";
-        t.textContent = extra;
-        div.appendChild(t);
+      div.appendChild(document.createTextNode(text));
+      if (toolsText) {
+        const details = document.createElement("details");
+        details.className = "tools-fold";
+        const summary = document.createElement("summary");
+        summary.textContent = "细节";
+        details.appendChild(summary);
+        const body = document.createElement("div");
+        body.textContent = toolsText;
+        details.appendChild(body);
+        div.appendChild(details);
       }
       if (actions && actions.length) {
         const bar = document.createElement("div");
-        bar.className = "tools";
+        bar.className = "actions";
         actions.forEach((a) => {
           const b = document.createElement("button");
           b.type = "button";
           b.textContent = a.label;
-          b.style.marginRight = "8px";
-          b.style.marginTop = "8px";
+          if (a.secondary) b.className = "secondary";
           b.onclick = () => chat(a.message);
           bar.appendChild(b);
         });
@@ -233,34 +241,80 @@
       }
       logEl.appendChild(div);
       logEl.scrollTop = logEl.scrollHeight;
+      return div;
+    }
+
+    function setBusy(busy) {
+      send.disabled = busy;
     }
 
     async function refreshHealth() {
       try {
         const res = await fetch("/api/health");
         const data = await res.json();
-        const backend = data.calendar_backend || "mock";
+        const cal = data.calendar_backend || "mock";
+        const mail = data.mail_backend || "none";
         dateChip.textContent =
-          "日历:" + backend + " · 今天 " + data.effective_today + " → 明天 " + data.effective_tomorrow;
+          cal + (mail !== "none" ? " · " + mail : "") +
+          " · " + data.effective_today + " → " + data.effective_tomorrow;
         if (data.has_openai_api_key) {
-          keyStatus.textContent = "OPENAI_API_KEY 已配置";
+          keyStatus.textContent = "已就绪";
           keyStatus.className = "chip ok";
-        } else {
-          keyStatus.textContent = "缺少 OPENAI_API_KEY";
-          keyStatus.className = "chip bad";
-          append("system", "请复制 .env.example 为 .env 并填入 OPENAI_API_KEY，然后重启服务。");
+          return true;
         }
-      } catch (e) {
-        keyStatus.textContent = "健康检查失败";
+        keyStatus.textContent = "缺少 API Key";
         keyStatus.className = "chip bad";
+        append("system", "请在 .env 填入 OPENAI_API_KEY 后重启。");
+        return false;
+      } catch (e) {
+        keyStatus.textContent = "无法连接";
+        keyStatus.className = "chip bad";
+        return false;
+      }
+    }
+
+    function renderReply(data) {
+      history.push({ role: "assistant", content: data.reply });
+      if (history.length > 20) history.splice(0, history.length - 20);
+      const tools = (data.tools_called || []).length
+        ? data.tools_called.join(" → ")
+        : null;
+      const needsConfirm = (data.tools_called || []).includes("request_user_confirmation");
+      const actions = needsConfirm
+        ? [
+            { label: "确认", message: "确认" },
+            { label: "取消", message: "取消，先不要执行。", secondary: true },
+          ]
+        : null;
+      append("bot", data.reply, tools, actions);
+    }
+
+    async function loadPresence() {
+      setBusy(true);
+      const thinking = append("system", "…");
+      try {
+        const res = await fetch("/api/presence", { method: "POST" });
+        const data = await res.json().catch(() => ({}));
+        thinking.remove();
+        if (!res.ok) {
+          append("error", data.detail || ("就绪失败：" + res.status));
+          return;
+        }
+        // 开场不把系统提示塞进可见 user 气泡；历史只保留助手态势
+        renderReply(data);
+      } catch (e) {
+        thinking.remove();
+        append("error", "网络或服务错误：" + e.message);
+      } finally {
+        setBusy(false);
+        input.focus();
       }
     }
 
     async function chat(message) {
-      send.disabled = true;
+      setBusy(true);
       append("user", message);
-      append("system", "思考中…");
-      const thinking = logEl.lastChild;
+      const thinking = append("system", "…");
       try {
         const res = await fetch("/api/chat", {
           method: "POST",
@@ -274,24 +328,12 @@
           return;
         }
         history.push({ role: "user", content: message });
-        history.push({ role: "assistant", content: data.reply });
-        if (history.length > 20) history.splice(0, history.length - 20);
-        const tools = (data.tools_called || []).length
-          ? "工具调用：" + data.tools_called.join(" → ")
-          : "工具调用：（无）";
-        const needsConfirm = (data.tools_called || []).includes("request_user_confirmation");
-        const actions = needsConfirm
-          ? [
-              { label: "确认执行", message: "确认" },
-              { label: "取消", message: "取消，先不要执行。" },
-            ]
-          : null;
-        append("bot", data.reply, tools, actions);
+        renderReply(data);
       } catch (e) {
         thinking.remove();
         append("error", "网络或服务错误：" + e.message);
       } finally {
-        send.disabled = false;
+        setBusy(false);
         input.focus();
       }
     }
@@ -304,13 +346,6 @@
       chat(msg);
     });
 
-    document.querySelectorAll(".demos button").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        input.value = btn.getAttribute("data-q");
-        chat(btn.getAttribute("data-q"));
-      });
-    });
-
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
@@ -318,8 +353,10 @@
       }
     });
 
-    refreshHealth();
-    append("system", "多轮对话已开启。创建日程时会出现「确认创建」按钮；请硬刷新页面（Ctrl+F5）以免用到旧缓存。");
+    (async () => {
+      const ok = await refreshHealth();
+      if (ok) await loadPresence();
+    })();
   </script>
 </body>
 </html>
