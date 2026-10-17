@@ -227,12 +227,72 @@
     .today .say:empty { display: none; }
     .today .say.failed { color: var(--danger); }
     @media (prefers-reduced-motion: no-preference) {
-      .msg, .today > * { animation: rise 0.28s ease-out; }
-      @keyframes rise { from { opacity: 0; transform: translateY(4px); } }
+      .msg {
+        animation: rise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+      .msg.user { animation-name: rise-user; }
+      .today > * {
+        animation: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+      .today > *:nth-child(2) { animation-delay: 0.04s; }
+      .today > *:nth-child(3) { animation-delay: 0.08s; }
+      .today > *:nth-child(4) { animation-delay: 0.12s; }
+      .today > *:nth-child(5) { animation-delay: 0.16s; }
+      .today section.attention {
+        animation: attention-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+      @keyframes rise {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes rise-user {
+        from { opacity: 0; transform: translateY(10px) scale(0.98); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      @keyframes attention-in {
+        from { opacity: 0; transform: translateY(8px); filter: blur(2px); }
+        to { opacity: 1; transform: translateY(0); filter: blur(0); }
+      }
+      #mic.recording {
+        animation: mic-pulse 1.4s ease-in-out infinite;
+      }
+      #mic.speaking {
+        animation: speak-wave 1.1s ease-in-out infinite;
+      }
+      body.listening #log::after {
+        content: "";
+        position: sticky;
+        bottom: 0;
+        display: block;
+        height: 2px;
+        margin-top: 8px;
+        background: linear-gradient(90deg, transparent, var(--ink), transparent);
+        background-size: 200% 100%;
+        animation: listen-scan 1.6s linear infinite;
+        opacity: 0.35;
+      }
+      @keyframes mic-pulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.18); transform: scale(1); }
+        50% { box-shadow: 0 0 0 10px rgba(0, 0, 0, 0); transform: scale(1.03); }
+      }
+      @keyframes speak-wave {
+        0%, 100% { box-shadow: inset 0 0 0 1px transparent; opacity: 1; }
+        50% { box-shadow: inset 0 0 0 2px var(--ink); opacity: 0.92; }
+      }
+      @keyframes listen-scan {
+        from { background-position: 100% 0; }
+        to { background-position: -100% 0; }
+      }
+      @media (prefers-color-scheme: dark) {
+        @keyframes mic-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.22); transform: scale(1); }
+          50% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); transform: scale(1.03); }
+        }
+      }
     }
     .typing {
       display: inline-flex;
-      gap: 5px;
+      gap: 6px;
       align-items: center;
       height: 1.2em;
       vertical-align: middle;
@@ -241,15 +301,15 @@
       width: 5px;
       height: 5px;
       border-radius: 50%;
-      background: var(--muted);
-      opacity: 0.35;
-      animation: pulse 1.2s infinite ease-in-out;
+      background: var(--ink);
+      opacity: 0.22;
+      animation: pulse 1.1s infinite ease-in-out;
     }
-    .typing i:nth-child(2) { animation-delay: 0.15s; }
-    .typing i:nth-child(3) { animation-delay: 0.3s; }
+    .typing i:nth-child(2) { animation-delay: 0.14s; }
+    .typing i:nth-child(3) { animation-delay: 0.28s; }
     @keyframes pulse {
-      0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
-      40% { opacity: 0.9; transform: translateY(-2px); }
+      0%, 80%, 100% { opacity: 0.18; transform: translateY(0) scale(0.9); }
+      40% { opacity: 0.85; transform: translateY(-3px) scale(1); }
     }
     .hint {
       margin-left: 8px;
@@ -327,9 +387,11 @@
       white-space: nowrap;
     }
     #mic {
+      position: relative;
       background: transparent;
       color: var(--ink);
       border: 1px solid var(--line);
+      transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
     }
     #mic:hover { border-color: var(--ink); }
     #mic.recording {
@@ -337,7 +399,14 @@
       color: var(--on-brand);
       border-color: var(--brand);
     }
+    #mic.speaking {
+      background: transparent;
+      color: var(--ink);
+      border-color: var(--ink);
+    }
     #mic:disabled, #send:disabled { opacity: 0.35; cursor: default; }
+    #send { transition: opacity 0.2s ease, transform 0.15s ease; }
+    #send:active:not(:disabled), #mic:active:not(:disabled) { transform: scale(0.97); }
     #send {
       background: var(--brand);
       color: var(--on-brand);
@@ -811,37 +880,51 @@
       if (!mediaRecorder || mediaRecorder.state !== "recording") micBtn.disabled = on;
     }
 
+    function setSpeaking(on) {
+      micBtn.classList.toggle("speaking", !!on);
+      if (on) {
+        micBtn.textContent = "…";
+        micBtn.title = "Friday 正在说";
+      } else if (!micBtn.classList.contains("recording")) {
+        micBtn.textContent = "说";
+        micBtn.title = "点一下开始说，再说完点一下";
+      }
+    }
+
     function stopPlaying() {
       if (!playingAudio) return;
       try { playingAudio.pause(); } catch (e) {}
       playingAudio = null;
+      setSpeaking(false);
     }
 
     async function speakReply(text) {
       const clean = (text || "").trim();
       if (!clean) return;
       stopPlaying();
-      const res = await fetch("/api/voice/speak", {
-        method: "POST",
-        credentials: "include",
-        headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ text: clean }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || "这句没念出来。");
-      }
-      const url = URL.createObjectURL(await res.blob());
-      const audio = new Audio(url);
-      playingAudio = audio;
-      audio.onended = () => {
-        URL.revokeObjectURL(url);
-        if (playingAudio === audio) playingAudio = null;
-      };
+      setSpeaking(true);
       try {
+        const res = await fetch("/api/voice/speak", {
+          method: "POST",
+          credentials: "include",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ text: clean }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.detail || "这句没念出来。");
+        }
+        const url = URL.createObjectURL(await res.blob());
+        const audio = new Audio(url);
+        playingAudio = audio;
+        audio.onended = () => {
+          URL.revokeObjectURL(url);
+          if (playingAudio === audio) playingAudio = null;
+          setSpeaking(false);
+        };
         await audio.play();
       } catch (e) {
-        URL.revokeObjectURL(url);
+        setSpeaking(false);
         throw e;
       }
     }
@@ -856,6 +939,7 @@
 
     function setRecording(on) {
       micBtn.classList.toggle("recording", !!on);
+      document.body.classList.toggle("listening", !!on);
       micBtn.textContent = on ? "完" : "说";
       micBtn.title = on ? "说完了，点一下发送" : "点一下开始说，再说完点一下";
       sendBtn.disabled = !!on || busy;

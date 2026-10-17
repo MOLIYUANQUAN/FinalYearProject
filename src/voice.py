@@ -15,6 +15,18 @@ MAX_AUDIO_BYTES = 12 * 1024 * 1024
 # 播报别念太长：长回复仍显示全文，只念前面
 MAX_SPEAK_CHARS = 800
 
+# 贴近 MCU Friday 的气质：爱尔兰、女声、干练、不煽情。
+# 不能克隆演员；用可引导的合成声 + 说明书。
+DEFAULT_TTS_MODEL = "gpt-4o-mini-tts"
+DEFAULT_TTS_VOICE = "coral"
+DEFAULT_TTS_INSTRUCTIONS = (
+    "You are Friday, a personal AI steward. "
+    "Speak with a light Irish English accent, feminine presentation, mid-range pitch. "
+    "Tone: calm, dry, competent, lightly witty — never chirpy, never theatrical. "
+    "Pace: measured and clear, short natural pauses. "
+    "Sound like a trusted aide in the room, not a call-center bot or a movie trailer."
+)
+
 
 def _client() -> OpenAI:
     return OpenAI(api_key=require_openai_api_key())
@@ -44,14 +56,19 @@ def speak(text: str) -> bytes:
     cleaned = _for_speech(text)
     if not cleaned:
         raise RuntimeError("没有可念的文字。")
-    voice = (os.getenv("FRIDAY_TTS_VOICE") or "onyx").strip() or "onyx"
-    model = (os.getenv("FRIDAY_TTS_MODEL") or "tts-1").strip() or "tts-1"
-    response = _client().audio.speech.create(
-        model=model,
-        voice=voice,
-        input=cleaned,
-        response_format="mp3",
-    )
+    voice = (os.getenv("FRIDAY_TTS_VOICE") or DEFAULT_TTS_VOICE).strip() or DEFAULT_TTS_VOICE
+    model = (os.getenv("FRIDAY_TTS_MODEL") or DEFAULT_TTS_MODEL).strip() or DEFAULT_TTS_MODEL
+    instructions = (os.getenv("FRIDAY_TTS_INSTRUCTIONS") or DEFAULT_TTS_INSTRUCTIONS).strip()
+    kwargs: dict = {
+        "model": model,
+        "voice": voice,
+        "input": cleaned,
+        "response_format": "mp3",
+    }
+    # tts-1 / tts-1-hd 不认 instructions；新模型才认
+    if instructions and "gpt-4o-mini-tts" in model:
+        kwargs["instructions"] = instructions
+    response = _client().audio.speech.create(**kwargs)
     return response.content
 
 
