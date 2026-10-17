@@ -7,7 +7,7 @@ Manchester CS FYP（Jimmy）：**单一 Personal Agent** — 认识你、盯住�
 
 **学术路线：** Baseline → Application → Evaluation（证据见 [docs/evaluation/](docs/evaluation/)，当前冻结）  
 **Baseline 快照：** tag [`baseline-v1`](https://github.com/MOLIYUANQUAN/FinalYearProject/releases/tag/baseline-v1) · [docs/baseline-v1.md](docs/baseline-v1.md)  
-**接入说明：** [Google Calendar](docs/google-calendar-setup.md) · [Gmail](docs/gmail-setup.md) · [Personal](docs/application-personal-v1.md) · [Memory](docs/application-memory-v1.md)
+**接入说明：** [Google Calendar](docs/google-calendar-setup.md) · [Gmail](docs/gmail-setup.md) · Google Tasks（`scripts\auth_google_tasks.py`，`.env` 设 `TASKS_BACKEND=google`） · [Personal](docs/application-personal-v1.md) · [Memory](docs/application-memory-v1.md)
 
 ## 成功标准
 
