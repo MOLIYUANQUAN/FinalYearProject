@@ -18,14 +18,34 @@ iPhone App  ──HTTPS + 登录──►  Friday API（云上常开）
 
 ## 分步（按依赖，不要并行摊开）
 
-### A. 云上跑起来（大脑搬家）
+### A. 云上跑起来（大脑搬家）· 进行中
 
-1. 选一个常开主机（Fly.io / Railway 等），部署现有 FastAPI。  
-2. 密钥只放在云环境变量：`OPENAI_API_KEY`、访问/会话密钥、Google OAuth 客户端。  
-3. Google Cloud 回调改成云域名；在服务器上重跑日历 / Gmail / Tasks 授权。  
-4. 验收：浏览器打开 `https://你的域名/`，登录后能开场、记待办、读日历——**电脑可关机**。
+选定 **Fly.io**（伦敦 `lhr`），应用名默认 `friday-jimmy`。仓库里已有：
 
-本机 `8765` + 隧道（[phone-access.md](phone-access.md)）变成可选开发方式，不再是「手机怎么用」的正路。
+- `Dockerfile` — 容器里跑 `python -m src.main`（`HOST=0.0.0.0`，`PORT` 由平台注入）  
+- `fly.toml` — HTTPS、健康检查 `/api/health`  
+- `scripts/deploy_fly.py` — 把 `.env` 与 `secrets/*.json` 导入 Fly secrets 并 deploy  
+- 云上用环境变量落下密钥：`GOOGLE_CREDENTIALS_JSON`、`GOOGLE_TOKEN_JSON`、`GMAIL_TOKEN_JSON`、`GOOGLE_TASKS_TOKEN_JSON`
+
+**你这台机器上跑一次：**
+
+```powershell
+# 1) 安装 flyctl（只需一次）
+powershell -ExecutionPolicy Bypass -File scripts\install_flyctl.ps1
+
+# 2) 浏览器登录 Fly（只需一次）
+flyctl auth login
+
+# 3) 部署（会读本机 .env 和 secrets/，不会把密钥打进 Git）
+.\.venv\Scripts\python.exe scripts\deploy_fly.py
+```
+
+脚本结束会打印：`https://friday-jimmy.fly.dev/?access=…`  
+iPhone Safari 打开即可；**电脑可关机**。
+
+若 Google 报 `redirect_uri_mismatch`：在 Google Cloud 给该域名加上授权来源/回调，本机重新 `auth_google_*.py`，再跑一遍 `deploy_fly.py`。
+
+本机 `8765` + 隧道（[phone-access.md](phone-access.md)）只作开发过渡。
 
 ### B. 登录（证明是你）
 

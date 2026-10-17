@@ -63,8 +63,8 @@
 
 按依赖拆三刀（做完一刀真用一刀）：
 
-1. **云上部署** — FastAPI 常开；Google 授权迁到云域名；浏览器打开就能用。  
-2. **登录** — 会话证明是你；电脑和手机共用。  
+1. **云上部署** — Fly.io + Docker；`scripts\deploy_fly.py`。代码与配置已进 develop；要你本机跑一次 `flyctl auth login` 再 deploy。  
+2. **登录** — 会话证明是你；电脑和手机共用（现用访问码顶上，下一步再正式化）。  
 3. **iPhone App** — Capacitor 包现有界面，装到你的手机（TestFlight / Xcode）；不急着公开上架。
 
 隧道方案（[phone-access.md](phone-access.md)）只作开发过渡，不当最终形态。

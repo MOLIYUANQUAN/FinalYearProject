@@ -118,6 +118,7 @@
 | 2026-10-17 | 路线按 Jimmy 优先级重排：手机 → 语音 → 看世界 → 人味/幽默；保住快和日历/Tasks/Gmail；人味放最后以免还没「在场」就先玩文案 |
 | 2026-10-17 | 手机第一刀：Safari + cloudflared 隧道 + FRIDAY_ACCESS_TOKEN；不做 App Store；隧道侧无法「本机免登」，桌面窗口由启动器带同一把码 |
 | 2026-10-17 | 最终形态改为云上 API + iPhone App（Capacitor/TestFlight）；电脑可关机；多人用时按用户隔离，不绑本地 Windows；隧道只作过渡。链路见 [cloud-and-iphone.md](cloud-and-iphone.md) |
+| 2026-10-17 | 云上第一刀选 Fly.io（lhr）：Dockerfile、fly.toml、secrets 从环境变量落下、`scripts/deploy_fly.py`；`/api/health` 对探活公开 |
 
 ## 评测冻结
 

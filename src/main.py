@@ -34,6 +34,7 @@ from src.config import (
     get_calendar_backend,
     get_mail_backend,
     get_tasks_backend,
+    materialize_secrets_from_env,
     require_openai_api_key,
 )
 from src.context import weekday_zh
@@ -54,6 +55,9 @@ def _warm_calendar() -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    written = materialize_secrets_from_env()
+    if written:
+        print(f"[OK] secrets from env: {', '.join(written)}")
     try:
         require_openai_api_key()
         print("[OK] OPENAI_API_KEY loaded")
@@ -75,9 +79,9 @@ async def lifespan(_app: FastAPI):
     except RuntimeError as exc:
         print(f"[WARN] {exc}")
     if get_access_token():
-        print("[OK] FRIDAY_ACCESS_TOKEN set (phone / remote access gated)")
+        print("[OK] FRIDAY_ACCESS_TOKEN set (remote access gated)")
     else:
-        print("[OK] FRIDAY_ACCESS_TOKEN unset (local only; run scripts\\phone_access.py for phone)")
+        print("[WARN] FRIDAY_ACCESS_TOKEN unset — set it before exposing Friday on the public internet")
     _warm = asyncio.create_task(asyncio.to_thread(_warm_calendar)) if backend == "google" else None
     yield
 
@@ -293,9 +297,14 @@ if STATIC_DIR.is_dir():
 
 
 def main() -> None:
+    import os
+
     import uvicorn
 
-    uvicorn.run("src.main:app", host="127.0.0.1", port=8765, reload=False)
+    # 本机默认只听 127.0.0.1；云上设 PORT（或 HOST=0.0.0.0）对外
+    port = int(os.getenv("PORT") or "8765")
+    host = (os.getenv("HOST") or ("0.0.0.0" if os.getenv("PORT") else "127.0.0.1")).strip()
+    uvicorn.run("src.main:app", host=host, port=port, reload=False)
 
 
 if __name__ == "__main__":

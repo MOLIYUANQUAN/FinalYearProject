@@ -10,9 +10,9 @@ from starlette.responses import JSONResponse, Response
 
 from src.config import get_access_token
 
-# 静态页和首页可以先出来，好输入访问码；接口必须带码
+# 静态页和首页可以先出来，好输入访问码；健康检查给负载均衡（不含对话）
 PUBLIC_PREFIXES = ("/static/",)
-PUBLIC_PATHS = {"/", "/favicon.ico", "/static/manifest.json"}
+PUBLIC_PATHS = {"/", "/favicon.ico", "/static/manifest.json", "/api/health"}
 
 
 def _offered(request: Request) -> str:

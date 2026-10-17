@@ -42,6 +42,26 @@ def load_env() -> None:
     load_dotenv(ROOT_DIR / ".env")
 
 
+def materialize_secrets_from_env() -> list[str]:
+    """云上把 JSON 密钥从环境变量落到 secrets/（不进镜像）。返回写过的文件名。"""
+    load_env()
+    SECRETS_DIR.mkdir(parents=True, exist_ok=True)
+    mapping = {
+        "GOOGLE_CREDENTIALS_JSON": GOOGLE_CREDENTIALS_PATH,
+        "GOOGLE_TOKEN_JSON": GOOGLE_TOKEN_PATH,
+        "GMAIL_TOKEN_JSON": GMAIL_TOKEN_PATH,
+        "GOOGLE_TASKS_TOKEN_JSON": GOOGLE_TASKS_TOKEN_PATH,
+    }
+    written: list[str] = []
+    for env_name, path in mapping.items():
+        raw = (os.getenv(env_name) or "").strip()
+        if not raw:
+            continue
+        path.write_text(raw, encoding="utf-8")
+        written.append(path.name)
+    return written
+
+
 def get_calendar_backend() -> str:
     """返回日历后端：mock（默认）或 google。"""
     load_env()
