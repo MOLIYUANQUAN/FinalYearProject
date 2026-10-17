@@ -84,6 +84,88 @@ def _task_section(tasks: list[dict[str, Any]], today: date) -> dict[str, Any] | 
     return {"label": "待办", "meta": "", "rows": rows, "empty": ""} if rows else None
 
 
+ATTENTION_LIMIT = 3
+
+
+def _attention(
+    now: datetime, timed: list[Timed], all_day: list[tuple[date, str]], tasks: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """需要你拍板或立刻看见的几件事：服务端从日历/待办算出，没有就空。"""
+    today = now.date()
+    tomorrow = today + timedelta(days=1)
+    items: list[dict[str, Any]] = []
+
+    for task, due in todos.ordered(tasks):
+        if due is None:
+            continue
+        if due < today:
+            items.append(
+                {
+                    "time": f"过了 {(today - due).days} 天",
+                    "title": task["title"],
+                    "where": "",
+                    "why": "截止已过",
+                    "now": False,
+                }
+            )
+        elif due == today:
+            items.append(
+                {
+                    "time": "今天",
+                    "title": task["title"],
+                    "where": "",
+                    "why": "今天截止",
+                    "now": False,
+                }
+            )
+
+    for start, end, event in timed:
+        if start <= now and (end is None or end > now):
+            continue
+        if start <= now:
+            continue
+        name = title(event)
+        if start - now <= timedelta(hours=2):
+            items.append(
+                {
+                    "time": _clock(start),
+                    "title": name,
+                    "where": _place(event),
+                    "why": f"{_span(start - now)}后开始",
+                    "now": False,
+                }
+            )
+        elif start.date() == tomorrow and IMPORTANT.search(name):
+            items.append(
+                {
+                    "time": f"明天{_clock(start)}",
+                    "title": name,
+                    "where": _place(event),
+                    "why": "明天要紧",
+                    "now": False,
+                }
+            )
+
+    for day, name in all_day:
+        if day == today and IMPORTANT.search(name):
+            items.append({"time": "今天全天", "title": name, "where": "", "why": "今天要紧", "now": False})
+        elif day == tomorrow and IMPORTANT.search(name):
+            items.append({"time": "明天全天", "title": name, "where": "", "why": "明天要紧", "now": False})
+
+    # 同标题只留一条；最多三条，宁缺勿滥
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for item in items:
+        key = item["title"]
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(item)
+        if len(out) >= ATTENTION_LIMIT:
+            break
+    return out
+
+
 def _sections(
     now: datetime, timed: list[Timed], all_day: list[tuple[date, str]], tasks: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
@@ -203,11 +285,17 @@ def _calendar_say(now: datetime, timed: list[Timed], all_day: list[tuple[date, s
 
 def today_view(
     now: datetime, events: list[dict[str, Any]], tasks: list[dict[str, Any]] | None = None
-) -> tuple[list[dict[str, Any]], str]:
-    """同一份日历和待办：他眼前的卡片，和此刻最该说的那一句。"""
+) -> tuple[list[dict[str, Any]], str, list[dict[str, Any]]]:
+    """同一份日历和待办：卡片分区、此刻那一句、需要你（可空）。"""
     timed, all_day = agenda.split(events)
     tasks = tasks or []
-    return _sections(now, timed, all_day, tasks), _say(now, timed, all_day, tasks)
+    attention = _attention(now, timed, all_day, tasks)
+    say = _say(now, timed, all_day, tasks)
+    if attention:
+        n = len(attention)
+        head = f"有 {n} 件需要你。" if n > 1 else "有 1 件需要你。"
+        say = _spaced(head) + say
+    return _sections(now, timed, all_day, tasks), say, attention
 
 
 def _reason(exc: BaseException, fallback: str) -> str:
@@ -218,7 +306,12 @@ async def presence_input() -> tuple[dict[str, Any], str]:
     """返回（卡片，那一句）；日历没读到时卡片上写原因，那一句为空。日历和待办同时读。"""
     now = effective_now()
     name = his_name()
-    card: dict[str, Any] = {"hello": f"{greeting(now)}，{name}" if name else greeting(now), "sections": [], "error": ""}
+    card: dict[str, Any] = {
+        "hello": f"{greeting(now)}，{name}" if name else greeting(now),
+        "attention": [],
+        "sections": [],
+        "error": "",
+    }
 
     calendar, todo = await asyncio.gather(
         asyncio.to_thread(agenda.read, CARD_FRESH_S),
@@ -229,7 +322,7 @@ async def presence_input() -> tuple[dict[str, Any], str]:
         card["error"] = _reason(calendar, "日历这次没读到。")
         return card, ""
     tasks = [] if isinstance(todo, BaseException) else todo[0]
-    card["sections"], say = today_view(now, calendar[0], tasks)
+    card["sections"], say, card["attention"] = today_view(now, calendar[0], tasks)
     if isinstance(todo, BaseException):
         card["sections"].append({"label": "待办", "meta": "", "rows": [], "empty": _reason(todo, "这次没读到。")})
     return card, say

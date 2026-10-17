@@ -2,7 +2,7 @@
 
 目标：电脑关机也能聊；以后若多人用，不会绑在某一台 Windows 上。  
 原则：**一个代理、一段关系**；手机和电脑打的是同一套 API。  
-产品顺序见 [plan.md](plan.md) 的「五刀」——本页只写刀 1 的工程链路。
+产品顺序见 [plan.md](plan.md)：网页是主战场，管家循环优先；本页只写云与手机过渡。
 
 ## 总览
 
@@ -59,10 +59,10 @@ flyctl auth login                                                    # 只需一
 
 | 顺序 | 在哪做 | 做什么 |
 | --- | --- | --- |
-| **C1 · 现在（Windows）** | 本机 + Fly | 把云上页做成可靠的主屏幕入口：Safari「添加到主屏幕」、全屏、白环图标、登录一次记住。验收：主屏幕点 Friday → 直接聊 → Tasks 能动。 |
-| **C2 · 有 Mac 时** | 借/租一台 Mac，或云端 macOS CI（如 GitHub Actions `macos` / Codemagic） | Capacitor 打 iOS 包 → 装到你的 iPhone（开发者账号 / TestFlight）。仓库里 Capacitor 工程可先在 Windows 脚手架，**编译与装机必须在 Mac**。 |
+| **C1 · 现在（Windows）** | 本机 + Fly | **网页就是产品**：登录、卡片、「需要你」、待办。Safari 主屏幕可选。验收：打开 → 看到真事 → Tasks 能动。 |
+| **C2 · 有 Mac 时** | 借/租一台 Mac，或云端 macOS CI | Capacitor / TestFlight。**编译必须在 Mac**；没 Mac 之前不阻塞管家与网页。 |
 
-纯 SwiftUI 重做聊天可以后做。没有 Mac 之前，**不要把「等原生壳」当成进度阻塞**——C1 过关就算刀 1 手机侧可用。
+没有 Mac 之前，进度 = 网页管家，不是等原生壳。
 
 ### D. 以后才做（有用户再加）
 

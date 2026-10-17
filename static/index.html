@@ -163,6 +163,17 @@
       letter-spacing: -0.03em;
     }
     .today section + section { margin-top: 14px; }
+    .today section.attention {
+      margin-bottom: 4px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    .today section.attention h3 { color: var(--ink); letter-spacing: 0.04em; }
+    .today .why {
+      display: block;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
     .today h3 {
       display: flex;
       justify-content: space-between;
@@ -571,6 +582,23 @@
       div.className = "msg bot today";
       div.replaceChildren(el("div", "hello", card.hello));
       if (card.error) div.append(el("p", "empty", card.error));
+      const needs = card.attention || [];
+      if (needs.length) {
+        const box = el("section", "attention");
+        const head = el("h3");
+        head.append(el("span", "", "需要你"));
+        head.append(el("span", "", needs.length + " 件"));
+        box.append(head);
+        for (const row of needs) {
+          const line = el("div", "row");
+          const what = el("div", "what", row.title);
+          if (row.why) what.append(el("span", "why", row.why));
+          if (row.where) what.append(el("span", "where", row.where));
+          line.append(el("time", "", row.time || ""), what);
+          box.append(line);
+        }
+        div.append(box);
+      }
       for (const section of card.sections || []) {
         const box = el("section");
         // 空的日子只占一行、退到后面；版面留给真要去的事
