@@ -15,17 +15,30 @@ MAX_AUDIO_BYTES = 12 * 1024 * 1024
 # 播报别念太长：长回复仍显示全文，只念前面
 MAX_SPEAK_CHARS = 800
 
-# 贴近 MCU Friday 的气质：爱尔兰、女声、干练、不煽情。
-# 不能克隆演员；用可引导的合成声 + 说明书。
 DEFAULT_TTS_MODEL = "gpt-4o-mini-tts"
-DEFAULT_TTS_VOICE = "coral"
-DEFAULT_TTS_INSTRUCTIONS = (
-    "You are Friday, a personal AI steward. "
-    "Speak with a light Irish English accent, feminine presentation, mid-range pitch. "
-    "Tone: calm, dry, competent, lightly witty — never chirpy, never theatrical. "
-    "Pace: measured and clear, short natural pauses. "
-    "Sound like a trusted aide in the room, not a call-center bot or a movie trailer."
+# OpenAI 内置声音里最自然的一个
+DEFAULT_TTS_VOICE = "marin"
+# 电影里 Friday 的味道来自爱尔兰口音的英语；演员本人的声音不能克隆，只能靠说明书贴近气质。
+# 中文硬套爱尔兰口音只会更生硬，所以中文按自然的普通话说。
+ENGLISH_STYLE = (
+    "Voice: a young Irish woman, soft and warm, quietly confident. "
+    "Accent: a gentle Irish English lilt. "
+    "Delivery: relaxed and conversational, like talking to someone she knows well; "
+    "natural rhythm with small pauses, a slight smile in the voice, a little dry wit. "
+    "Never sound like a newsreader, a phone menu, or a movie trailer."
 )
+CHINESE_STYLE = (
+    "Voice: a young woman, soft and warm, quietly confident. "
+    "Speak natural, native Mandarin Chinese, the way she talks to someone she knows well: "
+    "relaxed and conversational, natural rhythm with small pauses, a slight smile in the voice. "
+    "No broadcast tone, no customer-service tone, no exaggerated emotion."
+)
+
+TIME = re.compile(r"(?<![\d:])([01]?\d|2[0-3]):([0-5]\d)(?![\d:])")
+TIME_RANGE = re.compile(
+    r"(?<![\d:])([01]?\d|2[0-3]):([0-5]\d)\s*[–—~-]\s*([01]?\d|2[0-3]):([0-5]\d)(?![\d:])"
+)
+LIST_MARK = re.compile(r"^\s*(?:[-*•·]|\d+[)、]|\d+\.(?=\s))\s*")
 
 
 def _client() -> OpenAI:
@@ -51,35 +64,70 @@ def transcribe(audio: bytes, filename: str = "audio.webm") -> str:
 
 
 def speak(text: str) -> bytes:
-    """把回复念出来，返回 mp3 字节。"""
+    """把一句回复念出来，返回 mp3 字节。"""
     load_env()
-    cleaned = _for_speech(text)
+    chinese = _is_chinese(text)
+    cleaned = _for_speech(text, chinese)
     if not cleaned:
         raise RuntimeError("没有可念的文字。")
-    voice = (os.getenv("FRIDAY_TTS_VOICE") or DEFAULT_TTS_VOICE).strip() or DEFAULT_TTS_VOICE
     model = (os.getenv("FRIDAY_TTS_MODEL") or DEFAULT_TTS_MODEL).strip() or DEFAULT_TTS_MODEL
-    instructions = (os.getenv("FRIDAY_TTS_INSTRUCTIONS") or DEFAULT_TTS_INSTRUCTIONS).strip()
-    kwargs: dict = {
-        "model": model,
-        "voice": voice,
-        "input": cleaned,
-        "response_format": "mp3",
-    }
-    # tts-1 / tts-1-hd 不认 instructions；新模型才认
-    if instructions and "gpt-4o-mini-tts" in model:
-        kwargs["instructions"] = instructions
-    response = _client().audio.speech.create(**kwargs)
-    return response.content
+    voice = (os.getenv("FRIDAY_TTS_VOICE") or DEFAULT_TTS_VOICE).strip() or DEFAULT_TTS_VOICE
+    style = (os.getenv("FRIDAY_TTS_INSTRUCTIONS") or (CHINESE_STYLE if chinese else ENGLISH_STYLE)).strip()
+    kwargs: dict = {"model": model, "voice": voice, "input": cleaned, "response_format": "mp3"}
+    # tts-1 / tts-1-hd 不认 instructions
+    if style and model.startswith("gpt-"):
+        kwargs["instructions"] = style
+    return _client().audio.speech.create(**kwargs).content
 
 
-def _for_speech(text: str) -> str:
-    raw = (text or "").strip()
+def _is_chinese(text: str) -> bool:
+    han = len(re.findall(r"[\u4e00-\u9fff]", text or ""))
+    latin = len(re.findall(r"[A-Za-z]", text or ""))
+    return han > 0 and han * 3 >= latin
+
+
+def _period(hour: int) -> str:
+    return "凌晨" if hour < 5 else "上午" if hour < 12 else "中午" if hour < 13 else "下午" if hour < 18 else "晚上"
+
+
+def _say_clock(hour: int, minute: int, *, period: bool = True) -> str:
+    """「14:30」说成「下午2点半」。"""
+    tail = "点" if minute == 0 else "点半" if minute == 30 else f"点{minute}分"
+    return f"{_period(hour) if period else ''}{hour - 12 if hour > 12 else hour or 12}{tail}"
+
+
+def _say_range(match: re.Match) -> str:
+    h1, m1, h2, m2 = (int(x) for x in match.groups())
+    return f"{_say_clock(h1, m1)}到{_say_clock(h2, m2, period=_period(h1) != _period(h2))}"
+
+
+def _join(lines: list[str], chinese: bool) -> str:
+    """一行一件事的写法，连成说出口的句子。"""
+    out = ""
+    for line in lines:
+        if out and out[-1] not in "。！？!?；;，,：:….":
+            out += "。" if chinese else "."
+        out += line if chinese or not out else " " + line
+    return out
+
+
+def _for_speech(text: str, chinese: bool) -> str:
+    """写给眼睛看的回复改成念给耳朵听的：去掉符号和清单，中文里的钟点说成「下午三点半」。"""
+    raw = (text or "").replace("\u00a0", " ")
     raw = re.sub(r"```[\s\S]*?```", " ", raw)
     raw = re.sub(r"`([^`]+)`", r"\1", raw)
     raw = re.sub(r"\*\*(.+?)\*\*", r"\1", raw)
     raw = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", raw)
     raw = re.sub(r"https?://\S+", " ", raw)
+    raw = _join([line for line in (LIST_MARK.sub("", x).strip() for x in raw.splitlines()) if line], chinese)
     raw = re.sub(r"[#*_>•]+", " ", raw)
+    if chinese:
+        raw = raw.replace("·", "，")
+        raw = TIME_RANGE.sub(_say_range, raw)
+        raw = TIME.sub(lambda m: _say_clock(int(m[1]), int(m[2])), raw)
+        raw = re.sub(r"\s*([，。！？；：])\s*", r"\1", raw)
+    else:
+        raw = raw.replace("·", ", ")
     raw = re.sub(r"\s+", " ", raw).strip()
     if len(raw) > MAX_SPEAK_CHARS:
         raw = raw[: MAX_SPEAK_CHARS - 1].rstrip() + "…"

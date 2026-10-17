@@ -110,6 +110,7 @@ class ChatRequest(BaseModel):
         False,
         description="上一轮是否在等他确认写操作；只有这时「确认/好的」才算同意",
     )
+    spoken: bool = Field(False, description="他是开口说的：回答会被念出来")
 
 
 class ChatResponse(BaseModel):
@@ -266,6 +267,7 @@ async def chat_stream(body: ChatRequest) -> StreamingResponse:
             message,
             history=history,
             pending_confirmation=body.pending_confirmation,
+            spoken=body.spoken,
         ),
     )
 

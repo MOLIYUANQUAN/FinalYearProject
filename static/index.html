@@ -117,7 +117,10 @@
       flex-direction: column;
       gap: 16px;
       padding: 8px 2px 10px;
+      transition: padding-bottom 0.3s ease;
     }
+    /* 白环出来时给最后一句让位 */
+    #log.voice { padding-bottom: 108px; }
     .msg {
       max-width: 88%;
       line-height: 1.65;
@@ -253,42 +256,8 @@
         from { opacity: 0; transform: translateY(8px); filter: blur(2px); }
         to { opacity: 1; transform: translateY(0); filter: blur(0); }
       }
-      #mic.recording {
-        animation: mic-pulse 1.4s ease-in-out infinite;
-      }
-      #mic.speaking {
-        animation: speak-wave 1.1s ease-in-out infinite;
-      }
-      body.listening #log::after {
-        content: "";
-        position: sticky;
-        bottom: 0;
-        display: block;
-        height: 2px;
-        margin-top: 8px;
-        background: linear-gradient(90deg, transparent, var(--ink), transparent);
-        background-size: 200% 100%;
-        animation: listen-scan 1.6s linear infinite;
-        opacity: 0.35;
-      }
-      @keyframes mic-pulse {
-        0%, 100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.18); transform: scale(1); }
-        50% { box-shadow: 0 0 0 10px rgba(0, 0, 0, 0); transform: scale(1.03); }
-      }
-      @keyframes speak-wave {
-        0%, 100% { box-shadow: inset 0 0 0 1px transparent; opacity: 1; }
-        50% { box-shadow: inset 0 0 0 2px var(--ink); opacity: 0.92; }
-      }
-      @keyframes listen-scan {
-        from { background-position: 100% 0; }
-        to { background-position: -100% 0; }
-      }
-      @media (prefers-color-scheme: dark) {
-        @keyframes mic-pulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.22); transform: scale(1); }
-          50% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); transform: scale(1.03); }
-        }
-      }
+      .fresh { animation: fresh 0.45s ease-out both; }
+      @keyframes fresh { from { opacity: 0; } }
     }
     .typing {
       display: inline-flex;
@@ -399,14 +368,44 @@
       color: var(--on-brand);
       border-color: var(--brand);
     }
-    #mic.speaking {
-      background: transparent;
-      color: var(--ink);
-      border-color: var(--ink);
-    }
     #mic:disabled, #send:disabled { opacity: 0.35; cursor: default; }
     #send { transition: opacity 0.2s ease, transform 0.15s ease; }
     #send:active:not(:disabled), #mic:active:not(:disabled) { transform: scale(0.97); }
+    /* 白环跟着真实的声音起伏：你说话时听麦克风，她说话时听她自己；点一下就停 */
+    #orb {
+      --l: 0;
+      position: fixed;
+      left: 50%;
+      bottom: calc(108px + env(safe-area-inset-bottom, 0px));
+      width: 72px;
+      height: 72px;
+      margin-left: -36px;
+      opacity: 0;
+      transform: translateY(16px) scale(0.6);
+      pointer-events: none;
+      transition: opacity 0.3s ease, transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+      z-index: 10;
+    }
+    #orb.on { opacity: 1; transform: none; pointer-events: auto; cursor: pointer; }
+    #orb b, #orb i { position: absolute; inset: 0; border-radius: 50%; }
+    #orb b {
+      background: radial-gradient(closest-side, var(--ink), transparent);
+      opacity: calc(0.12 + var(--l) * 0.33);
+      transform: scale(calc(1.1 + var(--l) * 0.9));
+    }
+    #orb i {
+      border: 2px solid var(--ink);
+      background: var(--bg);
+      transform: scale(calc(0.88 + var(--l) * 0.2));
+    }
+    #orb.thinking b { animation: halo-breathe 1.8s ease-in-out infinite; }
+    #orb.thinking i { animation: ring-breathe 1.8s ease-in-out infinite; }
+    @keyframes ring-breathe { 50% { transform: scale(0.97); } }
+    @keyframes halo-breathe { 50% { opacity: 0.3; transform: scale(1.5); } }
+    @media (prefers-reduced-motion: reduce) {
+      #orb, #orb b, #orb i { transition: opacity 0.3s ease; transform: none; }
+      #orb.thinking b, #orb.thinking i { animation: none; }
+    }
     #send {
       background: var(--brand);
       color: var(--on-brand);
@@ -476,6 +475,7 @@
     </div>
 
     <div id="log" role="log" aria-live="polite"></div>
+    <div id="orb" aria-hidden="true" title="点一下停"><b></b><i></i></div>
 
     <form id="form">
       <textarea id="input" rows="1" placeholder="问我，或者告诉我一件事" autocomplete="off" enterkeyhint="send"></textarea>
@@ -525,7 +525,6 @@
     let mediaStream = null;
     let recordChunks = [];
     let recordTimer = null;
-    let playingAudio = null;
     const RECORD_MAX_MS = 60 * 1000;
 
     (function takeAccessFromUrl() {
@@ -720,6 +719,12 @@
         (hint ? '<span class="hint">' + escapeHtml(hint) + "</span>" : "");
     }
 
+    // 新写出来的字淡入，不是整段刷新；写完再换成排好版的全文
+    function appendFresh(target, chunk) {
+      if (target.querySelector(".typing")) target.textContent = "";
+      target.append(el("span", "fresh", chunk));
+    }
+
     function addDetails(div, tools) {
       const d = document.createElement("details");
       d.className = "details";
@@ -841,10 +846,12 @@
             scrollDown();
           } else if (ev.type === "delta") {
             text += ev.text;
-            view.el.innerHTML = render(text);
+            appendFresh(view.el, ev.text);
+            if (view.onText) view.onText(text);
             scrollDown();
           } else if (ev.type === "tool") {
             text = "";
+            if (view.onTool) view.onTool();
             showTyping(view.el, HINTS[ev.name]);
           } else if (ev.type === "done") {
             result = { reply: ev.reply || text, tools: ev.tools_called || [], undo: ev.undo || [] };
@@ -880,53 +887,238 @@
       if (!mediaRecorder || mediaRecorder.state !== "recording") micBtn.disabled = on;
     }
 
-    function setSpeaking(on) {
-      micBtn.classList.toggle("speaking", !!on);
-      if (on) {
-        micBtn.textContent = "…";
-        micBtn.title = "Friday 正在说";
-      } else if (!micBtn.classList.contains("recording")) {
-        micBtn.textContent = "说";
-        micBtn.title = "点一下开始说，再说完点一下";
+    // ---- 声音：你说话时听麦克风；她一句写完就念一句；白环跟着真实的响度起伏 ----
+    const orbEl = document.getElementById("orb");
+    const voiceOut = new Audio();
+    const SENTENCE_STOPS = "。！？!?；;…\n";
+    const ENVELOPE_HZ = 50; // 她的声音每 20ms 记一个响度
+    const levelBuf = new Uint8Array(1024);
+    let audioCtx = null;
+    let micSource = null;
+    let micAnalyser = null;
+    let voiceEnv = null; // 正在念的这句的响度曲线
+    let speechTurn = 0; // 每次打断 +1：上一轮没念完的句子作废
+    let speechQueue = []; // 排着队的句子：每句一个 Promise<{url, env}>
+    let speechPlaying = false;
+    let speechOpen = false; // 这一轮还在写，后面可能还有句子
+    let clipWatch = 0;
+    let orbState = "";
+    let orbLevel = 0;
+    let orbFrame = 0;
+    let orbHide = 0;
+
+    function audioContext() {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      if (!audioCtx) audioCtx = new AC();
+      if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+      return audioCtx;
+    }
+
+    // 均方根响度 → 0–1；开平方让轻声也有起伏
+    function toLevel(rms) {
+      return Math.min(1, Math.sqrt(Math.max(0, rms - 0.01)) * 2.2);
+    }
+
+    function micLevel() {
+      if (!micAnalyser) return 0;
+      micAnalyser.getByteTimeDomainData(levelBuf);
+      let sum = 0;
+      for (const v of levelBuf) sum += ((v - 128) / 128) ** 2;
+      return toLevel(Math.sqrt(sum / levelBuf.length));
+    }
+
+    function voiceLevel(now) {
+      if (voiceOut.paused) return 0;
+      if (!voiceEnv) return 0.35 + 0.25 * Math.sin(now / 150) * Math.sin(now / 410);
+      return toLevel(voiceEnv[Math.floor(voiceOut.currentTime * ENVELOPE_HZ)] || 0);
+    }
+
+    function orbTick(now) {
+      const target = orbState === "listening" ? micLevel() : orbState === "speaking" ? voiceLevel(now) : 0;
+      // 起得快、落得慢，像呼吸
+      orbLevel += (target - orbLevel) * (target > orbLevel ? 0.5 : 0.12);
+      orbEl.style.setProperty("--l", orbLevel.toFixed(3));
+      orbFrame = orbState || orbLevel > 0.01 ? requestAnimationFrame(orbTick) : 0;
+    }
+
+    function orbSet(state) {
+      clearTimeout(orbHide);
+      orbState = state;
+      orbEl.className = state ? "on " + state : "";
+      logEl.classList.toggle("voice", !!state);
+      if (state) setTimeout(scrollDown, 320);
+      if (state && !orbFrame) orbFrame = requestAnimationFrame(orbTick);
+    }
+
+    // 这一轮全说完才收起白环；句子之间的停顿不收
+    function settleOrb() {
+      if (orbState === "listening" || speechPlaying || speechQueue.length || speechOpen) return;
+      clearTimeout(orbHide);
+      orbHide = setTimeout(() => orbSet(""), 350);
+    }
+
+    // 手机 Safari 只让「点过的」播放器出声：第一次点麦克风时先放 0.1 秒静音
+    function unlockVoice() {
+      const ctx = audioContext();
+      if (!voiceOut.src) {
+        voiceOut.src = silentWav();
+        voiceOut.play().catch(() => {});
       }
+      return ctx;
     }
 
-    function stopPlaying() {
-      if (!playingAudio) return;
-      try { playingAudio.pause(); } catch (e) {}
-      playingAudio = null;
-      setSpeaking(false);
+    function silentWav() {
+      const samples = 800;
+      const bytes = new Uint8Array(44 + samples).fill(128); // 8-bit PCM，128 是静音
+      const view = new DataView(bytes.buffer);
+      const tag = (at, s) => [...s].forEach((c, i) => (bytes[at + i] = c.charCodeAt(0)));
+      tag(0, "RIFF");
+      view.setUint32(4, 36 + samples, true);
+      tag(8, "WAVEfmt ");
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, 8000, true);
+      view.setUint32(28, 8000, true);
+      view.setUint16(32, 1, true);
+      view.setUint16(34, 8, true);
+      tag(36, "data");
+      view.setUint32(40, samples, true);
+      return URL.createObjectURL(new Blob([bytes], { type: "audio/wav" }));
     }
 
-    async function speakReply(text) {
-      const clean = (text || "").trim();
-      if (!clean) return;
-      stopPlaying();
-      setSpeaking(true);
+    // 解出这句的响度曲线给白环用；声音本身照常由播放器放，不经过 Web Audio
+    async function envelopeOf(blob) {
+      const ctx = audioContext();
+      if (!ctx) return null;
       try {
-        const res = await fetch("/api/voice/speak", {
-          method: "POST",
-          credentials: "include",
-          headers: authHeaders({ "Content-Type": "application/json" }),
-          body: JSON.stringify({ text: clean }),
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.detail || "这句没念出来。");
+        const data = (await ctx.decodeAudioData(await blob.arrayBuffer())).getChannelData(0);
+        const step = Math.round(ctx.sampleRate / ENVELOPE_HZ);
+        const env = new Float32Array(Math.ceil(data.length / step));
+        for (let i = 0; i < env.length; i++) {
+          const end = Math.min(data.length, (i + 1) * step);
+          let sum = 0;
+          for (let j = i * step; j < end; j++) sum += data[j] * data[j];
+          env[i] = Math.sqrt(sum / (end - i * step));
         }
-        const url = URL.createObjectURL(await res.blob());
-        const audio = new Audio(url);
-        playingAudio = audio;
-        audio.onended = () => {
-          URL.revokeObjectURL(url);
-          if (playingAudio === audio) playingAudio = null;
-          setSpeaking(false);
-        };
-        await audio.play();
+        return env;
       } catch (e) {
-        setSpeaking(false);
-        throw e;
+        return null;
       }
+    }
+
+    function fetchSpeech(text) {
+      return fetch("/api/voice/speak", {
+        method: "POST",
+        credentials: "include",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ text }),
+      })
+        .then((res) => (res.ok ? res.blob() : null))
+        .then(async (blob) => (blob ? { url: URL.createObjectURL(blob), env: await envelopeOf(blob) } : null))
+        .catch(() => null);
+    }
+
+    function enqueueSpeech(text, turn) {
+      const clean = text.trim();
+      if (turn !== speechTurn || !/[\p{L}\p{N}]/u.test(clean)) return;
+      speechQueue.push(fetchSpeech(clean));
+      playNextSpeech();
+    }
+
+    async function playNextSpeech() {
+      if (speechPlaying) return;
+      const next = speechQueue.shift();
+      if (!next) return settleOrb();
+      speechPlaying = true;
+      const turn = speechTurn;
+      const clip = await next;
+      if (turn !== speechTurn) {
+        if (clip) URL.revokeObjectURL(clip.url);
+        return;
+      }
+      if (!clip) {
+        speechPlaying = false;
+        return playNextSpeech();
+      }
+      voiceEnv = clip.env;
+      voiceOut.src = clip.url;
+      orbSet("speaking");
+      voiceOut.play().catch(() => {
+        if (turn === speechTurn) doneSpeaking();
+      });
+      // 播放器卡住不报 ended 时，照这句的真实长度往下走，白环不会一直挂着
+      const seconds = clip.env ? clip.env.length / ENVELOPE_HZ : 20;
+      clipWatch = setTimeout(() => {
+        if (turn === speechTurn) doneSpeaking();
+      }, seconds * 1000 + 3000);
+    }
+
+    function doneSpeaking() {
+      clearTimeout(clipWatch);
+      if (voiceOut.src.startsWith("blob:")) URL.revokeObjectURL(voiceOut.src);
+      voiceEnv = null;
+      speechPlaying = false;
+      playNextSpeech();
+    }
+
+    voiceOut.addEventListener("ended", doneSpeaking);
+
+    function stopSpeaking() {
+      clearTimeout(clipWatch);
+      speechTurn += 1;
+      for (const p of speechQueue) p.then((clip) => clip && URL.revokeObjectURL(clip.url));
+      speechQueue = [];
+      speechOpen = false;
+      speechPlaying = false;
+      voiceEnv = null;
+      if (!voiceOut.paused) voiceOut.pause();
+      if (voiceOut.src.startsWith("blob:")) URL.revokeObjectURL(voiceOut.src);
+    }
+
+    function sentenceEnd(text, from) {
+      for (let i = from; i < text.length; i++) {
+        const stop = SENTENCE_STOPS.includes(text[i]) || (text[i] === "." && /\s/.test(text[i + 1] || ""));
+        if (stop && text.slice(from, i + 1).trim().length >= 4) return i + 1;
+      }
+      return -1;
+    }
+
+    // 一句写完就送去念，不等整段写完
+    function speakerFor() {
+      let turn = speechTurn;
+      let text = "";
+      let said = 0;
+      speechOpen = true;
+      const close = () => {
+        if (turn === speechTurn) speechOpen = false;
+        settleOrb();
+      };
+      return {
+        feed(full) {
+          text = full;
+          for (let end = sentenceEnd(text, said); end > 0; end = sentenceEnd(text, said)) {
+            enqueueSpeech(text.slice(said, end), turn);
+            said = end;
+          }
+        },
+        // 她去查工具了：之前写的字屏幕上会换掉，念到一半的也一起作废，免得同一件事说两遍
+        reset() {
+          if (turn !== speechTurn) return;
+          stopSpeaking();
+          turn = speechTurn;
+          speechOpen = true;
+          text = "";
+          said = 0;
+          orbSet("thinking");
+        },
+        end(reply) {
+          enqueueSpeech((text || reply || "").slice(said), turn);
+          close();
+        },
+        cancel: close,
+      };
     }
 
     function pickMime() {
@@ -939,7 +1131,6 @@
 
     function setRecording(on) {
       micBtn.classList.toggle("recording", !!on);
-      document.body.classList.toggle("listening", !!on);
       micBtn.textContent = on ? "完" : "说";
       micBtn.title = on ? "说完了，点一下发送" : "点一下开始说，再说完点一下";
       sendBtn.disabled = !!on || busy;
@@ -954,6 +1145,11 @@
         try { mediaRecorder.stop(); } catch (e) {}
       }
       mediaRecorder = null;
+      if (micSource) {
+        micSource.disconnect();
+        micSource = null;
+      }
+      micAnalyser = null;
       if (mediaStream) {
         mediaStream.getTracks().forEach((t) => t.stop());
         mediaStream = null;
@@ -966,8 +1162,15 @@
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error("这浏览器不能录音。换 Chrome / Edge，或用 HTTPS 打开。");
       }
-      stopPlaying();
+      stopSpeaking();
+      const ctx = unlockVoice();
       mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (ctx) {
+        micSource = ctx.createMediaStreamSource(mediaStream);
+        micAnalyser = ctx.createAnalyser();
+        micAnalyser.fftSize = levelBuf.length;
+        micSource.connect(micAnalyser);
+      }
       const mime = pickMime();
       mediaRecorder = mime ? new MediaRecorder(mediaStream, { mimeType: mime }) : new MediaRecorder(mediaStream);
       recordChunks = [];
@@ -976,6 +1179,7 @@
       };
       mediaRecorder.start();
       setRecording(true);
+      orbSet("listening");
       recordTimer = setTimeout(() => {
         if (mediaRecorder && mediaRecorder.state === "recording") stopRecordingAndSend();
       }, RECORD_MAX_MS);
@@ -985,10 +1189,12 @@
       if (!mediaRecorder || mediaRecorder.state !== "recording") return;
       const recorder = mediaRecorder;
       const mime = recorder.mimeType || "audio/webm";
+      orbSet("thinking");
       recorder.onstop = async () => {
         const blob = new Blob(recordChunks, { type: mime });
         releaseMic();
         if (!blob.size) {
+          orbSet("");
           addMessage("error", "没录到声音。");
           return;
         }
@@ -1012,20 +1218,24 @@
           setBusy(false);
           addMessage("error", (e && e.message) || String(e));
         }
+        settleOrb();
       };
-      try { recorder.stop(); } catch (e) { releaseMic(); }
+      try {
+        recorder.stop();
+      } catch (e) {
+        releaseMic();
+        orbSet("");
+      }
     }
 
     async function toggleMic() {
-      if (busy && !(mediaRecorder && mediaRecorder.state === "recording")) return;
-      if (mediaRecorder && mediaRecorder.state === "recording") {
-        stopRecordingAndSend();
-        return;
-      }
+      if (mediaRecorder && mediaRecorder.state === "recording") return stopRecordingAndSend();
+      if (busy) return;
       try {
         await startRecording();
       } catch (e) {
         releaseMic();
+        orbSet("");
         addMessage("error", (e && e.message) || "打不开麦克风。");
       }
     }
@@ -1070,6 +1280,8 @@
     }
 
     async function startOver() {
+      stopSpeaking();
+      settleOrb();
       setBusy(true);
       session = freshSession();
       saveSession();
@@ -1089,7 +1301,9 @@
 
     async function ask(message, opts) {
       if (busy || !ready) return;
-      const speak = !!(opts && opts.speak);
+      stopSpeaking();
+      const speaker = opts && opts.speak ? speakerFor() : null;
+      if (!speaker) settleOrb();
       setBusy(true);
       clearActions();
       const pending = awaitingConfirmation();
@@ -1102,21 +1316,26 @@
       saveSession();
       const div = addMessage("bot");
       showTyping(div);
+      const view = { el: div };
+      if (speaker) {
+        view.onText = (text) => speaker.feed(text);
+        view.onTool = () => speaker.reset();
+      }
       try {
         const { reply, tools, undo } = await stream(
           "/api/chat/stream",
-          { message, history, pending_confirmation: pending },
-          { el: div },
+          { message, history, pending_confirmation: pending, spoken: !!speaker },
+          view,
         );
         finish(div, reply, tools, undo);
-        if (speak && reply) {
-          try { await speakReply(reply); } catch (e) { /* 念不出来仍留字 */ }
-        }
+        if (speaker) speaker.end(reply);
       } catch (e) {
         fail(div, e);
+        if (speaker) speaker.cancel();
       } finally {
         setBusy(false);
-        input.focus();
+        // 开口说的那轮不弹键盘
+        if (!speaker) input.focus();
       }
     }
 
@@ -1153,6 +1372,14 @@
     });
 
     micBtn.addEventListener("click", () => { toggleMic(); });
+
+    orbEl.addEventListener("click", () => {
+      if (orbState === "listening") stopRecordingAndSend();
+      else if (orbState === "speaking") {
+        stopSpeaking();
+        settleOrb();
+      }
+    });
 
     input.addEventListener("input", fitInput);
 

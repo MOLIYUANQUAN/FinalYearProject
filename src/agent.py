@@ -57,6 +57,12 @@ VOICE = """你叫 Friday，是他的个人代理，只为他一个人工作。�
 - 写操作（建日程、发邮件、归档或删除邮件、删除记忆）：先 request_user_confirmation，一次说清要做什么和关键细节（时间、收件人、主题）；他同意后再以 user_confirmed=True 执行。页面会给他「确认 / 取消」按钮：问一句就停，不教他怎么回复。成功之前绝不说已完成；完成后一句话告诉他结果。
 - 帮他准备一场会面或重要对话：先搜相关的邮件和笔记，再写：时间地点（日历里没有就直说）+ 现状一句话 + 三个讨论点。讨论点只能来自真材料（档案、记忆、邮件、笔记）；材料不够就少写几点并直说，不用空话凑数。"""
 
+SPOKEN = """这一轮是他开口说的，你的回答会直接念给他听：
+- 像当面说话：一到三句短句，口语，先说答案。
+- 不列清单，不用符号、括号和链接；几件事就用「先……再……」串起来。
+- 时间说成「下午三点半」「周四」，不写 14:30 这种格式。
+- 他说英文就用英文回，说中文就用中文回。"""
+
 
 def _connections_line() -> str:
     calendar = {
@@ -74,26 +80,35 @@ def _connections_line() -> str:
     return f"已接入：{connected}。没接入的账户就直说没接入。"
 
 
-def build_instructions(calendar: str = "", todo: str = "") -> str:
-    parts = [VOICE, now_block(), _connections_line(), calendar, todo, profile_block(), memory_block()]
+def build_instructions(calendar: str = "", todo: str = "", *, spoken: bool = False) -> str:
+    parts = [
+        VOICE,
+        SPOKEN if spoken else "",
+        now_block(),
+        _connections_line(),
+        calendar,
+        todo,
+        profile_block(),
+        memory_block(),
+    ]
     return "\n\n".join(part for part in parts if part)
 
 
-def create_assistant(*, calendar: str = "", todo: str = "") -> Agent:
+def create_assistant(*, calendar: str = "", todo: str = "", spoken: bool = False) -> Agent:
     require_openai_api_key()
     return Agent(
         name="Friday",
-        instructions=build_instructions(calendar, todo),
+        instructions=build_instructions(calendar, todo, spoken=spoken),
         tools=ALL_TOOLS + TASK_TOOLS if todos.connected() else ALL_TOOLS,
         model=DEFAULT_MODEL,
         model_settings=ModelSettings(temperature=0.2),
     )
 
 
-async def _assistant() -> Agent:
+async def _assistant(spoken: bool = False) -> Agent:
     """这一轮的 Friday：日历和待办同时读，谁也不等谁。"""
     calendar, todo = await asyncio.gather(asyncio.to_thread(chat_block), asyncio.to_thread(todos.chat_block))
-    return create_assistant(calendar=calendar, todo=todo)
+    return create_assistant(calendar=calendar, todo=todo, spoken=spoken)
 
 
 def extract_tool_names(result: RunResult) -> list[str]:
@@ -233,9 +248,10 @@ async def stream_assistant(
     *,
     history: list[dict[str, str]] | None = None,
     pending_confirmation: bool = False,
+    spoken: bool = False,
     max_turns: int = 12,
 ) -> AsyncIterator[dict[str, Any]]:
-    agent = await _assistant()
+    agent = await _assistant(spoken)
     message = _expand_short_confirmation(message, history, pending_confirmation)
     async for event in _stream(agent, _history_to_input(message, history), max_turns=max_turns):
         yield event
