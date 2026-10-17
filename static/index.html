@@ -414,17 +414,24 @@
 
     (function takeAccessFromUrl() {
       try {
+        // 旧版存在 sessionStorage，关掉就丢；迁到 localStorage 长期记住
+        const legacy = sessionStorage.getItem(ACCESS_KEY);
+        if (legacy && !localStorage.getItem(ACCESS_KEY)) {
+          localStorage.setItem(ACCESS_KEY, legacy);
+          sessionStorage.removeItem(ACCESS_KEY);
+        }
         const u = new URL(location.href);
         const t = u.searchParams.get("access");
         if (!t) return;
-        sessionStorage.setItem(ACCESS_KEY, t);
+        localStorage.setItem(ACCESS_KEY, t);
+        sessionStorage.removeItem(ACCESS_KEY);
         u.searchParams.delete("access");
         history.replaceState({}, "", u.pathname + u.search + u.hash);
       } catch (e) {}
     })();
 
     function accessToken() {
-      return sessionStorage.getItem(ACCESS_KEY) || "";
+      return localStorage.getItem(ACCESS_KEY) || sessionStorage.getItem(ACCESS_KEY) || "";
     }
 
     function authHeaders(extra) {
@@ -839,7 +846,8 @@
       e.preventDefault();
       const t = unlockInput.value.trim();
       if (!t) return;
-      sessionStorage.setItem(ACCESS_KEY, t);
+      localStorage.setItem(ACCESS_KEY, t);
+      sessionStorage.removeItem(ACCESS_KEY);
       unlockInput.value = "";
       showUnlock(false);
       await startOver();
