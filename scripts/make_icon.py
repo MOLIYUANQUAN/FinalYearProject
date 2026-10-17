@@ -101,8 +101,11 @@ def main() -> None:
     STATIC.mkdir(exist_ok=True)
     for size in (32, 192, 512):
         (STATIC / f"icon-{size}.png").write_bytes(png(size))
-    (STATIC / "friday.ico").write_bytes(ico({size: png(size) for size in (16, 24, 32, 48, 64, 256)}))
-    print("wrote static/icon-32.png, icon-192.png, icon-512.png, friday.ico")
+    blob = ico({size: png(size) for size in (16, 24, 32, 48, 64, 256)})
+    (STATIC / "friday.ico").write_bytes(blob)
+    # 桌面快捷方式用新文件名，避免 Windows 死记旧 friday.ico 的缓存
+    (STATIC / "friday-ring.ico").write_bytes(blob)
+    print("wrote static/icon-32.png, icon-192.png, icon-512.png, friday.ico, friday-ring.ico")
 
 
 if __name__ == "__main__":

@@ -17,7 +17,7 @@ from open_agent import RESIDENT_PID, stop_resident
 ROOT = Path(__file__).resolve().parent.parent
 PYTHONW = ROOT / ".venv" / "Scripts" / "pythonw.exe"
 LAUNCHER = ROOT / "scripts" / "open_agent.py"
-ICON = ROOT / "static" / "friday.ico"
+ICON = ROOT / "static" / "friday-ring.ico"
 NAME = "Friday.lnk"
 DETACHED_PROCESS = 0x00000008
 
