@@ -122,6 +122,7 @@
 | 2026-10-17 | 路线收成「五刀」：杀网站感 → 同一张脸 → 真用一周 → 语音 → 看世界；人格最后。云已通；刀 1 下一截是会话登录 + iPhone 壳 |
 | 2026-10-17 | 会话登录：`POST /api/login` 换 httpOnly Cookie；`?access=` / 旧 localStorage 一次性兑换后清掉；界面不再叫「访问码」 |
 | 2026-10-17 | Jimmy 开发机是 Windows：iOS 签名必须 Mac；刀 1 手机侧先走 Safari 主屏幕（C1），Capacitor/TestFlight 等有 Mac 或云端 macOS（C2），不阻塞真用 |
+| 2026-10-17 | 产品北星定为管家而非顾问：GPT=你来问，Friday=它发现并来问；循环 Observe→Follow up；功能判据「是否减少必须亲自管理的事」；主动打扰等身体可信（五刀过关）后再薄切，禁止假热闹推送 |
 
 ## 评测冻结
 
