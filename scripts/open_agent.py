@@ -43,7 +43,13 @@ def _fail(message: str) -> None:
 
 def _health() -> dict | None:
     try:
-        with _local.open(f"{desktop.URL}api/health", timeout=1) as response:
+        from src.config import get_access_token
+
+        request = urllib.request.Request(f"{desktop.BASE_URL}api/health")
+        token = get_access_token()
+        if token:
+            request.add_header("Authorization", f"Bearer {token}")
+        with _local.open(request, timeout=1) as response:
             return json.loads(response.read().decode("utf-8"))
     except (OSError, ValueError):
         return None

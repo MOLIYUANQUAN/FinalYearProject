@@ -13,8 +13,20 @@ from collections.abc import Callable
 from pathlib import Path
 
 APP_NAME = "Friday"
-URL = "http://127.0.0.1:8765/"
+BASE_URL = "http://127.0.0.1:8765/"
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+
+
+def page_url() -> str:
+    """打开窗口用的地址；设了访问码就带上，本机和手机是同一把。"""
+    from src.config import get_access_token
+
+    token = get_access_token()
+    return f"{BASE_URL}?access={token}" if token else BASE_URL
+
+
+# 旧名字：启动器和健康检查仍可能引用
+URL = BASE_URL
 STATE_DIR = DATA_DIR / "logs"
 # 浏览器不记得应用窗口的大小：新窗口沿用上次的位置，没有就用竖长的默认尺寸
 WINDOW_STATE = STATE_DIR / "window.json"
@@ -215,7 +227,7 @@ def show_window() -> None:
         return
     browser = _app_browser()
     if not browser:
-        webbrowser.open(URL)
+        webbrowser.open(page_url())
         return
     target = _saved() or _default()
     _user32.AllowSetForegroundWindow(ASFW_ANY)
@@ -227,7 +239,7 @@ def show_window() -> None:
             "--no-default-browser-check",
             "--hide-crash-restore-bubble",
             *_geometry_flags(target),
-            f"--app={URL}",
+            f"--app={page_url()}",
         ],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,

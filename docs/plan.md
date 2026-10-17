@@ -56,11 +56,11 @@
 
 电脑上 Ctrl+Alt+F：安排排好，那句话一起到；今天到下周日的日程本来就知道。10 月 16 日全量实测通过。
 
-### 2. 人在哪都在 · 下一步（第一优先）
+### 2. 人在哪都在 · 第一刀已进 develop
 
 **做到：** iPhone 上能聊同一个 Friday。
 
-第一刀：同一套对话界面，从外面用 Safari 打开就能用（本机隧道或轻量部署）+ 最小鉴权；小屏能用。App Store 原生 App 以后再说。
+第一刀：同一套对话界面 + `scripts\phone_access.py`（cloudflared 隧道）+ `FRIDAY_ACCESS_TOKEN`；小屏好点。说明见 [phone-access.md](phone-access.md)。App Store 原生 App 以后再说——先要的是马上能聊，不是上架。
 
 **演示时刻：** 出门用手机说「提醒我下午续借书」，回家电脑上的 Friday 和 Tasks 里都在。
 

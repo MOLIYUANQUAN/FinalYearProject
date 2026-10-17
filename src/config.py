@@ -118,3 +118,9 @@ def require_openai_api_key() -> str:
             "缺少 OPENAI_API_KEY。请复制 .env.example 为 .env 并填入有效的 OpenAI API Key。"
         )
     return key
+
+
+def get_access_token() -> str:
+    """手机从外面进来时用的访问码；空字符串表示不启用（只适合本机）。"""
+    load_env()
+    return (os.getenv("FRIDAY_ACCESS_TOKEN") or "").strip()

@@ -24,11 +24,13 @@ from pydantic import BaseModel, Field
 from src import agenda, todos, usage_log
 from src.agent import run_assistant, stream_assistant
 from src.presence import stream_presence
+from src.access import gate
 from src.config import (
     STATIC_DIR,
     effective_now,
     effective_today,
     effective_tomorrow,
+    get_access_token,
     get_calendar_backend,
     get_mail_backend,
     get_tasks_backend,
@@ -72,6 +74,10 @@ async def lifespan(_app: FastAPI):
         print(f"[OK] TASKS_BACKEND={get_tasks_backend()}")
     except RuntimeError as exc:
         print(f"[WARN] {exc}")
+    if get_access_token():
+        print("[OK] FRIDAY_ACCESS_TOKEN set (phone / remote access gated)")
+    else:
+        print("[OK] FRIDAY_ACCESS_TOKEN unset (local only; run scripts\\phone_access.py for phone)")
     _warm = asyncio.create_task(asyncio.to_thread(_warm_calendar)) if backend == "google" else None
     yield
 
@@ -81,6 +87,7 @@ app = FastAPI(
     version="0.5.0",
     lifespan=lifespan,
 )
+app.middleware("http")(gate)
 
 
 class ChatTurn(BaseModel):
@@ -138,12 +145,19 @@ def health() -> dict:
     except RuntimeError:
         pass
     now = effective_now()
+    tasks = "none"
+    try:
+        tasks = get_tasks_backend()
+    except RuntimeError:
+        pass
     return {
         "ok": True,
         "code_version": CODE_VERSION,
         "has_openai_api_key": has_key,
         "calendar_backend": backend,
         "mail_backend": mail,
+        "tasks_backend": tasks,
+        "access_required": bool(get_access_token()),
         "effective_today": effective_today(),
         "effective_tomorrow": effective_tomorrow(),
         "now_label": f"{now.month}月{now.day}日 {weekday_zh(now)}",
