@@ -18,7 +18,7 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 
 def page_url() -> str:
-    """打开窗口用的地址；设了访问码就带上，本机和手机是同一把。"""
+    """打开窗口用的地址；带一次性 ?access=，页面会换成会话 Cookie。"""
     from src.config import get_access_token
 
     token = get_access_token()

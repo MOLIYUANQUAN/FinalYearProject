@@ -373,9 +373,9 @@
     </header>
 
     <div id="unlock" aria-live="polite">
-      <p>从外面打开需要访问码。用电脑上脚本给出的链接，或把码粘在下面。</p>
+      <p>输入一次密码，之后这台设备会记住你。</p>
       <form id="unlockForm">
-        <input id="unlockInput" type="password" autocomplete="current-password" placeholder="访问码" />
+        <input id="unlockInput" type="password" autocomplete="current-password" placeholder="密码" />
         <button type="submit">进入</button>
       </form>
     </div>
@@ -390,7 +390,7 @@
 
   <script>
     const STORE_KEY = "pa.session.v1";
-    const ACCESS_KEY = "pa.access";
+    const ACCESS_KEY = "pa.access"; // 旧版曾把密码存在本机；登录后清掉
     const IDLE_MS = 2 * 60 * 60 * 1000;
     const CARD_FRESH_MS = 15 * 60 * 1000;
     const HISTORY_LIMIT = 20;
@@ -423,10 +423,10 @@
     let session = null;
     let busy = false;
     let ready = false;
+    let pendingPassword = ""; // 桌面 ?access= 或旧 localStorage，登录后清掉
 
     (function takeAccessFromUrl() {
       try {
-        // 旧版存在 sessionStorage，关掉就丢；迁到 localStorage 长期记住
         const legacy = sessionStorage.getItem(ACCESS_KEY);
         if (legacy && !localStorage.getItem(ACCESS_KEY)) {
           localStorage.setItem(ACCESS_KEY, legacy);
@@ -434,29 +434,67 @@
         }
         const u = new URL(location.href);
         const t = u.searchParams.get("access");
-        if (!t) return;
-        localStorage.setItem(ACCESS_KEY, t);
-        sessionStorage.removeItem(ACCESS_KEY);
-        u.searchParams.delete("access");
-        history.replaceState({}, "", u.pathname + u.search + u.hash);
+        if (t) {
+          pendingPassword = t;
+          u.searchParams.delete("access");
+          history.replaceState({}, "", u.pathname + u.search + u.hash);
+        } else {
+          pendingPassword = localStorage.getItem(ACCESS_KEY) || sessionStorage.getItem(ACCESS_KEY) || "";
+        }
       } catch (e) {}
     })();
 
-    function accessToken() {
-      return localStorage.getItem(ACCESS_KEY) || sessionStorage.getItem(ACCESS_KEY) || "";
+    function clearStoredPassword() {
+      pendingPassword = "";
+      try {
+        localStorage.removeItem(ACCESS_KEY);
+        sessionStorage.removeItem(ACCESS_KEY);
+      } catch (e) {}
     }
 
     function authHeaders(extra) {
-      const headers = Object.assign({}, extra || {});
-      const t = accessToken();
-      if (t) headers.Authorization = "Bearer " + t;
-      return headers;
+      return Object.assign({}, extra || {});
     }
 
     function showUnlock(on) {
       unlockEl.classList.toggle("visible", !!on);
       form.style.display = on ? "none" : "";
       if (on) unlockInput.focus();
+    }
+
+    async function loginWithPassword(password) {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || "密码不对。");
+      }
+      clearStoredPassword();
+      return true;
+    }
+
+    async function ensureSignedIn() {
+      if (pendingPassword) {
+        try {
+          await loginWithPassword(pendingPassword);
+          showUnlock(false);
+          return true;
+        } catch (e) {
+          clearStoredPassword();
+        }
+      }
+      const res = await fetch("/api/session", { credentials: "include" });
+      const data = await res.json().catch(() => ({}));
+      if (!data.access_required || data.signed_in) {
+        showUnlock(false);
+        return true;
+      }
+      showUnlock(true);
+      return false;
     }
 
     function freshSession() {
@@ -600,13 +638,14 @@
         try {
           const res = await fetch("/api/undo", {
             method: "POST",
+            credentials: "include",
             headers: authHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({ items: m.undo }),
           });
           const data = await res.json().catch(() => ({}));
           if (res.status === 401) {
             showUnlock(true);
-            throw new Error("访问码不对或过期了，再进一次。");
+            throw new Error("需要重新登录。");
           }
           if (!res.ok) throw new Error(data.detail || "没撤销成功。");
           m.undone = true;
@@ -647,6 +686,7 @@
     async function stream(url, payload, view) {
       const res = await fetch(url, {
         method: "POST",
+        credentials: "include",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(payload || {}),
       });
@@ -654,7 +694,7 @@
         const data = await res.json().catch(() => ({}));
         if (res.status === 401) {
           showUnlock(true);
-          throw new Error("需要访问码才能聊。");
+          throw new Error("需要登录才能聊。");
         }
         if (res.status === 404) {
           throw new Error("本地服务还是旧版本：双击 Friday.cmd 重开，再刷新这页。");
@@ -773,7 +813,7 @@
       if (document.visibilityState !== "visible" || busy || !session) return;
       input.focus();
       if (!ready || expired(session) || onlyStaleOpener(session)) await startOver();
-      else fetch("/api/calendar/warm", { method: "POST", headers: authHeaders() }).catch(() => {});
+      else fetch("/api/calendar/warm", { method: "POST", credentials: "include", headers: authHeaders() }).catch(() => {});
     }
 
     async function ask(message) {
@@ -807,13 +847,9 @@
 
     async function checkHealth() {
       try {
-        const res = await fetch("/api/health", { headers: authHeaders() });
-        if (res.status === 401) {
-          showUnlock(true);
-          return false;
-        }
+        if (!(await ensureSignedIn())) return false;
+        const res = await fetch("/api/health", { credentials: "include", headers: authHeaders() });
         const data = await res.json();
-        showUnlock(false);
         if (data.now_label) todayEl.textContent = data.now_label;
         if (!data.has_openai_api_key) {
           addMessage("error", "缺少 OPENAI_API_KEY：在 .env 里填好后，双击 Friday.cmd 重开。");
@@ -821,7 +857,7 @@
         }
         return true;
       } catch (e) {
-        addMessage("error", "连不上 Friday：电脑上的服务开着吗？手机要用脚本给出的链接。");
+        addMessage("error", "连不上 Friday：电脑上的服务开着吗？云上打开 friday-jimmy.fly.dev。");
         return false;
       }
     }
@@ -858,11 +894,16 @@
       e.preventDefault();
       const t = unlockInput.value.trim();
       if (!t) return;
-      localStorage.setItem(ACCESS_KEY, t);
-      sessionStorage.removeItem(ACCESS_KEY);
-      unlockInput.value = "";
-      showUnlock(false);
-      await startOver();
+      try {
+        await loginWithPassword(t);
+        unlockInput.value = "";
+        showUnlock(false);
+        await startOver();
+      } catch (err) {
+        unlockInput.value = "";
+        unlockInput.placeholder = (err && err.message) || "密码不对";
+        unlockInput.focus();
+      }
     });
 
     document.addEventListener("visibilitychange", onReturn);
