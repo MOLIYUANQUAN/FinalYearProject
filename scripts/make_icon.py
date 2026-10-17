@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""画 Friday 的图标「F.」：PNG（网页 / 窗口）+ ICO（桌面快捷方式）。纯标准库，无需 Pillow。
+"""画 Friday 的图标「F.」：黑底白字。PNG（网页 / 窗口）+ ICO（桌面快捷方式）。纯标准库。
 
   python scripts/make_icon.py
 """
@@ -13,11 +13,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 STATIC = ROOT / "static"
 
-GREEN = (15, 92, 76)
-CREAM = (255, 252, 247)
-AMBER = (242, 180, 90)
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
 
-# 单位正方形里的几何（y 向下）：圆角底 + F + 落在基线上的句点
+# 单位正方形里的几何（y 向下）：圆角底 + F + 句点（同色，不做第二强调色）
 BACKGROUND = (0.0, 0.0, 1.0, 1.0, 0.225)
 F_BARS = (
     (0.26, 0.24, 0.38, 0.76, 0.012),
@@ -43,14 +42,13 @@ def _color_at(x: float, y: float) -> tuple[int, int, int] | None:
         return None
     dx, dy, dr = DOT
     if (x - dx) ** 2 + (y - dy) ** 2 <= dr * dr:
-        return AMBER
+        return WHITE
     if any(_in_round_rect(x, y, bar) for bar in F_BARS):
-        return CREAM
-    return GREEN
+        return WHITE
+    return BLACK
 
 
 def render(size: int) -> bytes:
-    """RGBA 行数据（每行前置 PNG 过滤字节 0）。"""
     rows = bytearray()
     step = 1.0 / (size * SAMPLES)
     total = SAMPLES * SAMPLES
@@ -93,7 +91,6 @@ def png(size: int) -> bytes:
 
 
 def ico(images: dict[int, bytes]) -> bytes:
-    """PNG 内嵌的 ICO（Windows Vista 起支持）。"""
     sizes = sorted(images)
     out = struct.pack("<HHH", 0, 1, len(sizes))
     offset = 6 + 16 * len(sizes)

@@ -3,9 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0f5c4c" />
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Friday</title>
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml" />
   <link rel="icon" href="/static/icon-32.png" sizes="32x32" type="image/png" />
@@ -14,44 +15,43 @@
   <style>
     :root {
       color-scheme: light dark;
-      --bg: #f3f0ea;
-      --glow-a: #e4efe9;
-      --glow-b: #efe6d8;
-      --ink: #1c1a16;
-      --soft: #5c574e;
-      --muted: #8f897d;
-      --line: #e2dccf;
-      --panel: #fffcf7;
-      --accent: #0f5c4c;
-      --brand: #0f5c4c;
-      --focus-line: #b9cfc6;
-      --focus-ring: rgba(15, 92, 76, 0.08);
-      --danger: #8b2e2e;
-      --danger-bg: #f7e4e4;
-      --danger-line: #e2bcbc;
-      --user: #e9e3d7;
-      --radius: 12px;
-      --font: "IBM Plex Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei UI", "Segoe UI", sans-serif;
-      --mono: "IBM Plex Mono", "SF Mono", ui-monospace, monospace;
+      --bg: #ffffff;
+      --ink: #000000;
+      --soft: #3a3a3c;
+      --muted: #8e8e93;
+      --line: #d2d2d7;
+      --panel: #ffffff;
+      --accent: #000000;
+      --brand: #000000;
+      --on-brand: #ffffff;
+      --focus-line: #000000;
+      --focus-ring: rgba(0, 0, 0, 0.08);
+      --danger: #ff3b30;
+      --danger-bg: #fff2f1;
+      --danger-line: #ffc4c0;
+      --user: #f2f2f7;
+      --radius: 14px;
+      /* iPhone 上就是 SF；Windows 用近黑体。品牌感靠黑白与字距，不靠花色 */
+      --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
+      --mono: "SF Mono", ui-monospace, "Cascadia Mono", monospace;
     }
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg: #151412;
-        --glow-a: #16211e;
-        --glow-b: #211c16;
-        --ink: #ebe6dc;
-        --soft: #bdb6a8;
-        --muted: #8a8478;
-        --line: #2d2a25;
-        --panel: #1d1b18;
-        --accent: #63c2a8;
-        --brand: #16735f;
-        --focus-line: #3d6a5e;
-        --focus-ring: rgba(99, 194, 168, 0.14);
-        --danger: #eaa0a0;
-        --danger-bg: #331f1f;
-        --danger-line: #553131;
-        --user: #2a2722;
+        --bg: #000000;
+        --ink: #f5f5f7;
+        --soft: #d1d1d6;
+        --muted: #8e8e93;
+        --line: #2c2c2e;
+        --panel: #000000;
+        --accent: #f5f5f7;
+        --brand: #f5f5f7;
+        --on-brand: #000000;
+        --focus-line: #f5f5f7;
+        --focus-ring: rgba(255, 255, 255, 0.12);
+        --danger: #ff453a;
+        --danger-bg: #1c0504;
+        --danger-line: #5c1a16;
+        --user: #1c1c1e;
       }
     }
     * { box-sizing: border-box; }
@@ -60,10 +60,8 @@
       margin: 0;
       font-family: var(--font);
       color: var(--ink);
-      background:
-        radial-gradient(1200px 500px at 10% -10%, var(--glow-a) 0%, transparent 55%),
-        radial-gradient(900px 400px at 100% 0%, var(--glow-b) 0%, transparent 50%),
-        var(--bg);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
     }
     main {
       max-width: 680px;
@@ -76,26 +74,29 @@
       padding-top: max(22px, env(safe-area-inset-top, 0px));
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 16px;
     }
     header {
       display: flex;
       align-items: baseline;
       justify-content: space-between;
       gap: 12px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--line);
     }
     header h1 {
       margin: 0;
-      font-size: 1.05rem;
+      font-size: 1.35rem;
       font-weight: 600;
-      letter-spacing: -0.01em;
+      letter-spacing: -0.045em;
     }
     .right {
       display: flex;
       align-items: baseline;
       gap: 16px;
       color: var(--muted);
-      font-size: 0.85rem;
+      font-size: 0.82rem;
+      font-weight: 400;
     }
     #newChat {
       font: inherit;
@@ -105,7 +106,7 @@
       padding: 0;
       cursor: pointer;
     }
-    #newChat:hover { color: var(--accent); }
+    #newChat:hover { color: var(--ink); }
     #log {
       flex: 1;
       min-height: 0;
@@ -114,27 +115,28 @@
       scrollbar-color: var(--line) transparent;
       display: flex;
       flex-direction: column;
-      gap: 14px;
-      padding: 4px 2px 8px;
+      gap: 16px;
+      padding: 8px 2px 10px;
     }
     .msg {
       max-width: 88%;
-      line-height: 1.7;
+      line-height: 1.65;
       white-space: pre-wrap;
       word-break: break-word;
+      font-size: 1.02rem;
+      letter-spacing: -0.01em;
     }
     .msg.user {
       align-self: flex-end;
       background: var(--user);
-      padding: 9px 13px;
+      padding: 10px 14px;
       border-radius: var(--radius);
     }
     .msg.bot {
       align-self: flex-start;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      padding: 11px 14px;
-      border-radius: var(--radius);
+      background: transparent;
+      border: none;
+      padding: 2px 0;
     }
     .msg.error {
       align-self: stretch;
@@ -145,34 +147,38 @@
       padding: 10px 13px;
       border-radius: var(--radius);
     }
-    .msg a { color: var(--accent); }
+    .msg a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
     .msg.today {
       align-self: stretch;
       max-width: none;
-      padding: 15px 18px 14px;
+      padding: 4px 0 8px;
       white-space: normal;
+      border: none;
+      background: transparent;
     }
     .today .hello {
-      margin-bottom: 10px;
-      font-size: 1.02rem;
+      margin-bottom: 14px;
+      font-size: 1.2rem;
       font-weight: 600;
+      letter-spacing: -0.03em;
     }
-    .today section + section { margin-top: 10px; }
+    .today section + section { margin-top: 14px; }
     .today h3 {
       display: flex;
       justify-content: space-between;
       gap: 12px;
-      margin: 0 0 2px;
+      margin: 0 0 4px;
       color: var(--muted);
-      font-size: 0.78rem;
+      font-size: 0.72rem;
       font-weight: 500;
-      letter-spacing: 0.02em;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
     }
     .today .row {
       display: grid;
       grid-template-columns: 6.6em minmax(0, 1fr);
       column-gap: 10px;
-      padding: 3px 0;
+      padding: 4px 0;
       line-height: 1.5;
     }
     .today time {
@@ -180,10 +186,10 @@
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
     }
-    .today .row.now time { color: var(--accent); font-weight: 600; }
+    .today .row.now time { color: var(--ink); font-weight: 600; }
     .today .tag {
       margin-left: 8px;
-      color: var(--accent);
+      color: var(--muted);
       font-size: 0.78rem;
     }
     .today .where {
@@ -200,66 +206,69 @@
       color: var(--muted);
     }
     .today .say {
-      margin-top: 12px;
-      padding-top: 11px;
+      margin-top: 16px;
+      padding-top: 14px;
       border-top: 1px solid var(--line);
       white-space: pre-wrap;
+      font-size: 1.05rem;
+      letter-spacing: -0.015em;
     }
     .today .say:empty { display: none; }
     .today .say.failed { color: var(--danger); }
     @media (prefers-reduced-motion: no-preference) {
-      .msg, .today > * { animation: rise 0.2s ease-out; }
-      @keyframes rise { from { opacity: 0; transform: translateY(3px); } }
+      .msg, .today > * { animation: rise 0.28s ease-out; }
+      @keyframes rise { from { opacity: 0; transform: translateY(4px); } }
     }
     .typing {
       display: inline-flex;
-      gap: 4px;
+      gap: 5px;
       align-items: center;
       height: 1.2em;
       vertical-align: middle;
     }
     .typing i {
-      width: 6px;
-      height: 6px;
+      width: 5px;
+      height: 5px;
       border-radius: 50%;
       background: var(--muted);
-      opacity: 0.3;
+      opacity: 0.35;
       animation: pulse 1.2s infinite ease-in-out;
     }
     .typing i:nth-child(2) { animation-delay: 0.15s; }
     .typing i:nth-child(3) { animation-delay: 0.3s; }
     @keyframes pulse {
       0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
-      40% { opacity: 0.85; transform: translateY(-2px); }
+      40% { opacity: 0.9; transform: translateY(-2px); }
     }
     .hint {
       margin-left: 8px;
       color: var(--muted);
       font-size: 0.85rem;
     }
-    .actions { margin-top: 10px; display: flex; gap: 8px; }
+    .actions { margin-top: 12px; display: flex; gap: 8px; }
     .actions button {
       font: inherit;
       font-size: 0.9rem;
+      font-weight: 500;
       min-height: 40px;
-      padding: 8px 16px;
-      border-radius: 8px;
+      padding: 8px 18px;
+      border-radius: var(--radius);
       border: 1px solid var(--brand);
       background: var(--brand);
-      color: #fff;
+      color: var(--on-brand);
       cursor: pointer;
       touch-action: manipulation;
     }
     .actions button.secondary {
       background: transparent;
-      color: var(--soft);
+      color: var(--ink);
       border-color: var(--line);
     }
     .actions .hint { margin-left: 0; }
     .details {
-      margin-top: 6px;
+      margin-top: 8px;
       font-family: var(--mono);
-      font-size: 0.72rem;
+      font-size: 0.7rem;
       color: var(--muted);
       white-space: normal;
     }
@@ -267,10 +276,10 @@
       cursor: pointer;
       user-select: none;
       list-style: none;
-      opacity: 0.6;
+      opacity: 0.55;
     }
     .details summary::-webkit-details-marker { display: none; }
-    .details summary:hover { opacity: 1; color: var(--accent); }
+    .details summary:hover { opacity: 1; color: var(--ink); }
     form {
       display: flex;
       gap: 8px;
@@ -280,39 +289,41 @@
       flex: 1;
       font: inherit;
       line-height: 1.5;
-      padding: 12px 14px;
+      padding: 12px 16px;
       border-radius: var(--radius);
       border: 1px solid var(--line);
-      background: var(--panel);
+      background: var(--user);
       resize: none;
       min-height: 48px;
       max-height: 160px;
       outline: none;
+      color: var(--ink);
     }
     #input:focus {
       border-color: var(--focus-line);
+      background: var(--panel);
       box-shadow: 0 0 0 3px var(--focus-ring);
     }
     #send {
       font: inherit;
       font-weight: 600;
       height: 48px;
-      padding: 0 18px;
+      padding: 0 20px;
       border: none;
       border-radius: var(--radius);
       background: var(--brand);
-      color: #fff;
+      color: var(--on-brand);
       cursor: pointer;
     }
-    #send:disabled { opacity: 0.5; cursor: default; }
+    #send:disabled { opacity: 0.35; cursor: default; }
     #unlock {
       display: none;
       flex-direction: column;
       gap: 12px;
-      padding: 18px 16px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: var(--panel);
+      padding: 20px 0;
+      border: none;
+      border-radius: 0;
+      background: transparent;
     }
     #unlock.visible { display: flex; }
     #unlock p { margin: 0; color: var(--soft); line-height: 1.55; }
@@ -324,22 +335,23 @@
       padding: 12px 14px;
       border-radius: var(--radius);
       border: 1px solid var(--line);
-      background: var(--bg);
+      background: var(--user);
+      color: var(--ink);
       outline: none;
     }
     #unlock button {
       font: inherit;
       font-weight: 600;
-      padding: 0 18px;
+      padding: 0 20px;
       border: none;
       border-radius: var(--radius);
       background: var(--brand);
-      color: #fff;
+      color: var(--on-brand);
       touch-action: manipulation;
     }
     @media (max-width: 520px) {
-      main { gap: 10px; }
-      header h1 { font-size: 1.1rem; }
+      main { gap: 12px; }
+      header h1 { font-size: 1.4rem; }
       #newChat { min-height: 44px; padding: 0 4px; }
       .msg { max-width: 94%; }
       .today .row { grid-template-columns: 5.2em minmax(0, 1fr); }
