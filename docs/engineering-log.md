@@ -127,6 +127,7 @@
 | 2026-10-17 | 网页语音第一刀：点「说」录音 → `/api/voice/transcribe`（Whisper）→ 原对话流 → `/api/voice/speak`（TTS）播报；全双工不做 |
 | 2026-10-17 | TTS 改 gpt-4o-mini-tts + coral + 爱尔兰干练女声说明书（气质贴近电影 Friday，不克隆演员）；开场/录音/播报动效加强 |
 | 2026-10-17 | 语音去生硬：声音换 `marin`，中文按自然普通话、英文才带爱尔兰口音；开口那轮 `spoken=true` 让回答写成口语，服务端把清单和 14:30 转成说出口的话；网页一句写完就念（预取下一句），工具调用前写的字连同声音一起作废，免得说两遍；固定循环动效换成跟着真实响度的白环（麦克风 / 解码出的响度曲线，声音不经过 Web Audio，iPhone 不会哑），新写的字淡入 |
+| 2026-10-17 | TTS 接 ElevenLabs：有 `ELEVENLABS_API_KEY` 就念 `ELEVENLABS_VOICE_ID`（默认 Jimmy 选的那条）+ `eleven_v4`，按中/英带 `language_code`；没有 key 仍用 OpenAI；deploy 会把这三项 secret 上云 |
 
 ## 评测冻结
 

@@ -135,6 +135,12 @@ def main() -> None:
         "GOOGLE_CALENDAR_ID": env.get("GOOGLE_CALENDAR_ID") or "selected",
         "HOST": "0.0.0.0",
     }
+    # 有 ElevenLabs key 就上云；没有则云上继续用 OpenAI TTS
+    for name in ("ELEVENLABS_API_KEY", "ELEVENLABS_VOICE_ID", "ELEVENLABS_MODEL"):
+        value = (env.get(name) or "").strip()
+        if value:
+            pairs[name] = value
+
     for env_name, path in [
         ("GOOGLE_CREDENTIALS_JSON", ROOT / "secrets" / "credentials.json"),
         ("GOOGLE_TOKEN_JSON", ROOT / "secrets" / "google_token.json"),

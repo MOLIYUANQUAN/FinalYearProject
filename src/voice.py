@@ -6,6 +6,7 @@ import io
 import os
 import re
 
+import requests
 from openai import OpenAI
 
 from src.config import load_env, require_openai_api_key
@@ -15,16 +16,15 @@ MAX_AUDIO_BYTES = 12 * 1024 * 1024
 # 播报别念太长：长回复仍显示全文，只念前面
 MAX_SPEAK_CHARS = 800
 
+# 有 ELEVENLABS_API_KEY 时用 ElevenLabs（更自然）；否则退回 OpenAI
+DEFAULT_ELEVEN_VOICE = "5VD7EFo2dAP623ZPyqSO"
+DEFAULT_ELEVEN_MODEL = "eleven_v4"
 DEFAULT_TTS_MODEL = "gpt-4o-mini-tts"
-# OpenAI 内置声音里最自然的一个
 DEFAULT_TTS_VOICE = "marin"
-# 电影里 Friday 的味道来自爱尔兰口音的英语；演员本人的声音不能克隆，只能靠说明书贴近气质。
-# 中文硬套爱尔兰口音只会更生硬，所以中文按自然的普通话说。
 ENGLISH_STYLE = (
-    "Voice: a young Irish woman, soft and warm, quietly confident. "
-    "Accent: a gentle Irish English lilt. "
+    "Voice: a young woman, soft and warm, quietly confident. "
     "Delivery: relaxed and conversational, like talking to someone she knows well; "
-    "natural rhythm with small pauses, a slight smile in the voice, a little dry wit. "
+    "natural rhythm with small pauses, a slight smile in the voice. "
     "Never sound like a newsreader, a phone menu, or a movie trailer."
 )
 CHINESE_STYLE = (
@@ -70,11 +70,46 @@ def speak(text: str) -> bytes:
     cleaned = _for_speech(text, chinese)
     if not cleaned:
         raise RuntimeError("没有可念的文字。")
+    if (os.getenv("ELEVENLABS_API_KEY") or "").strip():
+        return _speak_eleven(cleaned, chinese)
+    return _speak_openai(cleaned, chinese)
+
+
+def _speak_eleven(text: str, chinese: bool) -> bytes:
+    key = (os.getenv("ELEVENLABS_API_KEY") or "").strip()
+    voice = (os.getenv("ELEVENLABS_VOICE_ID") or DEFAULT_ELEVEN_VOICE).strip() or DEFAULT_ELEVEN_VOICE
+    model = (os.getenv("ELEVENLABS_MODEL") or DEFAULT_ELEVEN_MODEL).strip() or DEFAULT_ELEVEN_MODEL
+    payload: dict = {
+        "text": text,
+        "model_id": model,
+        "voice_settings": {
+            "stability": 0.45,
+            "similarity_boost": 0.75,
+            "style": 0.15,
+            "use_speaker_boost": True,
+        },
+    }
+    # v4 / flash 认 language_code；multilingual_v2 会忽略
+    if model != "eleven_multilingual_v2":
+        payload["language_code"] = "zh" if chinese else "en"
+    res = requests.post(
+        f"https://api.elevenlabs.io/v1/text-to-speech/{voice}",
+        params={"output_format": "mp3_44100_128"},
+        headers={"xi-api-key": key, "Content-Type": "application/json", "Accept": "audio/mpeg"},
+        json=payload,
+        timeout=60,
+    )
+    if res.status_code != 200:
+        detail = (res.text or "").strip()[:200] or f"HTTP {res.status_code}"
+        raise RuntimeError(f"ElevenLabs 没念出来：{detail}")
+    return res.content
+
+
+def _speak_openai(text: str, chinese: bool) -> bytes:
     model = (os.getenv("FRIDAY_TTS_MODEL") or DEFAULT_TTS_MODEL).strip() or DEFAULT_TTS_MODEL
     voice = (os.getenv("FRIDAY_TTS_VOICE") or DEFAULT_TTS_VOICE).strip() or DEFAULT_TTS_VOICE
     style = (os.getenv("FRIDAY_TTS_INSTRUCTIONS") or (CHINESE_STYLE if chinese else ENGLISH_STYLE)).strip()
-    kwargs: dict = {"model": model, "voice": voice, "input": cleaned, "response_format": "mp3"}
-    # tts-1 / tts-1-hd 不认 instructions
+    kwargs: dict = {"model": model, "voice": voice, "input": text, "response_format": "mp3"}
     if style and model.startswith("gpt-"):
         kwargs["instructions"] = style
     return _client().audio.speech.create(**kwargs).content
