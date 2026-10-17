@@ -315,18 +315,33 @@
       background: var(--panel);
       box-shadow: 0 0 0 3px var(--focus-ring);
     }
-    #send {
+    #mic, #send {
       font: inherit;
       font-weight: 600;
       height: 48px;
-      padding: 0 20px;
+      padding: 0 18px;
       border: none;
       border-radius: var(--radius);
+      cursor: pointer;
+      touch-action: manipulation;
+      white-space: nowrap;
+    }
+    #mic {
+      background: transparent;
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+    #mic:hover { border-color: var(--ink); }
+    #mic.recording {
       background: var(--brand);
       color: var(--on-brand);
-      cursor: pointer;
+      border-color: var(--brand);
     }
-    #send:disabled { opacity: 0.35; cursor: default; }
+    #mic:disabled, #send:disabled { opacity: 0.35; cursor: default; }
+    #send {
+      background: var(--brand);
+      color: var(--on-brand);
+    }
     #unlock {
       display: none;
       flex-direction: column;
@@ -367,7 +382,7 @@
       .msg { max-width: 94%; }
       .today .row { grid-template-columns: 5.2em minmax(0, 1fr); }
       #input { font-size: 16px; min-height: 48px; }
-      #send { min-width: 4.5rem; min-height: 48px; touch-action: manipulation; }
+      #mic, #send { min-width: 3.6rem; min-height: 48px; padding: 0 14px; }
       .actions { flex-wrap: wrap; }
       .actions button { min-height: 44px; flex: 1 1 auto; }
     }
@@ -395,6 +410,7 @@
 
     <form id="form">
       <textarea id="input" rows="1" placeholder="问我，或者告诉我一件事" autocomplete="off" enterkeyhint="send"></textarea>
+      <button id="mic" type="button" aria-label="说话" title="点一下开始说，再说完点一下">说</button>
       <button id="send" type="submit">发送</button>
     </form>
   </main>
@@ -425,6 +441,7 @@
     const form = document.getElementById("form");
     const input = document.getElementById("input");
     const sendBtn = document.getElementById("send");
+    const micBtn = document.getElementById("mic");
     const todayEl = document.getElementById("today");
     const newChatBtn = document.getElementById("newChat");
     const unlockEl = document.getElementById("unlock");
@@ -435,6 +452,12 @@
     let busy = false;
     let ready = false;
     let pendingPassword = ""; // 桌面 ?access= 或旧 localStorage，登录后清掉
+    let mediaRecorder = null;
+    let mediaStream = null;
+    let recordChunks = [];
+    let recordTimer = null;
+    let playingAudio = null;
+    const RECORD_MAX_MS = 60 * 1000;
 
     (function takeAccessFromUrl() {
       try {
@@ -785,6 +808,142 @@
     function setBusy(on) {
       busy = on;
       sendBtn.disabled = on;
+      if (!mediaRecorder || mediaRecorder.state !== "recording") micBtn.disabled = on;
+    }
+
+    function stopPlaying() {
+      if (!playingAudio) return;
+      try { playingAudio.pause(); } catch (e) {}
+      playingAudio = null;
+    }
+
+    async function speakReply(text) {
+      const clean = (text || "").trim();
+      if (!clean) return;
+      stopPlaying();
+      const res = await fetch("/api/voice/speak", {
+        method: "POST",
+        credentials: "include",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ text: clean }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || "这句没念出来。");
+      }
+      const url = URL.createObjectURL(await res.blob());
+      const audio = new Audio(url);
+      playingAudio = audio;
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        if (playingAudio === audio) playingAudio = null;
+      };
+      try {
+        await audio.play();
+      } catch (e) {
+        URL.revokeObjectURL(url);
+        throw e;
+      }
+    }
+
+    function pickMime() {
+      const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
+      for (const t of types) {
+        if (window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) return t;
+      }
+      return "";
+    }
+
+    function setRecording(on) {
+      micBtn.classList.toggle("recording", !!on);
+      micBtn.textContent = on ? "完" : "说";
+      micBtn.title = on ? "说完了，点一下发送" : "点一下开始说，再说完点一下";
+      sendBtn.disabled = !!on || busy;
+    }
+
+    function releaseMic() {
+      if (recordTimer) {
+        clearTimeout(recordTimer);
+        recordTimer = null;
+      }
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        try { mediaRecorder.stop(); } catch (e) {}
+      }
+      mediaRecorder = null;
+      if (mediaStream) {
+        mediaStream.getTracks().forEach((t) => t.stop());
+        mediaStream = null;
+      }
+      recordChunks = [];
+      setRecording(false);
+    }
+
+    async function startRecording() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("这浏览器不能录音。换 Chrome / Edge，或用 HTTPS 打开。");
+      }
+      stopPlaying();
+      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = pickMime();
+      mediaRecorder = mime ? new MediaRecorder(mediaStream, { mimeType: mime }) : new MediaRecorder(mediaStream);
+      recordChunks = [];
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size) recordChunks.push(e.data);
+      };
+      mediaRecorder.start();
+      setRecording(true);
+      recordTimer = setTimeout(() => {
+        if (mediaRecorder && mediaRecorder.state === "recording") stopRecordingAndSend();
+      }, RECORD_MAX_MS);
+    }
+
+    function stopRecordingAndSend() {
+      if (!mediaRecorder || mediaRecorder.state !== "recording") return;
+      const recorder = mediaRecorder;
+      const mime = recorder.mimeType || "audio/webm";
+      recorder.onstop = async () => {
+        const blob = new Blob(recordChunks, { type: mime });
+        releaseMic();
+        if (!blob.size) {
+          addMessage("error", "没录到声音。");
+          return;
+        }
+        setBusy(true);
+        try {
+          const formData = new FormData();
+          const ext = mime.includes("mp4") ? "m4a" : mime.includes("ogg") ? "ogg" : "webm";
+          formData.append("file", blob, "speech." + ext);
+          const res = await fetch("/api/voice/transcribe", {
+            method: "POST",
+            credentials: "include",
+            body: formData,
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.detail || "没听清。");
+          const text = (data.text || "").trim();
+          if (!text) throw new Error("没听清，再说一遍？");
+          setBusy(false);
+          await ask(text, { speak: true });
+        } catch (e) {
+          setBusy(false);
+          addMessage("error", (e && e.message) || String(e));
+        }
+      };
+      try { recorder.stop(); } catch (e) { releaseMic(); }
+    }
+
+    async function toggleMic() {
+      if (busy && !(mediaRecorder && mediaRecorder.state === "recording")) return;
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        stopRecordingAndSend();
+        return;
+      }
+      try {
+        await startRecording();
+      } catch (e) {
+        releaseMic();
+        addMessage("error", (e && e.message) || "打不开麦克风。");
+      }
     }
 
     async function presence() {
@@ -844,8 +1003,9 @@
       else fetch("/api/calendar/warm", { method: "POST", credentials: "include", headers: authHeaders() }).catch(() => {});
     }
 
-    async function ask(message) {
+    async function ask(message, opts) {
       if (busy || !ready) return;
+      const speak = !!(opts && opts.speak);
       setBusy(true);
       clearActions();
       const pending = awaitingConfirmation();
@@ -865,6 +1025,9 @@
           { el: div },
         );
         finish(div, reply, tools, undo);
+        if (speak && reply) {
+          try { await speakReply(reply); } catch (e) { /* 念不出来仍留字 */ }
+        }
       } catch (e) {
         fail(div, e);
       } finally {
@@ -897,12 +1060,15 @@
 
     form.addEventListener("submit", (e) => {
       e.preventDefault();
+      if (mediaRecorder && mediaRecorder.state === "recording") return;
       const message = input.value.trim();
       if (!message || busy) return;
       input.value = "";
       fitInput();
       ask(message);
     });
+
+    micBtn.addEventListener("click", () => { toggleMic(); });
 
     input.addEventListener("input", fitInput);
 

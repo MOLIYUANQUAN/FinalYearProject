@@ -16,12 +16,12 @@ if str(ROOT) not in sys.path:
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, File, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from src import agenda, todos, usage_log
+from src import agenda, todos, usage_log, voice
 from src.agent import run_assistant, stream_assistant
 from src.presence import stream_presence
 from src.access import gate, router as access_router
@@ -291,6 +291,37 @@ async def chat(body: ChatRequest) -> ChatResponse:
         effective_today=effective_today(),
         effective_tomorrow=effective_tomorrow(),
     )
+
+
+class SpeakBody(BaseModel):
+    text: str = Field(..., min_length=1)
+
+
+@app.post("/api/voice/transcribe")
+async def voice_transcribe(file: UploadFile = File(...)) -> dict:
+    """网页录的一段音 → 文字；再走原来的对话。"""
+    _require_key()
+    data = await file.read()
+    try:
+        text = await asyncio.to_thread(voice.transcribe, data, file.filename or "audio.webm")
+    except Exception as exc:  # noqa: BLE001
+        reason = str(exc).splitlines()[0]
+        raise HTTPException(status_code=502, detail=f"没听清：{reason}") from exc
+    if not text:
+        raise HTTPException(status_code=400, detail="没听清，再说一遍？")
+    return {"text": text}
+
+
+@app.post("/api/voice/speak")
+async def voice_speak(body: SpeakBody) -> Response:
+    """把回复念出来（mp3）。"""
+    _require_key()
+    try:
+        audio = await asyncio.to_thread(voice.speak, body.text)
+    except Exception as exc:  # noqa: BLE001
+        reason = str(exc).splitlines()[0]
+        raise HTTPException(status_code=502, detail=f"这句没念出来：{reason}") from exc
+    return Response(content=audio, media_type="audio/mpeg", headers={"Cache-Control": "no-store"})
 
 
 if STATIC_DIR.is_dir():
