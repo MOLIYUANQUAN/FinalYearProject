@@ -1299,10 +1299,16 @@
       else fetch("/api/calendar/warm", { method: "POST", credentials: "include", headers: authHeaders() }).catch(() => {});
     }
 
+    // 他打字说「听听你的声音」也要念出来，不只点「说」才开口
+    function wantsVoice(text) {
+      return /听听|听你|你的声音|念给|读给|说两句|说句话|hear (your )?voice|speak (to me|up)|say something/i.test(text || "");
+    }
+
     async function ask(message, opts) {
       if (busy || !ready) return;
       stopSpeaking();
-      const speaker = opts && opts.speak ? speakerFor() : null;
+      const speak = !!(opts && opts.speak) || wantsVoice(message);
+      const speaker = speak ? speakerFor() : null;
       if (!speaker) settleOrb();
       setBusy(true);
       clearActions();
