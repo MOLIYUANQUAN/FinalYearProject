@@ -44,8 +44,21 @@ def _fly() -> str:
     )
 
 
-def _run(fly: str, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-    return subprocess.run([fly, *args], cwd=ROOT, text=True, encoding="utf-8", check=check)
+def _run(
+    fly: str,
+    *args: str,
+    check: bool = True,
+    capture: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [fly, *args],
+        cwd=ROOT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        capture_output=capture,
+        check=check,
+    )
 
 
 def _env_map() -> dict[str, str]:
@@ -94,17 +107,24 @@ def main() -> None:
     token = _ensure_access_token(env)
 
     apps = _run(fly, "apps", "list", "--json", check=False)
-    names = []
-    if apps.returncode == 0 and apps.stdout.strip():
+    names: list[str] = []
+    raw_apps = (apps.stdout or "").strip()
+    if apps.returncode == 0 and raw_apps:
         try:
-            names = [a.get("Name") or a.get("name") for a in json.loads(apps.stdout)]
+            parsed = json.loads(raw_apps)
+            if isinstance(parsed, list):
+                names = [str(a.get("Name") or a.get("name") or "") for a in parsed]
         except json.JSONDecodeError:
             names = []
     if APP not in names:
         print(f"Creating app {APP}…")
         created = _run(fly, "apps", "create", APP, "--org", "personal", check=False)
         if created.returncode != 0:
-            _run(fly, "apps", "create", APP, check=False)
+            # org 名因账号而异：不带 --org 再试一次
+            created = _run(fly, "apps", "create", APP, check=False)
+            if created.returncode != 0:
+                print(created.stderr or created.stdout or "")
+                _fail("Could not create Fly app. Run: flyctl apps create friday-jimmy")
 
     pairs = {
         "OPENAI_API_KEY": openai,
@@ -143,7 +163,7 @@ def main() -> None:
         _fail("fly secrets import failed")
 
     print("Deploying…")
-    _run(fly, "deploy", "--app", APP, "--ha=false")
+    _run(fly, "deploy", "--app", APP, "--ha=false", capture=False)
 
     # hostname
     status = _run(fly, "status", "--app", APP, "--json", check=False)
