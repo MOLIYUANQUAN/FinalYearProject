@@ -65,8 +65,8 @@
 按依赖拆（做完一截真用一截）：
 
 1. **云上** — 已通：Fly + Docker；`scripts\deploy_fly.py`。  
-2. **会话登录** — 密码换 httpOnly Cookie；电脑 / 手机 / 以后 App 共用。访问码链接只作一次性兑换。  
-3. **iPhone 壳** — Capacitor 包现有界面，装到你手机（Xcode / TestFlight）；不急着公开上架。
+2. **会话登录** — 已通：密码换 httpOnly Cookie；`?access=` 只作一次性兑换。  
+3. **手机入口** — 你只有 **Windows**：先把 Safari「添加到主屏幕」做成可靠入口（全屏 + 白环 + 登录记住）。真正的 Capacitor / TestFlight **必须 Mac + Xcode**，不用本机硬扛；有 Mac 或云端 macOS 再打 `.ipa`。
 
 整条链路：[cloud-and-iphone.md](cloud-and-iphone.md)。隧道只作开发过渡。
 

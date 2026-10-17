@@ -42,7 +42,7 @@ flyctl auth login                                                    # 只需一
 
 本机 `8765` + 隧道（[phone-access.md](phone-access.md)）只作开发过渡。
 
-### B. 会话登录（证明是你）· 正在做
+### B. 会话登录（证明是你）· 已通
 
 目标：像产品，不像「贴访问码的工具站」。
 
@@ -51,13 +51,18 @@ flyctl auth login                                                    # 只需一
 3. 电脑浏览器与以后 App 共用同一登录；Safari / WebView 里 `credentials: "include"`。  
 4. 有 Apple Developer 后再加 Sign in with Apple；现在不并行摊开。
 
-### C. iPhone App（壳 + 同一套 UI）· 登录稳了接着做
+### C. 手机上「像 App」· Jimmy 只有 Windows 时的正路
 
-1. 用 Capacitor（或同类）把现有页面打成 iOS 包：图标（白环）、全屏、安全区。  
-2. API 指向云域名；装到你的手机（Xcode / TestFlight），不急着公开上架。  
-3. 验收：主屏幕点 Friday →（已登录则直接进）→「提醒我明天续借书」→ Tasks 里有。
+**约束：** 你日常开发机是 **Windows**。Apple 规定：`.ipa` / TestFlight **必须在 macOS + Xcode 上签**。Windows 本机装不了 Xcode，也跑不了 iOS 模拟器。
 
-纯 SwiftUI 重做聊天可以后做；API 稳定比换皮重要。Windows 上先把 Web 与登录做稳；打 iOS 包需要 Mac / Xcode 一步。
+所以刀 1 在 Windows 上拆成两截，**先做能天天用的，再等 Mac 一步**：
+
+| 顺序 | 在哪做 | 做什么 |
+| --- | --- | --- |
+| **C1 · 现在（Windows）** | 本机 + Fly | 把云上页做成可靠的主屏幕入口：Safari「添加到主屏幕」、全屏、白环图标、登录一次记住。验收：主屏幕点 Friday → 直接聊 → Tasks 能动。 |
+| **C2 · 有 Mac 时** | 借/租一台 Mac，或云端 macOS CI（如 GitHub Actions `macos` / Codemagic） | Capacitor 打 iOS 包 → 装到你的 iPhone（开发者账号 / TestFlight）。仓库里 Capacitor 工程可先在 Windows 脚手架，**编译与装机必须在 Mac**。 |
+
+纯 SwiftUI 重做聊天可以后做。没有 Mac 之前，**不要把「等原生壳」当成进度阻塞**——C1 过关就算刀 1 手机侧可用。
 
 ### D. 以后才做（有用户再加）
 
