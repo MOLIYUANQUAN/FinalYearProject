@@ -177,14 +177,15 @@ def main() -> None:
         except json.JSONDecodeError:
             pass
 
-    url = f"https://{host}/?access={token}"
     print()
     print("=" * 60)
     print("Friday on the cloud:")
-    print(url)
+    print(f"https://{host}/")
     print()
-    print("Open in Safari on your iPhone (Add to Home Screen optional).")
-    print("PC can be off. Do not share this link.")
+    print("Open in Safari; enter FRIDAY_ACCESS_TOKEN once (then Cookie remembers).")
+    print("One-shot link (optional):")
+    print(f"https://{host}/?access={token}")
+    print("PC can be off. Do not share the one-shot link.")
     print()
     print("If Google says redirect_uri_mismatch: add")
     print(f"  https://{host}")
