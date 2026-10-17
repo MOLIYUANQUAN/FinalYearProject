@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""画 Friday 的图标「F.」：黑底白字。PNG（网页 / 窗口）+ ICO（桌面快捷方式）。纯标准库。
+"""Friday 图标：黑底白环（一个代理，不用字母）。PNG + ICO。纯标准库。
 
   python scripts/make_icon.py
 """
@@ -16,14 +16,11 @@ STATIC = ROOT / "static"
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 
-# 单位正方形里的几何（y 向下）：圆角底 + F + 句点（同色，不做第二强调色）
 BACKGROUND = (0.0, 0.0, 1.0, 1.0, 0.225)
-F_BARS = (
-    (0.26, 0.24, 0.38, 0.76, 0.012),
-    (0.26, 0.24, 0.64, 0.355, 0.012),
-    (0.26, 0.465, 0.57, 0.575, 0.012),
-)
-DOT = (0.71, 0.705, 0.065)
+# 白环：外半径 / 内半径（单位正方形）
+RING_OUTER = 0.275
+RING_INNER = 0.215
+CX, CY = 0.5, 0.5
 
 SAMPLES = 4
 
@@ -40,10 +37,8 @@ def _in_round_rect(x: float, y: float, rect: tuple[float, float, float, float, f
 def _color_at(x: float, y: float) -> tuple[int, int, int] | None:
     if not _in_round_rect(x, y, BACKGROUND):
         return None
-    dx, dy, dr = DOT
-    if (x - dx) ** 2 + (y - dy) ** 2 <= dr * dr:
-        return WHITE
-    if any(_in_round_rect(x, y, bar) for bar in F_BARS):
+    d2 = (x - CX) ** 2 + (y - CY) ** 2
+    if RING_INNER * RING_INNER <= d2 <= RING_OUTER * RING_OUTER:
         return WHITE
     return BLACK
 
