@@ -58,9 +58,10 @@ def fix_friction_with_cursor(
     user_confirmed: bool = False,
 ) -> dict[str, Any]:
     """用 Cursor Agent 改 Friday 的代码。必须先 request_user_confirmation（只问一次），
-    说清要改什么、会动仓库；他点确认后以 user_confirmed=True 调用。可能要几分钟。
+    说清要改什么、会动仓库；他点确认后以 user_confirmed=True 调用。
 
-    有 friction_id 就修那条；没有就用 what 当场记下再修。不要为了「流程正式」再多问一轮。
+    工具会立刻返回「已交给 Cursor」，不要干等几分钟。有 friction_id 就修那条；
+    没有就用 what 当场记下再修。
 
     Args:
         friction_id: 已有摩擦 id（可选）。
@@ -92,7 +93,17 @@ def fix_friction_with_cursor(
         if not created.get("ok"):
             return created
         fid = str(created["id"])
-    return cursor_fix.run_fix(fid)
+    return cursor_fix.start_fix(fid)
+
+
+@function_tool
+def check_cursor_fix() -> dict[str, Any]:
+    """查 Cursor 改代码进度：还在跑 / 改完待部署 / 失败。
+
+    他问「改好了吗」「Cursor 好了吗」「进度」时调用。把返回的 say 原样告诉他；
+    若已 ready，可再 preview_pending_ship 看文件列表。
+    """
+    return cursor_fix.check_status()
 
 
 @function_tool
@@ -101,8 +112,12 @@ def preview_pending_ship() -> dict[str, Any]:
 
     他问「改了什么」「效果怎么样」「待部署」时调用。把返回的 say 原样给他看。
     """
+    cursor_fix.refresh_job()
     pending = ship.load_or_recover_pending()
     if not pending:
+        job = cursor_fix.check_status()
+        if job.get("status") == "running":
+            return {"ok": False, "error": "still_running", "say": job.get("say") or "还在改。"}
         return {"ok": False, "error": "nothing_pending", "say": "现在没有待部署的改动。"}
     refreshed = ship.save_pending(
         branch=pending["branch"],
@@ -112,6 +127,7 @@ def preview_pending_ship() -> dict[str, Any]:
         friction_id=pending.get("friction_id") or "",
         agent_url=pending.get("agent_url") or "",
     )
+    cursor_fix.acknowledge_delivered()
     return {"ok": True, "say": refreshed["say"], "files": refreshed.get("files") or []}
 
 

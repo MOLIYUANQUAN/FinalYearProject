@@ -487,7 +487,8 @@
       note_friction: "记下",
       list_friction: "翻反馈",
       resolve_friction: "划掉",
-      fix_friction_with_cursor: "改代码",
+      fix_friction_with_cursor: "交给 Cursor",
+      check_cursor_fix: "看改代码进度",
       preview_pending_ship: "看改动",
       ship_pending_fix: "部署",
       add_task: "记下",
@@ -1307,7 +1308,17 @@
         finish(div, reply, tools, undo);
         if (speaker) speaker.end(reply);
       } catch (e) {
-        fail(div, e);
+        const raw = (e && e.message) || String(e);
+        const network =
+          /load failed|failed to fetch|networkerror|aborted|connection/i.test(raw);
+        fail(
+          div,
+          network
+            ? new Error(
+                "连不上了（网络或云上刚重启）。Cursor 若已开跑，问我「改好了吗」就能接上，不必重说一整遍。",
+              )
+            : e,
+        );
         if (speaker) speaker.cancel();
       } finally {
         setBusy(false);

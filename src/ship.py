@@ -339,6 +339,12 @@ def ship(*, user_confirmed: bool) -> dict[str, Any]:
     if fid:
         friction.resolve(fid)
     clear_pending()
+    try:
+        from src import cursor_fix
+
+        cursor_fix.acknowledge_delivered()
+    except Exception:  # noqa: BLE001
+        pass
     if not deployed.get("ok"):
         return {
             "ok": True,

@@ -23,6 +23,7 @@ TOOL_POLICIES: dict[str, ToolPolicy] = {
     "list_friction": "allow",
     "resolve_friction": "allow",
     "fix_friction_with_cursor": "require_confirmation",
+    "check_cursor_fix": "allow",
     "preview_pending_ship": "allow",
     "ship_pending_fix": "require_confirmation",
     "request_user_confirmation": "allow",

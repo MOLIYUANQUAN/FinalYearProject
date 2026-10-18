@@ -1,6 +1,7 @@
 from .approval_tools import request_user_confirmation
 from .calendar import create_calendar_event, get_calendar_events
 from .feedback import (
+    check_cursor_fix,
     fix_friction_with_cursor,
     list_friction,
     note_friction,
@@ -34,6 +35,7 @@ ALL_TOOLS = [
     list_friction,
     resolve_friction,
     fix_friction_with_cursor,
+    check_cursor_fix,
     preview_pending_ship,
     ship_pending_fix,
     request_user_confirmation,
@@ -56,6 +58,7 @@ __all__ = [
     "list_friction",
     "resolve_friction",
     "fix_friction_with_cursor",
+    "check_cursor_fix",
     "preview_pending_ship",
     "ship_pending_fix",
     "request_user_confirmation",

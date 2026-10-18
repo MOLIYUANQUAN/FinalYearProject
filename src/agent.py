@@ -18,7 +18,7 @@ from src.config import (
     get_tasks_backend,
     require_openai_api_key,
 )
-from src import friction
+from src import cursor_fix, friction
 from src.context import memory_block, now_block, profile_block
 from src.tools import ALL_TOOLS, TASK_TOOLS
 from src.turn import Turn
@@ -61,8 +61,9 @@ VOICE = """你叫 Friday，是 Jimmy 的管家，只为他一个人。不是顾�
 - 他抱怨 Friday 的建议、打扰、「需要你」里不该出现的东西 → note_friction（可写 better=他希望怎样）。回一句「记下了，下次按这个来。」别辩护、别解释架构。
 - 他问「我说过哪些不好用」「待修清单」→ list_friction，按条说清楚。
 - 他确认某条已经改好 → resolve_friction。下面「还嫌弃的」里有的，说话和挑「需要你」时都要避开。
-- 他说「用 Cursor 改…」「修开场/需要你」→ 只 request_user_confirmation 一次（说清会改仓库）；他点确认后立刻 fix_friction_with_cursor(user_confirmed=True, what=他要的改动)。没有摩擦 id 也没关系，工具会自己记下。不要再说「请再点确认」。可能要几分钟。
-- Cursor 改完后：工具会返回改了哪些文件和说明——把 say **原样**给他，再问要不要部署；他确认后 ship_pending_fix(user_confirmed=True)。他问「改了什么」→ preview_pending_ship，同样原样转述。
+- 他说「用 Cursor 改…」「修开场/需要你」→ 只 request_user_confirmation 一次（说清会改仓库）；他点确认后立刻 fix_friction_with_cursor(user_confirmed=True, what=他要的改动)。没有摩擦 id 也没关系，工具会自己记下。不要再说「请再点确认」。
+- fix_friction_with_cursor 会**马上**返回「已交给 Cursor」——把 say 原样告诉他，让他可以走开。不要假装还在改、不要干等、不要叫他一直盯着页面。
+- 上下文若写 Cursor 改完待部署，或他问「改好了吗」「改了什么」→ check_cursor_fix 或 preview_pending_ship，把 say **原样**给他，再问要不要部署；他确认后 ship_pending_fix(user_confirmed=True)。
 
 行动：
 - 读操作直接做，不预告。
@@ -103,6 +104,7 @@ def build_instructions(calendar: str = "", todo: str = "", *, spoken: bool = Fal
         profile_block(),
         memory_block(),
         friction.chat_block(),
+        cursor_fix.chat_block(),
     ]
     return "\n\n".join(part for part in parts if part)
 
@@ -196,7 +198,7 @@ def _expand_short_confirmation(
     elif any(k in last_assistant for k in ("Cursor", "改代码", "摩擦", "修这条", "需要你")):
         action = (
             "fix_friction_with_cursor(user_confirmed=True, what=上一轮要改的内容)。"
-            "没有 friction_id 就只传 what；不要再问确认；完成后把工具 say 原样给他。"
+            "没有 friction_id 就只传 what；不要再问确认；把工具立刻返回的 say 原样给他（已交给 Cursor，他可走开）。"
         )
     elif any(k in last_assistant for k in ("忘记", "删除记忆", "forget")):
         action = "forget_fact(..., user_confirmed=True)"
