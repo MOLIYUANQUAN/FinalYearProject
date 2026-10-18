@@ -287,21 +287,6 @@
       border-color: var(--line);
     }
     .actions .hint { margin-left: 0; }
-    .details {
-      margin-top: 8px;
-      font-family: var(--mono);
-      font-size: 0.7rem;
-      color: var(--muted);
-      white-space: normal;
-    }
-    .details summary {
-      cursor: pointer;
-      user-select: none;
-      list-style: none;
-      opacity: 0.55;
-    }
-    .details summary::-webkit-details-marker { display: none; }
-    .details summary:hover { opacity: 1; color: var(--ink); }
     form {
       display: flex;
       gap: 8px;
@@ -697,17 +682,6 @@
       target.append(el("span", "fresh", chunk));
     }
 
-    function addDetails(div, tools) {
-      const d = document.createElement("details");
-      d.className = "details";
-      const s = document.createElement("summary");
-      s.textContent = "细节";
-      const body = document.createElement("div");
-      body.textContent = tools.join(" → ");
-      d.append(s, body);
-      div.appendChild(d);
-    }
-
     function addConfirm(div) {
       const bar = document.createElement("div");
       bar.className = "actions";
@@ -766,7 +740,6 @@
       session.messages.forEach((m, i) => {
         const div = addMessage(m.role === "user" ? "user" : "bot", m.agenda ? null : m.content);
         if (m.agenda) drawToday(div, m.agenda).innerHTML = render(m.content);
-        if (m.tools && m.tools.length) addDetails(div, m.tools);
         const last = i === session.messages.length - 1;
         if (m.needsConfirm && last) addConfirm(div);
         if (m.undo && m.undo.length && !m.undone && last) addUndo(div, m);
@@ -840,7 +813,6 @@
       div.innerHTML = render(reply);
       const needsConfirm = tools.includes("request_user_confirmation");
       const m = { role: "assistant", content: reply, tools, needsConfirm, undo };
-      if (tools.length) addDetails(div, tools);
       if (needsConfirm) addConfirm(div);
       if (undo.length) addUndo(div, m);
       session.messages.push(m);
