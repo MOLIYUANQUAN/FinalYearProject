@@ -132,6 +132,7 @@
 | 2026-10-17 | VOICE 开头改成管家定位：盯没关上的事、减少亲自管理、发现再来找他、被问才一两句说清；不再用「个人代理」 |
 | 2026-10-18 | 产品摩擦薄刀：`note_friction` / `list_friction` / `resolve_friction`，落 `data/feedback/friction.jsonl`；开着的摩擦注入每轮上下文，抱怨时记下、照着避开；接 Cursor 改代码留到他说「修这条」 |
 | 2026-10-18 | `fix_friction_with_cursor`：确认后用 Cursor SDK 改仓库（本机 local / Fly cloud + PR）；需 `CURSOR_API_KEY` |
+| 2026-10-18 | Windows 上 SDK bridge 报 WinError 10038，改走 Cloud Agents REST（`POST /v1/agents`）；真跑通「明天别催」→ [PR #1](https://github.com/MOLIYUANQUAN/FinalYearProject/pull/1) 已合进 develop |
 
 ## 评测冻结
 
