@@ -165,36 +165,88 @@
       font-weight: 600;
       letter-spacing: -0.03em;
     }
-    .today section + section { margin-top: 14px; }
+    .today section + section { margin-top: 18px; }
     .today section.attention {
-      margin-bottom: 4px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid var(--line);
+      margin-bottom: 2px;
+      padding: 12px 12px 10px 14px;
+      border-left: 3px solid var(--ink);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      background: var(--user);
     }
-    .today section.attention h3 { color: var(--ink); letter-spacing: 0.04em; }
+    .today section.attention h3 {
+      margin-bottom: 8px;
+      color: var(--ink);
+      font-size: 0.92rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      text-transform: none;
+    }
+    .today section.attention .count {
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .today section.schedule h3 {
+      color: var(--ink);
+      font-size: 0.88rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      text-transform: none;
+    }
+    .today section.tasks h3 {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      text-transform: none;
+    }
     .today .why {
       display: block;
+      margin-top: 2px;
       color: var(--muted);
-      font-size: 0.85rem;
+      font-size: 0.82rem;
     }
     .today h3 {
       display: flex;
       justify-content: space-between;
+      align-items: baseline;
       gap: 12px;
-      margin: 0 0 4px;
+      margin: 0 0 6px;
       color: var(--muted);
       font-size: 0.72rem;
       font-weight: 500;
       letter-spacing: 0.06em;
       text-transform: uppercase;
     }
+    .today h3 .meta-side {
+      font-size: 0.78rem;
+      font-weight: 400;
+      color: var(--muted);
+      letter-spacing: 0;
+      text-transform: none;
+    }
     .today .row {
       display: grid;
       grid-template-columns: 6.6em minmax(0, 1fr);
-      column-gap: 10px;
-      padding: 4px 0;
-      line-height: 1.5;
+      column-gap: 12px;
+      padding: 6px 0;
+      line-height: 1.45;
+      border-bottom: 1px solid transparent;
     }
+    .today section.attention .row:last-child { padding-bottom: 2px; }
+    .today .row + .row { border-bottom-color: color-mix(in srgb, var(--line) 55%, transparent); }
+    .today section.attention .row + .row { border-bottom-color: color-mix(in srgb, var(--line) 40%, transparent); }
+    .today .task-group { margin-top: 8px; }
+    .today .task-group:first-of-type { margin-top: 2px; }
+    .today .task-group-label {
+      margin: 0 0 2px;
+      padding-left: 0;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 500;
+    }
+    .today .task-group.overdue .task-group-label { color: var(--danger); }
     .today time {
       color: var(--soft);
       font-variant-numeric: tabular-nums;
@@ -202,9 +254,15 @@
     }
     .today .row.now time { color: var(--ink); font-weight: 600; }
     .today .tag {
-      margin-left: 8px;
-      color: var(--muted);
-      font-size: 0.78rem;
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 6px;
+      border-radius: 6px;
+      background: color-mix(in srgb, var(--ink) 8%, transparent);
+      color: var(--ink);
+      font-size: 0.72rem;
+      font-weight: 500;
+      vertical-align: 0.05em;
     }
     .today .where {
       display: block;
@@ -672,6 +730,16 @@
       return node;
     }
 
+    function appendAgendaRow(parent, row) {
+      const line = el("div", row.now ? "row now" : "row");
+      const what = el("div", "what", row.title);
+      if (row.why) what.append(el("span", "why", row.why));
+      if (row.now) what.append(el("span", "tag", "进行中"));
+      if (row.where) what.append(el("span", "where", row.where));
+      line.append(el("time", "", row.time || ""), what);
+      parent.append(line);
+    }
+
     // 卡片上的安排是服务端读到的原样数据，不经过模型；返回写那句判断的位置
     function drawToday(div, card) {
       div.className = "msg bot today";
@@ -682,33 +750,33 @@
         const box = el("section", "attention");
         const head = el("h3");
         head.append(el("span", "", "需要你"));
-        head.append(el("span", "", needs.length + " 件"));
+        head.append(el("span", "count", needs.length + " 件"));
         box.append(head);
-        for (const row of needs) {
-          const line = el("div", "row");
-          const what = el("div", "what", row.title);
-          if (row.why) what.append(el("span", "why", row.why));
-          if (row.where) what.append(el("span", "where", row.where));
-          line.append(el("time", "", row.time || ""), what);
-          box.append(line);
-        }
+        for (const row of needs) appendAgendaRow(box, row);
         div.append(box);
       }
       for (const section of card.sections || []) {
-        const box = el("section");
-        // 空的日子只占一行、退到后面；版面留给真要去的事
+        const isTasks = section.label === "待办" || (section.groups && section.groups.length);
+        const box = el("section", isTasks ? "tasks" : "schedule");
         const head = el("h3");
         head.append(el("span", "", section.label));
-        const side = section.rows.length ? section.meta : section.empty;
-        if (side) head.append(el("span", "", side));
+        const rowCount = section.groups
+          ? section.groups.reduce((n, g) => n + (g.rows ? g.rows.length : 0), 0)
+          : section.rows.length;
+        const side = rowCount ? section.meta : section.empty;
+        if (side) head.append(el("span", "meta-side", side));
         box.append(head);
-        for (const row of section.rows) {
-          const line = el("div", row.now ? "row now" : "row");
-          const what = el("div", "what", row.title);
-          if (row.now) what.append(el("span", "tag", "进行中"));
-          if (row.where) what.append(el("span", "where", row.where));
-          line.append(el("time", "", row.time), what);
-          box.append(line);
+        if (section.groups && section.groups.length) {
+          for (const group of section.groups) {
+            const wrap = el("div", "task-group" + (group.label === "逾期" ? " overdue" : ""));
+            wrap.append(el("div", "task-group-label", group.label));
+            for (const row of group.rows || []) appendAgendaRow(wrap, row);
+            box.append(wrap);
+          }
+        } else {
+          const rows = (section.rows || []).slice();
+          rows.sort((a, b) => (b.now ? 1 : 0) - (a.now ? 1 : 0));
+          for (const row of rows) appendAgendaRow(box, row);
         }
         div.append(box);
       }

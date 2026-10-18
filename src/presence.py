@@ -73,15 +73,29 @@ def _all_day_rows(titles: list[str]) -> list[dict[str, Any]]:
     return [{"time": "全天", "title": name, "where": "", "now": False} for name in titles]
 
 
-def _task_section(tasks: list[dict[str, Any]], today: date) -> dict[str, Any] | None:
-    """待办里过了截止的、今天和明天截止的；别的不占卡片。"""
-    rows = []
+def _task_section(
+    tasks: list[dict[str, Any]], today: date, *, skip_titles: set[str] | None = None
+) -> dict[str, Any] | None:
+    """待办：逾期 / 今天 / 明天分组；已在「需要你」里的同标题不再重复。"""
+    skip = skip_titles or set()
+    buckets: dict[str, list[dict[str, Any]]] = {"逾期": [], "今天": [], "明天": []}
     for task, due in todos.ordered(tasks):
         if due is None or due > today + timedelta(days=1):
             continue
-        word = "今天" if due == today else "明天" if due > today else f"过了 {(today - due).days} 天"
-        rows.append({"time": word, "title": task["title"], "where": "", "now": False})
-    return {"label": "待办", "meta": "", "rows": rows, "empty": ""} if rows else None
+        name = task["title"]
+        if name in skip:
+            continue
+        if due < today:
+            key, word = "逾期", f"过了 {(today - due).days} 天"
+        elif due == today:
+            key, word = "今天", "今天"
+        else:
+            key, word = "明天", "明天"
+        buckets[key].append({"time": word, "title": name, "where": "", "now": False})
+    groups = [{"label": label, "rows": buckets[label]} for label in ("逾期", "今天", "明天") if buckets[label]]
+    if not groups:
+        return None
+    return {"label": "待办", "meta": "", "rows": [], "groups": groups, "empty": ""}
 
 
 ATTENTION_LIMIT = 3
@@ -157,7 +171,7 @@ def _attention(
             )
 
     for start, end, event in timed:
-        if start <= now and (end is None or end > now):
+        if start.date() != today:
             continue
         if start <= now:
             continue
@@ -192,7 +206,12 @@ def _attention(
 
 
 def _sections(
-    now: datetime, timed: list[Timed], all_day: list[tuple[date, str]], tasks: list[dict[str, Any]]
+    now: datetime,
+    timed: list[Timed],
+    all_day: list[tuple[date, str]],
+    tasks: list[dict[str, Any]],
+    *,
+    attention_titles: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """他眼前的卡片：今天还剩的、明天的；两天都空就给下一件；最后是快到期的待办。"""
     today = now.date()
@@ -225,7 +244,7 @@ def _sections(
             )
         else:
             sections.append({"label": "到下周日", "meta": "", "rows": [], "empty": "都没有安排"})
-    due = _task_section(tasks, today)
+    due = _task_section(tasks, today, skip_titles=attention_titles)
     return sections + [due] if due else sections
 
 
@@ -320,7 +339,8 @@ def today_view(
         n = len(attention)
         head = f"有 {n} 件需要你。" if n > 1 else "有 1 件需要你。"
         say = _spaced(head) + say
-    return _sections(now, timed, all_day, tasks), say, attention
+    titles = {item["title"] for item in attention}
+    return _sections(now, timed, all_day, tasks, attention_titles=titles), say, attention
 
 
 def _reason(exc: BaseException, fallback: str) -> str:
