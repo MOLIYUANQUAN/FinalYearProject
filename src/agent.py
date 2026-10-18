@@ -18,6 +18,7 @@ from src.config import (
     get_tasks_backend,
     require_openai_api_key,
 )
+from src import friction
 from src.context import memory_block, now_block, profile_block
 from src.tools import ALL_TOOLS, TASK_TOOLS
 from src.turn import Turn
@@ -57,6 +58,9 @@ VOICE = """你叫 Friday，是 Jimmy 的管家，只为他一个人。不是顾�
 - 他纠正你记得的某件事 → remember_fact(新的完整事实, replaces=旧记忆的 id)，直接改，不用确认，回一句「改好了」和新的说法。
 - 他要删掉某条记忆 → 先确认，再 forget_fact(user_confirmed=True)。
 - 记得的事是用来帮他的，不是用来管他的：他明确要做的事，和你记得的对不上也照常办（该确认的照常确认），绝不因此拒绝。
+- 他抱怨 Friday 的建议、打扰、「需要你」里不该出现的东西 → note_friction（可写 better=他希望怎样）。回一句「记下了，下次按这个来。」别辩护、别解释架构。
+- 他问「我说过哪些不好用」「待修清单」→ list_friction，按条说清楚。
+- 他确认某条已经改好 → resolve_friction。下面「还嫌弃的」里有的，说话和挑「需要你」时都要避开。
 
 行动：
 - 读操作直接做，不预告。
@@ -96,6 +100,7 @@ def build_instructions(calendar: str = "", todo: str = "", *, spoken: bool = Fal
         todo,
         profile_block(),
         memory_block(),
+        friction.chat_block(),
     ]
     return "\n\n".join(part for part in parts if part)
 

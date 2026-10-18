@@ -1,5 +1,6 @@
 from .approval_tools import request_user_confirmation
 from .calendar import create_calendar_event, get_calendar_events
+from .feedback import list_friction, note_friction, resolve_friction
 from .files import read_file, search_files
 from .mail import modify_email, read_email, search_emails, send_email
 from .memory import forget_fact, remember_fact, search_memory
@@ -22,6 +23,9 @@ ALL_TOOLS = [
     remember_fact,
     search_memory,
     forget_fact,
+    note_friction,
+    list_friction,
+    resolve_friction,
     request_user_confirmation,
 ]
 
@@ -38,6 +42,9 @@ __all__ = [
     "remember_fact",
     "search_memory",
     "forget_fact",
+    "note_friction",
+    "list_friction",
+    "resolve_friction",
     "request_user_confirmation",
     "add_task",
     "complete_task",

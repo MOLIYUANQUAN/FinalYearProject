@@ -130,6 +130,7 @@
 | 2026-10-17 | TTS 接 ElevenLabs：有 `ELEVENLABS_API_KEY` 就念 `ELEVENLABS_VOICE_ID`（默认 Jimmy 选的那条）+ `eleven_v4`，按中/英带 `language_code`；没有 key 仍用 OpenAI；deploy 会把这三项 secret 上云 |
 | 2026-10-17 | 人设补上「你有声音」：别再说只能打字；打字说「听听你的声音」也走口语回复并播报 |
 | 2026-10-17 | VOICE 开头改成管家定位：盯没关上的事、减少亲自管理、发现再来找他、被问才一两句说清；不再用「个人代理」 |
+| 2026-10-18 | 产品摩擦薄刀：`note_friction` / `list_friction` / `resolve_friction`，落 `data/feedback/friction.jsonl`；开着的摩擦注入每轮上下文，抱怨时记下、照着避开；接 Cursor 改代码留到他说「修这条」 |
 
 ## 评测冻结
 
