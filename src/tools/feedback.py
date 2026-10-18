@@ -51,23 +51,45 @@ def resolve_friction(friction_id: str) -> dict[str, Any]:
 
 
 @function_tool
-def fix_friction_with_cursor(friction_id: str, user_confirmed: bool = False) -> dict[str, Any]:
-    """用 Cursor Agent 按一条产品摩擦改 Friday 的代码。必须先 request_user_confirmation，
-    说清要修哪一条、会改仓库；他同意后再以 user_confirmed=True 调用。可能要几分钟。
+def fix_friction_with_cursor(
+    friction_id: str = "",
+    what: str = "",
+    better: str = "",
+    user_confirmed: bool = False,
+) -> dict[str, Any]:
+    """用 Cursor Agent 改 Friday 的代码。必须先 request_user_confirmation（只问一次），
+    说清要改什么、会动仓库；他点确认后以 user_confirmed=True 调用。可能要几分钟。
+
+    有 friction_id 就修那条；没有就用 what 当场记下再修。不要为了「流程正式」再多问一轮。
 
     Args:
-        friction_id: list_friction / 上下文里方括号中的 id。
+        friction_id: 已有摩擦 id（可选）。
+        what: 没有 id 时必填：要改成什么样，一句说清。
+        better: 可选，更具体的期望。
         user_confirmed: 用户是否已确认让 Cursor 改代码。
     """
+    fid = (friction_id or "").strip()
+    text = (what or "").strip()
+    item = next((x for x in friction.open_items(50) if x.get("id") == fid), None) if fid else None
+    label = (item or {}).get("what") or text or fid or "改代码"
     if not user_confirmed:
-        item = next((x for x in friction.open_items(50) if x.get("id") == (friction_id or "").strip()), None)
-        what = item["what"] if item else friction_id
         return {
             "ok": False,
             "error": "user_not_confirmed",
             "message": (
                 "还没确认。请先 request_user_confirmation，说明要用 Cursor 修："
-                f"「{what}」，同意后再以 user_confirmed=True 调用。"
+                f"「{label}」，同意后再以 user_confirmed=True 调用同一参数。"
             ),
         }
-    return cursor_fix.run_fix(friction_id)
+    if item is None:
+        if not text:
+            return {
+                "ok": False,
+                "error": "missing_what",
+                "message": "没有摩擦 id，也没有 what。用他刚才说的改动目标填 what，再调用一次。",
+            }
+        created = friction.note(what=text, better=better)
+        if not created.get("ok"):
+            return created
+        fid = str(created["id"])
+    return cursor_fix.run_fix(fid)
