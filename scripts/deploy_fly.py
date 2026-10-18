@@ -145,6 +145,8 @@ def main() -> None:
         "CURSOR_REPO_URL",
         "CURSOR_REPO_REF",
         "CURSOR_MODEL",
+        "GITHUB_TOKEN",
+        "GH_TOKEN",
     ):
         value = (env.get(name) or "").strip()
         if value:

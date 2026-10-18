@@ -6,7 +6,7 @@ from typing import Any
 
 from agents import function_tool
 
-from src import cursor_fix, friction
+from src import cursor_fix, friction, ship
 
 
 @function_tool
@@ -93,3 +93,35 @@ def fix_friction_with_cursor(
             return created
         fid = str(created["id"])
     return cursor_fix.run_fix(fid)
+
+
+@function_tool
+def preview_pending_ship() -> dict[str, Any]:
+    """查看 Cursor 改完、还没部署的那一版：改了哪些文件、说明是什么。
+
+    他问「改了什么」「效果怎么样」「待部署」时调用。把返回的 say 原样给他看。
+    """
+    pending = ship.load_or_recover_pending()
+    if not pending:
+        return {"ok": False, "error": "nothing_pending", "say": "现在没有待部署的改动。"}
+    refreshed = ship.save_pending(
+        branch=pending["branch"],
+        summary=pending.get("summary") or "",
+        agent_id=pending.get("agent_id") or "",
+        run_id=pending.get("run_id") or "",
+        friction_id=pending.get("friction_id") or "",
+        agent_url=pending.get("agent_url") or "",
+    )
+    return {"ok": True, "say": refreshed["say"], "files": refreshed.get("files") or []}
+
+
+@function_tool
+def ship_pending_fix(user_confirmed: bool = False) -> dict[str, Any]:
+    """把待部署的 Cursor 改动合进 develop 并部署到云上。必须先确认一次。
+
+    他把「确认部署」或点确认后，以 user_confirmed=True 调用。把返回的 say 原样告诉他。
+
+    Args:
+        user_confirmed: 用户是否已确认合并并部署。
+    """
+    return ship.ship(user_confirmed=user_confirmed)

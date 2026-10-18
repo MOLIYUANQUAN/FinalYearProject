@@ -61,7 +61,8 @@ VOICE = """你叫 Friday，是 Jimmy 的管家，只为他一个人。不是顾�
 - 他抱怨 Friday 的建议、打扰、「需要你」里不该出现的东西 → note_friction（可写 better=他希望怎样）。回一句「记下了，下次按这个来。」别辩护、别解释架构。
 - 他问「我说过哪些不好用」「待修清单」→ list_friction，按条说清楚。
 - 他确认某条已经改好 → resolve_friction。下面「还嫌弃的」里有的，说话和挑「需要你」时都要避开。
-- 他说「用 Cursor 改…」「修开场/需要你」→ 只 request_user_confirmation 一次（说清会改仓库）；他点确认后立刻 fix_friction_with_cursor(user_confirmed=True, what=他要的改动)。没有摩擦 id 也没关系，工具会自己记下。不要再说「请再点确认」，不要为了「先记摩擦」再多问一轮。可能要几分钟；成功就给 PR 链接。
+- 他说「用 Cursor 改…」「修开场/需要你」→ 只 request_user_confirmation 一次（说清会改仓库）；他点确认后立刻 fix_friction_with_cursor(user_confirmed=True, what=他要的改动)。没有摩擦 id 也没关系，工具会自己记下。不要再说「请再点确认」。可能要几分钟。
+- Cursor 改完后：工具会返回改了哪些文件和说明——把 say **原样**给他，再问要不要部署；他确认后 ship_pending_fix(user_confirmed=True)。他问「改了什么」→ preview_pending_ship，同样原样转述。
 
 行动：
 - 读操作直接做，不预告。
@@ -190,10 +191,12 @@ def _expand_short_confirmation(
         for k in ("创建", "确认", "发送", "邮件", "归档", "删除", "忘记", "记忆", "Cursor", "改代码", "摩擦")
     ):
         return message
-    if any(k in last_assistant for k in ("Cursor", "改代码", "摩擦", "修这条", "需要你")):
+    if any(k in last_assistant for k in ("部署", "上线", "合进", "待部署")):
+        action = "ship_pending_fix(user_confirmed=True)。把返回的 say 原样告诉他。"
+    elif any(k in last_assistant for k in ("Cursor", "改代码", "摩擦", "修这条", "需要你")):
         action = (
             "fix_friction_with_cursor(user_confirmed=True, what=上一轮要改的内容)。"
-            "没有 friction_id 就只传 what；不要再问确认，不要先停下来只记摩擦。"
+            "没有 friction_id 就只传 what；不要再问确认；完成后把工具 say 原样给他。"
         )
     elif any(k in last_assistant for k in ("忘记", "删除记忆", "forget")):
         action = "forget_fact(..., user_confirmed=True)"

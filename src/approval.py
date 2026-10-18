@@ -23,6 +23,8 @@ TOOL_POLICIES: dict[str, ToolPolicy] = {
     "list_friction": "allow",
     "resolve_friction": "allow",
     "fix_friction_with_cursor": "require_confirmation",
+    "preview_pending_ship": "allow",
+    "ship_pending_fix": "require_confirmation",
     "request_user_confirmation": "allow",
     "create_calendar_event": "require_confirmation",
     "send_email": "require_confirmation",
@@ -41,6 +43,7 @@ WRITE_ACTION_TYPES = {
     "trash_email",
     "forget_fact",
     "fix_friction_with_cursor",
+    "ship_pending_fix",
     "share_file",
     "other_write",
 }

@@ -12,7 +12,7 @@ from typing import Any
 
 import requests
 
-from src import friction
+from src import friction, ship
 from src.config import load_env
 
 DEFAULT_REPO = "https://github.com/MOLIYUANQUAN/FinalYearProject"
@@ -171,9 +171,21 @@ def run_fix(friction_id: str) -> dict[str, Any]:
     if branch:
         out["branch"] = branch
     if ok:
-        friction.resolve(fid)
-        out["resolved"] = True
-        out["say"] = f"改好了。" + (f" PR：{pr_url}" if pr_url else f" 看进度：{out['url']}")
+        if branch:
+            pending = ship.save_pending(
+                branch=branch,
+                summary=text,
+                agent_id=agent_id,
+                run_id=run_id,
+                friction_id=fid,
+                agent_url=out["url"],
+            )
+            # 一字不改交给用户看；部署要他再确认一次
+            out["say"] = pending.get("say") or text[:800]
+            out["pending_ship"] = True
+            out["files"] = pending.get("files") or []
+        else:
+            out["say"] = (text[:800] or "改完了，但没有分支名，没法自动部署。") + f" 看：{out['url']}"
     else:
         out["say"] = f"Cursor 没改成（{status or '超时'}）。" + (
             f" 看：{out['url']}" if agent_id else ""
