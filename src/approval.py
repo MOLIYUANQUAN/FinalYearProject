@@ -22,6 +22,7 @@ TOOL_POLICIES: dict[str, ToolPolicy] = {
     "note_friction": "allow",
     "list_friction": "allow",
     "resolve_friction": "allow",
+    "fix_friction_with_cursor": "require_confirmation",
     "request_user_confirmation": "allow",
     "create_calendar_event": "require_confirmation",
     "send_email": "require_confirmation",
@@ -39,6 +40,7 @@ WRITE_ACTION_TYPES = {
     "archive_email",
     "trash_email",
     "forget_fact",
+    "fix_friction_with_cursor",
     "share_file",
     "other_write",
 }

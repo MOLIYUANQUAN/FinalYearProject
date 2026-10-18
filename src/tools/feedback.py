@@ -1,4 +1,4 @@
-"""产品摩擦工具：记下不好用的建议，列出来，改掉后划掉。"""
+"""产品摩擦工具：记下不好用的建议，列出来，改掉后划掉；确认后可叫 Cursor 改代码。"""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import Any
 
 from agents import function_tool
 
-from src import friction
+from src import cursor_fix, friction
 
 
 @function_tool
@@ -48,3 +48,26 @@ def resolve_friction(friction_id: str) -> dict[str, Any]:
         friction_id: list_friction / 上下文里方括号中的 id。
     """
     return friction.resolve(friction_id)
+
+
+@function_tool
+def fix_friction_with_cursor(friction_id: str, user_confirmed: bool = False) -> dict[str, Any]:
+    """用 Cursor Agent 按一条产品摩擦改 Friday 的代码。必须先 request_user_confirmation，
+    说清要修哪一条、会改仓库；他同意后再以 user_confirmed=True 调用。可能要几分钟。
+
+    Args:
+        friction_id: list_friction / 上下文里方括号中的 id。
+        user_confirmed: 用户是否已确认让 Cursor 改代码。
+    """
+    if not user_confirmed:
+        item = next((x for x in friction.open_items(50) if x.get("id") == (friction_id or "").strip()), None)
+        what = item["what"] if item else friction_id
+        return {
+            "ok": False,
+            "error": "user_not_confirmed",
+            "message": (
+                "还没确认。请先 request_user_confirmation，说明要用 Cursor 修："
+                f"「{what}」，同意后再以 user_confirmed=True 调用。"
+            ),
+        }
+    return cursor_fix.run_fix(friction_id)
