@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import re
 from collections.abc import AsyncIterator
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from typing import Any
 
 from src import agenda, todos
@@ -86,33 +86,70 @@ def _task_section(tasks: list[dict[str, Any]], today: date) -> dict[str, Any] | 
 
 ATTENTION_LIMIT = 3
 
+# 待办标题里写的截止钟点（「下午3点半」「18:00」）；看不懂就 None
+_TITLE_DUE_CLOCK = re.compile(
+    r"(?:凌晨|早上|上午|中午|下午|傍晚|晚上)?(\d{1,2})[:：](\d{2})|"
+    r"(凌晨|早上|上午|中午|下午|傍晚|晚上)?(\d{1,2})(点半|点(?!\d))"
+)
+
+
+def _title_due_clock(title: str) -> tuple[int, int] | None:
+    m = _TITLE_DUE_CLOCK.search(title)
+    if not m:
+        return None
+    if m.group(1) is not None:
+        hour, minute = int(m.group(1)), int(m.group(2))
+    else:
+        period, hour, tail = m.group(3), int(m.group(4)), m.group(5)
+        minute = 30 if tail == "点半" else 0
+        if period in ("下午", "傍晚", "晚上") and hour < 12:
+            hour += 12
+        elif period == "中午":
+            hour = 12
+        elif period == "凌晨" and hour == 12:
+            hour = 0
+    if hour >= 24 or minute >= 60:
+        return None
+    return hour, minute
+
+
+def _task_belongs_in_attention(now: datetime, title: str, due: date) -> bool:
+    """今天截止且标题里写了钟点：过了那个点就不再占「需要你」。"""
+    if due != now.date():
+        return True
+    clock = _title_due_clock(title)
+    if clock is None:
+        return True
+    hour, minute = clock
+    return now < datetime.combine(due, time(hour, minute))
+
 
 def _attention(
     now: datetime, timed: list[Timed], all_day: list[tuple[date, str]], tasks: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    """需要你拍板或立刻看见的几件事：服务端从日历/待办算出，没有就空。"""
+    """需要你拍板或立刻看见的几件事：过期待办、今天截止且未过点的待办、几小时内要开始的会；明天只在日程分区。"""
     today = now.date()
-    tomorrow = today + timedelta(days=1)
     items: list[dict[str, Any]] = []
 
     for task, due in todos.ordered(tasks):
         if due is None:
             continue
+        name = task["title"]
         if due < today:
             items.append(
                 {
                     "time": f"过了 {(today - due).days} 天",
-                    "title": task["title"],
+                    "title": name,
                     "where": "",
                     "why": "截止已过",
                     "now": False,
                 }
             )
-        elif due == today:
+        elif due == today and _task_belongs_in_attention(now, name, due):
             items.append(
                 {
                     "time": "今天",
-                    "title": task["title"],
+                    "title": name,
                     "where": "",
                     "why": "今天截止",
                     "now": False,
@@ -135,22 +172,10 @@ def _attention(
                     "now": False,
                 }
             )
-        elif start.date() == tomorrow and IMPORTANT.search(name):
-            items.append(
-                {
-                    "time": f"明天{_clock(start)}",
-                    "title": name,
-                    "where": _place(event),
-                    "why": "明天要紧",
-                    "now": False,
-                }
-            )
 
     for day, name in all_day:
         if day == today and IMPORTANT.search(name):
             items.append({"time": "今天全天", "title": name, "where": "", "why": "今天要紧", "now": False})
-        elif day == tomorrow and IMPORTANT.search(name):
-            items.append({"time": "明天全天", "title": name, "where": "", "why": "明天要紧", "now": False})
 
     # 同标题只留一条；最多三条，宁缺勿滥
     seen: set[str] = set()
