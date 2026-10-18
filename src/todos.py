@@ -6,6 +6,7 @@ import re
 import threading
 import time
 from datetime import date, datetime, timedelta
+from dataclasses import dataclass, field
 from typing import Any, NamedTuple
 
 from src.agenda import this_sunday, weekday_word
@@ -153,13 +154,174 @@ def chat_block() -> str:
 TASK_RULES = (
     "- 他问「还有几件没做」「有什么待办」「要交什么」，问的就是上面这份：直接用它答，不调用工具；几件就用写好的数。",
     "- 他交代要做完的事（「Lab 3 周四交」「记得买牛奶」「提醒我明天给妈妈打电话」）是待办，不是记忆："
-    "直接 add_task，不用先问，也不用 remember_fact；没说日子就不带日子。",
+    "直接 add_task，不用先问、不用等他确认，也不用 remember_fact；没说日子就不带日子。",
     "- 上面清单里已经有的，他再说一次也照样 add_task：工具会回「已经记着了」，不会记重。",
     "- 他改口刚交代的截止日（「说错了，是周五」）→ 再 add_task 一次，同一个名字、新的日子，工具会把日子改过来。",
-    "- 他说哪件做完了 → complete_task。",
-    "- 回复就是 add_task / complete_task 返回的 say，一字不改，不加别的；调用了几次就几行。页面会给他「撤销」。",
+    "- 他说哪件做完了 → complete_task；不要问「要不要划掉」「帮你记进待办吗」。",
+    "- 本条里明显的待办增删，服务端会在你回完话后自动执行；你仍可调 add_task / complete_task，但绝不要为待办走 request_user_confirmation。",
+    "- 若你调了 add_task / complete_task：回复就是工具返回的 say，一字不改，不加别的；调用了几次就几行。页面会给他「撤销」。",
     "- 约了人、有具体钟点或地点的（「明天下午三点和 Tom 喝咖啡」）是日程，不是待办：照日程的规矩，先确认再建。",
 )
+
+
+@dataclass
+class SyncOutcome:
+    """从一句用户话里自动改待办的结果（模型没调工具时的兜底）。"""
+
+    undo: list[dict[str, Any]] = field(default_factory=list)
+    says: list[str] = field(default_factory=list)
+
+
+def _norm(text: str) -> str:
+    return re.sub(r"[\W_]+", "", text).casefold()
+
+
+def _looks_like_calendar(text: str) -> bool:
+    """有具体钟点且像在约人 → 日程，不当待办记。"""
+    if not re.search(r"(?:下午|上午|早上|晚上|中午|凌晨)?\d{1,2}[点:：]", text):
+        return False
+    return bool(re.search(r"见|开会|会议|面试|碰头|喝|约|聚餐|吃饭|mentor|supervisor|meeting", text, re.I))
+
+
+def _pick_task(which: str, tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
+    key = _norm(which)
+    if not key:
+        return None
+    exact = [t for t in tasks if _norm(t["title"]) == key]
+    if len(exact) == 1:
+        return exact[0]
+    if len(exact) > 1:
+        return None
+    partial = [t for t in tasks if key in _norm(t["title"]) or _norm(t["title"]) in key]
+    if len(partial) == 1:
+        return partial[0]
+    return None
+
+
+_COMPLETE_CUES = ("做完了", "完成了", "搞定了", "弄好了", "交完了", "交了", "已交")
+_COMPLETE_RES = (
+    re.compile(r"(?:把|将)?(?P<t>.+?)(?:已经|我)?(?:做完了|完成了|搞定了|弄好了|交(?:了|完)?)(?:[。.!！？?\s]|$)"),
+    re.compile(r"(?:划掉|取消(?:掉)?|删掉)(?:了)?(?P<t>.+?)(?:[。.!！？?\s]|$)"),
+)
+
+
+def _find_completions(text: str, tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    hits: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for task in tasks:
+        title = task["title"]
+        if len(_norm(title)) < 2:
+            continue
+        if _norm(title) in _norm(text) and any(c in text for c in _COMPLETE_CUES + ("划掉",)):
+            if task["id"] not in seen:
+                hits.append(task)
+                seen.add(task["id"])
+    for pattern in _COMPLETE_RES:
+        for match in pattern.finditer(text):
+            task = _pick_task(match.group("t").strip(), tasks)
+            if task and task["id"] not in seen:
+                hits.append(task)
+                seen.add(task["id"])
+    if not hits and _norm(text) in {_norm(c) for c in ("做完了", "完成了", "搞定了", "弄好了")} and len(tasks) == 1:
+        hits.append(tasks[0])
+    return hits
+
+
+_REMEMBER = re.compile(
+    r"(?:^|[，,。；;\n])\s*(?:记得|提醒(?:我)?(?:一下)?)\s*(?P<body>.+?)(?=(?:[，,。；;\n]|还有|另外|$))",
+)
+_DUE_PHRASE = re.compile(
+    r"(?P<title>.+?)"
+    r"(?P<due>今天|今晚|明天|明晚|后天|大后天|下(?:周|星期)[一二三四五六日天]|(?:周|星期)[一二三四五六日天]|\d{1,2}月\d{1,2}[日号]?)"
+    r"(?:之前|以前|前|要交|得交|交|截止|到期)",
+)
+
+
+def _clean_title(raw: str) -> str:
+    title = re.sub(r"^(?:去|要|得|该|把)", "", raw.strip())
+    title = re.sub(r"(?:一下|先)$", "", title).strip(" ，,。；;")
+    return title.strip()
+
+
+def _find_adds(text: str, tasks: list[dict[str, Any]], today: date) -> list[tuple[str, str]]:
+    """(title, due 原话) 列表。"""
+    found: list[tuple[str, str]] = []
+    seen_titles: set[str] = set()
+
+    def offer(title: str, due: str = "") -> None:
+        title = _clean_title(title)
+        if len(title) < 2 or _looks_like_calendar(title + due):
+            return
+        key = _norm(title)
+        if key in seen_titles:
+            return
+        seen_titles.add(key)
+        found.append((title, due))
+
+    for match in _REMEMBER.finditer(text):
+        offer(match.group("body"))
+    for match in _DUE_PHRASE.finditer(text):
+        offer(match.group("title"), match.group("due"))
+    if not found and re.search(r"(?:还要|得|要)(?!不要)", text):
+        tail = re.split(r"[，,。；;\n]", text)[-1]
+        if len(_clean_title(tail)) >= 2 and not _looks_like_calendar(tail):
+            offer(tail)
+    return found
+
+
+def sync_from_message(message: str) -> SyncOutcome:
+    """从用户本条话识别待办新增/完成并直接写入；供对话结束后兜底，不经过确认。"""
+    text = (message or "").strip()
+    if not text or not connected():
+        return SyncOutcome()
+    provider = get_tasks_provider()
+    if provider is None:
+        return SyncOutcome()
+
+    today = effective_now().date()
+    try:
+        tasks, _ = read(60)
+    except Exception:  # noqa: BLE001
+        return SyncOutcome()
+
+    outcome = SyncOutcome()
+
+    def when(day: date | None) -> str:
+        return f"，{when_due(day, today)}截止" if day else ""
+
+    for task in _find_completions(text, tasks):
+        try:
+            done = provider.complete(task["id"])
+        except Exception:  # noqa: BLE001
+            continue
+        tasks = [t for t in tasks if t["id"] != task["id"]]
+        outcome.undo.append({"kind": "task_completed", "id": done["id"], "title": done["title"]})
+        outcome.says.append(f"划掉了：{done['title']}。")
+
+    for raw_title, due_said in _find_adds(text, tasks, today):
+        due_day = parse_due(due_said, today) if due_said.strip() else None
+        same = next((t for t in tasks if _norm(t["title"]) == _norm(raw_title)), None)
+        try:
+            if same and (due_day is None or due_date(same) == due_day):
+                outcome.says.append(f"已经记着了：{same['title']}{when(due_date(same))}。")
+                continue
+            if same:
+                task = provider.set_due(same["id"], due_day)
+                outcome.undo.append(
+                    {"kind": "task_due_changed", "id": task["id"], "title": task["title"], "due": same.get("due")}
+                )
+                outcome.says.append(f"改好了：{task['title']}{when(due_day)}。")
+            else:
+                task = provider.add(raw_title, due_day, None)
+                tasks.append(task)
+                outcome.undo.append({"kind": "task_added", "id": task["id"], "title": task["title"]})
+                outcome.says.append(f"记下了：{task['title']}{when(due_day)}。")
+        except Exception:  # noqa: BLE001
+            continue
+
+    if outcome.undo:
+        forget()
+    return outcome
 
 
 def undo(items: list[dict[str, Any]]) -> None:

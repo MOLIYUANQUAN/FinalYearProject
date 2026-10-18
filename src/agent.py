@@ -67,6 +67,7 @@ VOICE = """你叫 Friday，是 Jimmy 的管家，只为他一个人。不是顾�
 行动：
 - 读操作直接做，不预告。
 - 写操作（建日程、发邮件、归档或删除邮件、删除记忆）：先 request_user_confirmation，一次说清要做什么和关键细节（时间、收件人、主题）；他同意后再以 user_confirmed=True 执行。页面会给他「确认 / 取消」按钮：问一句就停，不教他怎么回复。成功之前绝不说已完成；完成后一句话告诉他结果。
+- 待办（记下、划掉、改截止日）：直接 add_task / complete_task，或交给服务端从本条话自动识别；不要问「要不要记」「帮你划掉吗」，不要为待办调用 request_user_confirmation。页面只给「撤销」。
 - 帮他准备一场会面或重要对话：先搜相关的邮件和笔记，再写：时间地点（日历里没有就直说）+ 现状一句话 + 三个讨论点。讨论点只能来自真材料（档案、记忆、邮件、笔记）；材料不够就少写几点并直说，不用空话凑数。"""
 
 SPOKEN = """这一轮是他开口说的，你的回答会直接念给他听：
@@ -228,10 +229,30 @@ async def run_assistant(
     reply = result.final_output
     if not isinstance(reply, str):
         reply = str(reply)
+    tools = extract_tool_names(result)
+    outcome = _maybe_sync_todos(message, tools)
+    reply = _merge_sync_reply(reply if isinstance(reply, str) else str(reply), outcome)
     return {
         "reply": reply,
-        "tools_called": extract_tool_names(result),
+        "tools_called": tools,
     }
+
+
+def _maybe_sync_todos(message: str, tools: list[str]) -> todos.SyncOutcome:
+    """模型没动待办工具时，服务端从用户话里兜底同步清单。"""
+    if "add_task" in tools or "complete_task" in tools:
+        return todos.SyncOutcome()
+    return todos.sync_from_message(message)
+
+
+def _merge_sync_reply(reply: str, outcome: todos.SyncOutcome) -> str:
+    if not outcome.says:
+        return reply
+    extra = "\n".join(outcome.says)
+    base = (reply or "").strip()
+    if extra in base:
+        return reply
+    return f"{base}\n{extra}".strip() if base else extra
 
 
 async def _stream(
@@ -239,6 +260,7 @@ async def _stream(
     run_input: str | list[dict[str, Any]],
     *,
     max_turns: int,
+    user_message: str = "",
 ) -> AsyncIterator[dict[str, Any]]:
     """把一次运行变成事件流：delta（新文字）/ tool（开始用某个工具）/ done（最终回复和能撤销的事）。"""
     turn = Turn()
@@ -256,9 +278,15 @@ async def _stream(
                     tools.append(str(name))
                 yield {"type": "tool", "name": str(name)}
     reply = result.final_output
+    if not isinstance(reply, str):
+        reply = str(reply or "")
+    outcome = _maybe_sync_todos(user_message, tools)
+    if outcome.undo:
+        turn.undo.extend(outcome.undo)
+    reply = _merge_sync_reply(reply, outcome)
     yield {
         "type": "done",
-        "reply": reply if isinstance(reply, str) else str(reply or ""),
+        "reply": reply,
         "tools_called": tools,
         "undo": turn.undo,
     }
@@ -274,5 +302,10 @@ async def stream_assistant(
 ) -> AsyncIterator[dict[str, Any]]:
     agent = await _assistant(spoken)
     message = _expand_short_confirmation(message, history, pending_confirmation)
-    async for event in _stream(agent, _history_to_input(message, history), max_turns=max_turns):
+    async for event in _stream(
+        agent,
+        _history_to_input(message, history),
+        max_turns=max_turns,
+        user_message=message,
+    ):
         yield event
