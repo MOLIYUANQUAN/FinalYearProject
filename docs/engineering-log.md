@@ -134,6 +134,7 @@
 | 2026-10-18 | `fix_friction_with_cursor`：确认后用 Cursor SDK 改仓库（本机 local / Fly cloud + PR）；需 `CURSOR_API_KEY` |
 | 2026-10-18 | Windows 上 SDK bridge 报 WinError 10038，改走 Cloud Agents REST（`POST /v1/agents`）；真跑通「明天别催」→ [PR #1](https://github.com/MOLIYUANQUAN/FinalYearProject/pull/1) 已合进 develop |
 | 2026-10-18 | Cursor 改完写入 `pending_ship`：Friday 展示文件列表+说明；确认后 `ship_pending_fix` 合并 develop 并 `deploy_fly` |
+| 2026-10-18 | 能力模型定调：Friday 不必自身多强大；价值是调已有强工具（Cursor / 日历 / 邮件等），确认后开跑、收回结果让主人拍板。人设：「管家不是全能工匠，是会调工匠的人。」摩擦→Cursor→预览→部署已真用跑通，作样板写进 [plan.md](plan.md) |
 
 ## 评测冻结
 
