@@ -61,12 +61,25 @@ def profile_block() -> str:
     return "他的档案：\n" + PROFILE_PATH.read_text(encoding="utf-8").strip()
 
 
+def _is_private_fact(fact: dict) -> bool:
+    tags = {str(t).lower() for t in (fact.get("tags") or [])}
+    sens = str(fact.get("sensitivity") or "").lower()
+    return "private" in tags or sens in {"personal", "sensitive", "private"}
+
+
 def memory_block() -> str:
     facts = memory_store.all_facts()
     if not facts:
         return "你记得的事：（还没有）"
-    shown = facts[:MEMORY_INJECT_LIMIT]
+    # 私密条（感情/财务/健康等）默认不塞进每轮；他问起再用 search_memory
+    public = [f for f in facts if not _is_private_fact(f)]
+    private_n = len(facts) - len(public)
+    shown = public[:MEMORY_INJECT_LIMIT]
     lines = [f"- [{f.get('id')}] {f.get('content')}" for f in shown]
-    if len(facts) > len(shown):
-        lines.append(f"（还有 {len(facts) - len(shown)} 条更早的，需要时用 search_memory 搜）")
+    if len(public) > len(shown):
+        lines.append(f"（还有 {len(public) - len(shown)} 条更早的公开记忆，需要时用 search_memory 搜）")
+    if private_n:
+        lines.append(
+            f"（另有 {private_n} 条私密记忆：不在普通场景主动提起；他问起感情/健康/财务/团队人事时再用 search_memory）"
+        )
     return "你记得的事（新的在前，方括号里是 id）：\n" + "\n".join(lines)
