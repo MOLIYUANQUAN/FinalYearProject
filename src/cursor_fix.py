@@ -61,7 +61,7 @@ def _headers(key: str) -> dict[str, str]:
 def _prompt_for(item: dict[str, Any]) -> str:
     better = (item.get("better") or "").strip()
     better_line = f"\n他希望：{better}" if better else ""
-    return f"""你在 Jimmy 的 FYP 仓库里改 Friday 产品代码。
+    return f"""你在 Zeep 的 FYP 仓库里改 Friday 产品代码。
 
 产品摩擦（必须消掉）：
 {item.get("what")}{better_line}

@@ -14,7 +14,7 @@ iPhone App  ──HTTPS + 会话 Cookie──►  Friday API（云上常开）
                                              └─ 每用户自己的记忆与配置（以后）
 ```
 
-- **现在（FYP）：** 云上先只服务 Jimmy 一个人（单租户做稳）。  
+- **现在（FYP）：** 云上先只服务 Zeep 一个人（单租户做稳）。  
 - **以后做大：** 同一套 API 按「用户」隔离数据与 Google 授权；不做成多智能体。
 
 ## 分步（按依赖，不要并行摊开）
@@ -51,7 +51,7 @@ flyctl auth login                                                    # 只需一
 3. 电脑浏览器与以后 App 共用同一登录；Safari / WebView 里 `credentials: "include"`。  
 4. 有 Apple Developer 后再加 Sign in with Apple；现在不并行摊开。
 
-### C. 手机上「像 App」· Jimmy 只有 Windows 时的正路
+### C. 手机上「像 App」· Zeep 只有 Windows 时的正路
 
 **约束：** 你日常开发机是 **Windows**。Apple 规定：`.ipa` / TestFlight **必须在 macOS + Xcode 上签**。Windows 本机装不了 Xcode，也跑不了 iOS 模拟器。
 

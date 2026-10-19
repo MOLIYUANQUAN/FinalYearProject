@@ -1,7 +1,7 @@
-# Jimmy
+# Zeep
 
 ## Who he is
-- Jimmy（Zepeng Jia），曼彻斯特大学计算机科学大三（2026/27）；常用中文，技术语境熟悉英语
+- Zeep（Zepeng Jia），曼彻斯特大学计算机科学大三（2026/27）；常用中文，技术语境熟悉英语；英文名用 Zeep，不用 Jimmy
 - 综合体：学生 + 程序员 + 早期创业者；Windows 笔记本 + iPhone
 - Final Year Project：Personal AI Agent「Friday」；导师 Dr Wang Zhipeng（王志鹏）
 - 创业：深圳市宏流创新科技有限公司（深圳南山）；首个产品「留子圈」（微信小程序，运营重心曼彻斯特）
