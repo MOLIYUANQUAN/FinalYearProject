@@ -136,6 +136,7 @@
 | 2026-10-18 | Cursor 改完写入 `pending_ship`：Friday 展示文件列表+说明；确认后 `ship_pending_fix` 合并 develop 并 `deploy_fly` |
 | 2026-10-18 | 能力模型定调：Friday 不必自身多强大；价值是调已有强工具（Cursor / 日历 / 邮件等），确认后开跑、收回结果让主人拍板。人设：「管家不是全能工匠，是会调工匠的人。」摩擦→Cursor→预览→部署已真用跑通，作样板写进 [plan.md](plan.md) |
 | 2026-10-18 | Cursor 改码改为异步：确认后立刻返回「已交给 Cursor」，后台轮询；每轮 refresh_job / check_cursor_fix 可接上结果。避免手机长连接断掉出现 Load failed、活做完了却说不回来。Fly 试用需绑卡解除 5 分钟强制关机 |
+| 2026-10-19 | 战略定调写进 [plan.md](plan.md)：滩头 = 会写代码的早期创业者/builder（Jimmy 是学生+程序员+创业者综合体，付费侧重创业者侧）；护城河 = Action（Cursor/Google 等连接）不是 Context 也不是分发；不和大厂硬碰全能 Personal Agent；征服顺序 = 自己 → 像他的 builder → 再谈世界 |
 
 ## 评测冻结
 
