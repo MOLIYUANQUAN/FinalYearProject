@@ -138,6 +138,7 @@
 | 2026-10-18 | Cursor 改码改为异步：确认后立刻返回「已交给 Cursor」，后台轮询；每轮 refresh_job / check_cursor_fix 可接上结果。避免手机长连接断掉出现 Load failed、活做完了却说不回来。Fly 试用需绑卡解除 5 分钟强制关机 |
 | 2026-10-19 | 战略定调写进 [plan.md](plan.md)：滩头 = 会写代码的早期创业者/builder（Zeep 是学生+程序员+创业者综合体，付费侧重创业者侧）；护城河 = Action（Cursor/Google 等连接）不是 Context 也不是分发；不和大厂硬碰全能 Personal Agent；征服顺序 = 自己 → 像他的 builder → 再谈世界 |
 | 2026-10-19 | 主人英文名统一为 Zeep（不用 Jimmy）；档案标题与 VOICE/plan 同步。Fly 应用名 `friday-jimmy` 仍为基础设施域名，不改 |
+| 2026-10-19 | 人味第一刀：VOICE 定为「名字 Friday、气质 JARVIS」——中文利落、偶有干幽默、敢轻纠正；不改 TTS；不走客服热情也不走 MCU Friday 的过冷 |
 
 ## 评测冻结
 
