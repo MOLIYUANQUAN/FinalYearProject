@@ -107,6 +107,37 @@
       cursor: pointer;
     }
     #newChat:hover { color: var(--ink); }
+    /* 对话框：消息区 + 输入区一体，借鉴常见 chat-widget 布局 */
+    .chat-dialog {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: calc(var(--radius) + 2px);
+      padding: 10px 10px 12px;
+      background: var(--panel);
+    }
+    .chat-dialog-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 0 2px 2px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .chat-dialog-head span:last-child {
+      text-transform: none;
+      letter-spacing: 0;
+      font-weight: 400;
+      font-size: 0.78rem;
+    }
     #log {
       flex: 1;
       min-height: 0;
@@ -115,7 +146,7 @@
       scrollbar-color: var(--line) transparent;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 12px;
       padding: 8px 2px 10px;
       transition: padding-bottom 0.3s ease;
     }
@@ -137,9 +168,10 @@
     }
     .msg.bot {
       align-self: flex-start;
-      background: transparent;
-      border: none;
-      padding: 2px 0;
+      background: var(--user);
+      border: 1px solid var(--line);
+      padding: 10px 14px;
+      border-radius: var(--radius);
     }
     .msg.error {
       align-self: stretch;
@@ -302,10 +334,11 @@
     }
     .details summary::-webkit-details-marker { display: none; }
     .details summary:hover { opacity: 1; color: var(--ink); }
-    form {
+    .chat-dialog form {
       display: flex;
       gap: 8px;
       align-items: flex-end;
+      flex-shrink: 0;
     }
     #input {
       flex: 1;
@@ -456,16 +489,23 @@
       </form>
     </div>
 
-    <div id="log" role="log" aria-live="polite"></div>
-    <div id="orb" aria-hidden="true" title="点一下停"><b></b><i></i></div>
+    <section id="chatDialog" class="chat-dialog" aria-label="与管家对话">
+      <div class="chat-dialog-head">
+        <span>对话</span>
+        <span>像聊天一样说就行</span>
+      </div>
+      <div id="log" role="log" aria-live="polite" aria-relevant="additions"></div>
+      <div id="orb" aria-hidden="true" title="点一下停"><b></b><i></i></div>
 
-    <form id="form">
-      <textarea id="input" rows="1" placeholder="问我，或者告诉我一件事" autocomplete="off" enterkeyhint="send"></textarea>
-      <button id="mic" type="button" aria-label="说话" title="点一下开始说，再说完点一下">说</button>
-      <button id="send" type="submit">发送</button>
-    </form>
+      <form id="form">
+        <textarea id="input" rows="1" placeholder="问我，或者告诉我一件事" autocomplete="off" enterkeyhint="send" aria-label="消息"></textarea>
+        <button id="mic" type="button" aria-label="说话" title="点一下开始说，再说完点一下">说</button>
+        <button id="send" type="submit">发送</button>
+      </form>
+    </section>
   </main>
 
+  <script src="/static/chat-dialog.js?v=1"></script>
   <script>
     const STORE_KEY = "pa.session.v1";
     const ACCESS_KEY = "pa.access"; // 旧版曾把密码存在本机；登录后清掉
@@ -496,7 +536,9 @@
     };
 
     const logEl = document.getElementById("log");
+    const chatDialogEl = document.getElementById("chatDialog");
     const form = document.getElementById("form");
+    FridayChat.bindLog(logEl);
     const input = document.getElementById("input");
     const sendBtn = document.getElementById("send");
     const micBtn = document.getElementById("mic");
@@ -549,7 +591,7 @@
 
     function showUnlock(on) {
       unlockEl.classList.toggle("visible", !!on);
-      form.style.display = on ? "none" : "";
+      chatDialogEl.style.display = on ? "none" : "";
       if (on) unlockInput.focus();
     }
 
@@ -620,35 +662,10 @@
       try { localStorage.setItem(STORE_KEY, JSON.stringify(session)); } catch (e) {}
     }
 
-    function escapeHtml(s) {
-      return s
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-    }
-
-    // 模型偶尔仍会输出 Markdown：只做最小渲染，其余按纯文本显示
-    function render(text) {
-      return escapeHtml(text || "")
-        .replace(/^#{1,6}\s+/gm, "")
-        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-        .replace(/^(\s*)[-*•]\s+/gm, "$1· ")
-        .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
-    }
-
-    function scrollDown() {
-      logEl.scrollTop = logEl.scrollHeight;
-    }
-
-    function addMessage(role, text) {
-      const div = document.createElement("div");
-      div.className = "msg " + role;
-      if (text != null) div.innerHTML = render(text);
-      logEl.appendChild(div);
-      scrollDown();
-      return div;
-    }
+    const escapeHtml = FridayChat.escapeHtml;
+    const render = FridayChat.render;
+    const scrollDown = () => FridayChat.scrollDown();
+    const addMessage = (role, text) => FridayChat.addMessage(role, text);
 
     function el(tag, className, text) {
       const node = document.createElement(tag);
@@ -685,17 +702,8 @@
       return say;
     }
 
-    function showTyping(div, hint) {
-      div.innerHTML =
-        '<span class="typing"><i></i><i></i><i></i></span>' +
-        (hint ? '<span class="hint">' + escapeHtml(hint) + "</span>" : "");
-    }
-
-    // 新写出来的字淡入，不是整段刷新；写完再换成排好版的全文
-    function appendFresh(target, chunk) {
-      if (target.querySelector(".typing")) target.textContent = "";
-      target.append(el("span", "fresh", chunk));
-    }
+    const showTyping = (div, hint) => FridayChat.showTyping(div, hint);
+    const appendFresh = (target, chunk) => FridayChat.appendFresh(target, chunk);
 
     function addDetails(div, tools) {
       const d = document.createElement("details");
