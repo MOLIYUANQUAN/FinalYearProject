@@ -34,7 +34,10 @@ def _base() -> str:
 
 def _gh_headers() -> dict[str, str]:
     load_env()
-    headers = {"Accept": "application/vnd.github+json"}
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
     token = (os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN") or "").strip()
     if token:
         headers["Authorization"] = f"Bearer {token}"
@@ -246,6 +249,74 @@ def _merge_local(branch: str) -> dict[str, Any]:
     return {"ok": True, "method": "local_git"}
 
 
+def _pull_request_for_merge(branch: str, slug: str, headers: dict[str, str]) -> dict[str, Any]:
+    """找到或开一个指向 base 的 PR，返回 GitHub 的 PR 对象。"""
+    pr = requests.post(
+        f"{GITHUB_API}/repos/{slug}/pulls",
+        headers=headers,
+        json={"title": f"Ship {branch}", "head": branch, "base": _base(), "body": "Friday 确认部署"},
+        timeout=30,
+    )
+    if pr.status_code == 422:
+        owner = slug.split("/")[0]
+        listed = requests.get(
+            f"{GITHUB_API}/repos/{slug}/pulls",
+            headers=headers,
+            params={"head": f"{owner}:{branch}", "state": "open"},
+            timeout=30,
+        )
+        items = listed.json() if listed.ok else []
+        if not isinstance(items, list) or not items:
+            return {"ok": False, "error": "pr_failed", "message": (pr.text or "")[:200]}
+        return {"ok": True, "pr": items[0]}
+    if pr.status_code >= 400:
+        return {"ok": False, "error": "pr_failed", "message": (pr.text or "")[:200]}
+    return {"ok": True, "pr": pr.json()}
+
+
+def _already_ready(text: str) -> bool:
+    lowered = text.lower()
+    return "already" in lowered or "not a draft" in lowered
+
+
+def _mark_ready(slug: str, headers: dict[str, str], pr_obj: dict[str, Any]) -> dict[str, Any] | None:
+    """草稿不能合并。先标成可审查，失败再用 GraphQL。"""
+    if not pr_obj.get("draft"):
+        return None
+    number = pr_obj.get("number")
+    ready = requests.patch(
+        f"{GITHUB_API}/repos/{slug}/pulls/{number}",
+        headers=headers,
+        json={"draft": False},
+        timeout=30,
+    )
+    if ready.status_code < 400:
+        return None
+    if _already_ready(ready.text or ""):
+        return None
+    node_id = pr_obj.get("node_id") or ""
+    if not node_id:
+        return {"ok": False, "error": "undraft_failed", "message": (ready.text or "")[:200]}
+    gql = requests.post(
+        "https://api.github.com/graphql",
+        headers=headers,
+        json={
+            "query": (
+                "mutation($id:ID!){ markPullRequestReadyForReview"
+                "(input:{pullRequestId:$id}){ pullRequest { isDraft } } }"
+            ),
+            "variables": {"id": node_id},
+        },
+        timeout=30,
+    )
+    body_text = gql.text or ""
+    if gql.status_code < 400 and not (gql.json() or {}).get("errors"):
+        return None
+    if _already_ready(body_text):
+        return None
+    return {"ok": False, "error": "undraft_failed", "message": (body_text or ready.text or "")[:200]}
+
+
 def _merge_github(branch: str) -> dict[str, Any]:
     load_env()
     token = (os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN") or "").strip()
@@ -255,31 +326,16 @@ def _merge_github(branch: str) -> dict[str, Any]:
             "error": "missing_github_token",
             "message": "云上合并需要 GITHUB_TOKEN。本机有仓库时可直接合并。",
         }
-    # 开 PR 再 merge（已有 PR 也无所谓）
     slug = _repo_slug()
     headers = _gh_headers()
-    pr = requests.post(
-        f"{GITHUB_API}/repos/{slug}/pulls",
-        headers=headers,
-        json={"title": f"Ship {branch}", "head": branch, "base": _base(), "body": "Friday 确认部署"},
-        timeout=30,
-    )
-    if pr.status_code == 422:
-        # 可能已有 PR：列出 head
-        listed = requests.get(
-            f"{GITHUB_API}/repos/{slug}/pulls",
-            headers=headers,
-            params={"head": f"{slug.split('/')[0]}:{branch}", "state": "open"},
-            timeout=30,
-        )
-        items = listed.json() if listed.ok else []
-        if not items:
-            return {"ok": False, "error": "pr_failed", "message": (pr.text or "")[:200]}
-        number = items[0]["number"]
-    elif pr.status_code >= 400:
-        return {"ok": False, "error": "pr_failed", "message": (pr.text or "")[:200]}
-    else:
-        number = pr.json()["number"]
+    found = _pull_request_for_merge(branch, slug, headers)
+    if not found.get("ok"):
+        return found
+    pr_obj = found["pr"]
+    number = pr_obj.get("number")
+    undraft = _mark_ready(slug, headers, pr_obj)
+    if undraft:
+        return undraft
     merged = requests.put(
         f"{GITHUB_API}/repos/{slug}/pulls/{number}/merge",
         headers=headers,
@@ -346,15 +402,26 @@ def ship(*, user_confirmed: bool) -> dict[str, Any]:
     except Exception:  # noqa: BLE001
         pass
     if not deployed.get("ok"):
+        message = deployed.get("message") or ""
+        # 云镜像没有 flyctl。代码已经推上 develop，由 GitHub Action 部署。
+        cloud = "flyctl not found" in message or "找不到 deploy_fly.py" in message
+        if cloud:
+            say = (
+                f"已合进 {_base()}，GitHub 正在自动部署。"
+                "一两分钟后刷新页面，点「新对话」看效果。"
+                "若页面没有更新，把 Fly 部署令牌加到仓库 Secrets 的 FLY_API_TOKEN。"
+            )
+        else:
+            say = (
+                f"代码已合进 {_base()}，但自动部署失败：{message}。"
+                "本机可跑 scripts/deploy_fly.py。"
+            )
         return {
             "ok": True,
             "merged": True,
             "deployed": False,
             "method": merged.get("method"),
-            "say": (
-                f"代码已合进 {_base()}，但自动部署失败：{deployed.get('message', '')}。"
-                "本机可跑 scripts/deploy_fly.py。"
-            ),
+            "say": say,
         }
     return {
         "ok": True,

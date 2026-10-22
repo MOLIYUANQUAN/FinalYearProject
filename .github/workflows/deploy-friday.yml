@@ -1,0 +1,28 @@
+# develop 被推送后部署 Friday（Fly 应用 friday-jimmy）。
+# 仓库 Secrets 需要 FLY_API_TOKEN：fly tokens create deploy -a friday-jimmy
+name: Deploy Friday
+
+on:
+  push:
+    branches:
+      - develop
+
+concurrency:
+  group: deploy-friday
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy
+        run: flyctl deploy --remote-only --app friday-jimmy --ha=false
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
