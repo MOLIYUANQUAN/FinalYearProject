@@ -17,7 +17,7 @@ if str(ROOT) not in sys.path:
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, File, HTTPException, Response, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -382,9 +382,9 @@ class SpeakBody(BaseModel):
     text: str = Field(..., min_length=1)
 
 
-@app.post("/api/voice/transcribe")
-async def voice_transcribe(file: UploadFile = File(...)) -> dict:
-    """网页录的一段音 → 文字；再走原来的对话。"""
+@app.post("/api/voice/ask")
+async def voice_ask(file: UploadFile = File(...), conversation_id: str | None = Form(None)) -> StreamingResponse:
+    """按住说话松手：一趟里转写完就接着回答。先回 {"type": "heard"} 让气泡立刻填上他说的话。"""
     _require_key()
     data = await file.read()
     try:
@@ -394,7 +394,15 @@ async def voice_transcribe(file: UploadFile = File(...)) -> dict:
         raise HTTPException(status_code=502, detail=f"没听清：{reason}") from exc
     if not text:
         raise HTTPException(status_code=400, detail="没听清，再说一遍？")
-    return {"text": text}
+    cid = friday.resolve_conversation(conversation_id)
+    spoken = voice.wants_voice(text)
+
+    async def events() -> AsyncIterator[dict[str, Any]]:
+        yield {"type": "heard", "text": text, "spoken": spoken}
+        async for event in friday.turn(cid, text, spoken=spoken):
+            yield event
+
+    return _sse("chat", events())
 
 
 @app.post("/api/voice/speak")

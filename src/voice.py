@@ -13,6 +13,7 @@ from src.config import load_env, require_openai_api_key
 
 # Whisper 单文件上限 25MB；网页侧再卡短一点
 MAX_AUDIO_BYTES = 12 * 1024 * 1024
+TRANSCRIBE_MODEL = os.getenv("FRIDAY_TRANSCRIBE_MODEL", "gpt-4o-mini-transcribe")
 # 播报别念太长：长回复仍显示全文，只念前面
 MAX_SPEAK_CHARS = 800
 
@@ -54,13 +55,37 @@ def transcribe(audio: bytes, filename: str = "audio.webm") -> str:
     name = (filename or "audio.webm").strip() or "audio.webm"
     if "/" in name or "\\" in name:
         name = name.replace("\\", "/").rsplit("/", 1)[-1]
-    bio = io.BytesIO(audio)
-    bio.name = name
-    result = _client().audio.transcriptions.create(
-        model="whisper-1",
-        file=bio,
-    )
-    return (result.text or "").strip()
+    import openai
+
+    # 比 whisper-1 快、也更准；把他常说的专有名词告诉它，「Kilburn」「COMP34111」就不会听成别的
+    for model in (TRANSCRIBE_MODEL, "whisper-1"):
+        bio = io.BytesIO(audio)
+        bio.name = name
+        try:
+            result = _client().audio.transcriptions.create(model=model, file=bio, prompt=_vocabulary())
+        except (openai.NotFoundError, openai.BadRequestError) as exc:
+            if model == "whisper-1":
+                raise
+            print(f"[WARN] {model} unavailable ({exc}); falling back to whisper-1")
+            continue
+        return (result.text or "").strip()
+    return ""
+
+
+def _vocabulary() -> str:
+    """转写提示：Friday、他的名字、课程代码、常去的楼——从档案里取，没有就给几个固定的。"""
+    from src.context import his_name, module_names
+
+    words = ["Friday", his_name() or "Zeep", "FYP", "Kilburn", "Cursor", *module_names().keys()]
+    return "、".join(w for w in words if w)
+
+
+# 他明说要听才念：和页面上 wantsVoice 是同一套说法
+WANTS_VOICE = re.compile(r"听听|听你|你的声音|念给|读给|说两句|说句话|hear (your )?voice|speak (to me|up)|say something", re.I)
+
+
+def wants_voice(text: str) -> bool:
+    return bool(WANTS_VOICE.search(text or ""))
 
 
 def speak(text: str) -> bytes:

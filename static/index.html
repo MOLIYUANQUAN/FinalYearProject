@@ -1151,11 +1151,12 @@
 
     // view.el 是正在写字的位置；开场的卡片到了以后它会换成卡片里那句判断
     async function stream(url, payload, view) {
+      const form = payload instanceof FormData;
       const res = await fetch(url, {
         method: "POST",
         credentials: "include",
-        headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify(payload || {}),
+        headers: form ? authHeaders() : authHeaders({ "Content-Type": "application/json" }),
+        body: form ? payload : JSON.stringify(payload || {}),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -1183,7 +1184,9 @@
           buffer = buffer.slice(cut + 2);
           if (!frame.startsWith("data: ")) continue;
           const ev = JSON.parse(frame.slice(6));
-          if (ev.type === "conversation") {
+          if (ev.type === "heard") {
+            if (view.onHeard) view.onHeard(ev);
+          } else if (ev.type === "conversation") {
             if (session && ev.id) session.id = ev.id;
           } else if (ev.type === "agenda") {
             view.onAgenda(ev);
@@ -1639,29 +1642,51 @@
       }
     }
 
-    // 松手气泡就出来；转写好了换成文字，她忙完上一句就接着回
+    // 松手气泡就出来；录音一趟传上去：转写好了先填进气泡（heard），她紧接着就回，不再多跑一趟
     async function sendVoice(blob, mime) {
       const bubble = addMessage("user");
       bubble.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>';
-      orbSet("thinking");
       scrollDown();
+      await whenIdle();
+      setBusy(true);
+      clearActions();
+      const div = addMessage("bot");
+      div.hidden = true; // 听清之前先不摆她的气泡
+      const view = { el: div };
+      let speaker = null;
+      view.onHeard = (ev) => {
+        bubble.textContent = ev.text;
+        session.messages.push({ role: "user", content: ev.text, at: Date.now() });
+        div.hidden = false;
+        showTyping(div);
+        // 只有他明说要听（「念给我听」）才出声
+        if (ev.spoken) {
+          speaker = speakerFor();
+          view.onText = (text) => speaker.feed(text);
+          view.onTool = () => speaker.reset();
+        }
+        scrollDown();
+      };
       try {
         const formData = new FormData();
         const ext = mime.includes("mp4") ? "m4a" : mime.includes("ogg") ? "ogg" : "webm";
         formData.append("file", blob, "speech." + ext);
-        const res = await fetch("/api/voice/transcribe", { method: "POST", credentials: "include", body: formData });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.detail || "没听清。");
-        const text = (data.text || "").trim();
-        if (!text) throw new Error("没听清，再说一遍？");
-        bubble.textContent = text;
-        await whenIdle();
-        // 说话只是另一种打字：照常用文字回；他要听（「念给我听」）时 ask 里的 wantsVoice 会让她出声
-        await ask(text, { userDiv: bubble });
+        if (session && session.id) formData.append("conversation_id", session.id);
+        const result = await stream("/api/voice/ask", formData, view);
+        finish(div, result);
+        if (speaker) speaker.end(result.reply);
       } catch (e) {
-        bubble.remove();
+        if (div.hidden) {
+          bubble.remove();
+          div.remove();
+          addMessage("error", (e && e.message) || String(e));
+        } else {
+          fail(div, e);
+        }
+        if (speaker) speaker.cancel();
+      } finally {
         settleOrb();
-        addMessage("error", (e && e.message) || String(e));
+        setBusy(false);
       }
     }
 
