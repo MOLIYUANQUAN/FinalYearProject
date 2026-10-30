@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import AsyncIterator
 from typing import Any
 
-from agents import Agent, ModelSettings, Runner, RunResult
+from agents import Agent, Model, ModelSettings, RunState, Runner
 from openai.types.responses import ResponseTextDeltaEvent
 
 from src import todos
@@ -18,8 +19,10 @@ from src.config import (
     get_tasks_backend,
     require_openai_api_key,
 )
-from src import cursor_fix, friction
+from src import approval, cursor_fix, friction
+from src.config import STATE_DIR
 from src.context import memory_block, now_block, profile_block
+from src.conversation import Conversations, store
 from src.tools import ALL_TOOLS, TASK_TOOLS
 from src.turn import Turn
 
@@ -61,19 +64,19 @@ VOICE = """你叫 Friday，是 Zeep 的管家，只为他一个人。不是顾�
 - 他说「记住…」，记的是关于他自己的事 → remember_fact。要去做的事（「记得续借图书馆的书」）不是记忆。
 - 他顺带说出关于自己的长期事实或偏好（身份、重要的人、习惯、长期安排、喜好）→ 也用 remember_fact 记下，并在回复末尾加一句「记下了。」不记一次性的事、密码，也不记你自己的推测。
 - 他纠正你记得的某件事 → remember_fact(新的完整事实, replaces=旧记忆的 id)，直接改，不用确认，回一句「改好了」和新的说法。
-- 他要删掉某条记忆 → 先确认，再 forget_fact(user_confirmed=True)。
+- 他要删掉某条记忆 → forget_fact（系统会先请他确认）。
 - 记得的事是用来帮他的，不是用来管他的：他明确要做的事，和你记得的对不上也照常办（该确认的照常确认），绝不因此拒绝。
 - 感情、医疗、家庭、财务旧数据：不在普通场景主动提起；他问起再用 search_memory。过时数字（DAU、资产、分成）要标明「记忆里是旧的」并建议核实。
 - 他抱怨 Friday 的建议、打扰、「需要你」里不该出现的东西 → note_friction（可写 better=他希望怎样）。回一句「记下了，下次按这个来。」别辩护、别解释架构。
 - 他问「我说过哪些不好用」「待修清单」→ list_friction，按条说清楚。
 - 他确认某条已经改好 → resolve_friction。下面「还嫌弃的」里有的，说话和挑「需要你」时都要避开。
-- 他说「用 Cursor 改…」「修开场/需要你」→ 只 request_user_confirmation 一次（说清会改仓库）；他点确认后立刻 fix_friction_with_cursor(user_confirmed=True, what=他要的改动)。没有摩擦 id 也没关系，工具会自己记下。不要再说「请再点确认」。
+- 他说「用 Cursor 改…」「修开场/需要你」→ 直接 fix_friction_with_cursor(what=他要的改动)；系统会请他确认一次（会动仓库）。没有摩擦 id 也没关系，工具会自己记下。
 - fix_friction_with_cursor 会**马上**返回「已交给 Cursor」——把 say 原样告诉他，让他可以走开。不要假装还在改、不要干等、不要叫他一直盯着页面。
-- 上下文若写 Cursor 改完待部署，或他问「改好了吗」「改了什么」→ check_cursor_fix 或 preview_pending_ship，把 say **原样**给他，再问要不要部署；他确认后 ship_pending_fix(user_confirmed=True)。
+- 上下文若写 Cursor 改完待部署，或他问「改好了吗」「改了什么」→ check_cursor_fix 或 preview_pending_ship，把 say **原样**给他，再问要不要部署；他说部署就 ship_pending_fix（系统会把改动给他看、请他确认）。
 
 行动：
 - 读操作直接做，不预告。
-- 写操作（建日程、发邮件、归档或删除邮件、删除记忆）：先 request_user_confirmation，一次说清要做什么和关键细节（时间、收件人、主题）；他同意后再以 user_confirmed=True 执行。页面会给他「确认 / 取消」按钮：问一句就停，不教他怎么回复。成功之前绝不说已完成；完成后一句话告诉他结果。
+- 写操作（建日程、发邮件、归档或删除邮件、删除记忆、让 Cursor 改代码、部署）：信息齐了就直接调用对应工具，不要先用文字问「要不要」——系统会在执行前把具体内容（时间、收件人、主题、正文）给他看，等他点确认。关键信息缺了（不知道几点、发给谁）才先问一句。他拒绝了就一句话说没做，不重试。成功之前绝不说已完成；工具返回后一句话告诉他结果。
 - 帮他准备一场会面或重要对话：先搜相关的邮件和笔记，再写：时间地点（日历里没有就直说）+ 现状一句话 + 三个讨论点。讨论点只能来自真材料（档案、记忆、邮件、笔记）；材料不够就少写几点并直说，不用空话凑数。"""
 
 SPOKEN = """这一轮是他开口说的，你的回答会直接念给他听：
@@ -115,172 +118,294 @@ def build_instructions(calendar: str = "", todo: str = "", *, spoken: bool = Fal
     return "\n\n".join(part for part in parts if part)
 
 
-def create_assistant(*, calendar: str = "", todo: str = "", spoken: bool = False) -> Agent:
-    require_openai_api_key()
+def create_assistant(
+    *, calendar: str = "", todo: str = "", spoken: bool = False, model: Model | None = None
+) -> Agent:
+    if model is None:
+        require_openai_api_key()
     return Agent(
         name="Friday",
         instructions=build_instructions(calendar, todo, spoken=spoken),
         tools=ALL_TOOLS + TASK_TOOLS if todos.connected() else ALL_TOOLS,
-        model=DEFAULT_MODEL,
+        model=model or DEFAULT_MODEL,
         model_settings=ModelSettings(temperature=0.2),
     )
 
 
-async def _assistant(spoken: bool = False) -> Agent:
+async def _assistant(spoken: bool = False, model: Model | None = None) -> Agent:
     """这一轮的 Friday：日历和待办同时读，谁也不等谁。"""
     calendar, todo = await asyncio.gather(asyncio.to_thread(chat_block), asyncio.to_thread(todos.chat_block))
-    return create_assistant(calendar=calendar, todo=todo, spoken=spoken)
+    return create_assistant(calendar=calendar, todo=todo, spoken=spoken, model=model)
 
 
-def extract_tool_names(result: RunResult) -> list[str]:
-    names: list[str] = []
-    for item in result.new_items:
-        name = getattr(item, "tool_name", None)
-        if not name and getattr(item, "type", None) == "tool_call_item":
-            raw = getattr(item, "raw_item", None)
-            name = getattr(raw, "name", None) if raw is not None else None
-        if name and name not in names:
-            names.append(str(name))
-    return names
+# ---------------------------------------------------------------------------
+# 一轮对话：服务端的会话 + 流式 + 写操作停下等确认
+# ---------------------------------------------------------------------------
+
+PENDING_DIR = STATE_DIR / "pending"
 
 
-def _history_to_input(
-    message: str,
-    history: list[dict[str, str]] | None,
-) -> str | list[dict[str, Any]]:
-    """把多轮历史打成 Agents SDK 可接受的 input。"""
-    if not history:
-        return message
-    items: list[dict[str, Any]] = []
-    for turn in history:
-        role = (turn.get("role") or "").strip()
-        content = (turn.get("content") or "").strip()
-        if role not in {"user", "assistant"} or not content:
-            continue
-        items.append({"role": role, "content": content})
-    items.append({"role": "user", "content": message})
-    return items
+def _get(raw: Any, key: str) -> Any:
+    return raw.get(key) if isinstance(raw, dict) else getattr(raw, key, None)
 
 
-_CONFIRM_REPLIES = {
-    "确认",
-    "同意",
-    "创建吧",
-    "确认创建",
-    "好的",
-    "可以",
-    "ok",
-    "OK",
-    "yes",
-    "Yes",
-}
+def _approval_info(item: Any) -> dict[str, Any]:
+    raw = item.raw_item
+    args = _get(raw, "arguments")
+    try:
+        parsed = json.loads(args) if isinstance(args, str) and args else (args or {})
+    except json.JSONDecodeError:
+        parsed = {"raw": args}
+    return {"call_id": _get(raw, "call_id") or _get(raw, "id"), "name": item.tool_name or _get(raw, "name"), "arguments": parsed}
 
 
-def _expand_short_confirmation(
-    message: str,
-    history: list[dict[str, str]] | None,
-    pending_confirmation: bool,
-) -> str:
-    """他在等确认时回一句「确认/好的」，补全上下文，避免模型装作不知道在确认什么。
+def _turn_to_json(turn: Any) -> dict[str, Any]:
+    return {"undo": list(getattr(turn, "undo", []) or [])}
 
-    只在上一轮真的请求了确认时生效：平时的「好的」不能被当成发邮件、建日程的授权。
+
+def _turn_from_json(data: Any) -> Turn:
+    return Turn(undo=list((data or {}).get("undo") or []))
+
+
+class Friday:
+    """对话存在服务端（见 conversation.py）；写操作停下时，那一步原样存着，他确认才继续。
+
+    停下的那一步也写到磁盘（STATE_DIR/pending/），云上重启了他再说「确认」也接得上。
     """
-    text = message.strip()
-    if not pending_confirmation or text not in _CONFIRM_REPLIES or not history:
-        return message
-    last_assistant = next(
-        (h["content"] for h in reversed(history) if h.get("role") == "assistant"),
-        "",
-    )
-    if not last_assistant:
-        return message
-    if not any(
-        k in last_assistant
-        for k in ("创建", "确认", "发送", "邮件", "归档", "删除", "忘记", "记忆", "Cursor", "改代码", "摩擦")
-    ):
-        return message
-    if any(k in last_assistant for k in ("部署", "上线", "合进", "待部署")):
-        action = "ship_pending_fix(user_confirmed=True)。把返回的 say 原样告诉他。"
-    elif any(k in last_assistant for k in ("Cursor", "改代码", "摩擦", "修这条", "需要你")):
-        action = (
-            "fix_friction_with_cursor(user_confirmed=True, what=上一轮要改的内容)。"
-            "没有 friction_id 就只传 what；不要再问确认；把工具立刻返回的 say 原样给他（已交给 Cursor，他可走开）。"
-        )
-    elif any(k in last_assistant for k in ("忘记", "删除记忆", "forget")):
-        action = "forget_fact(..., user_confirmed=True)"
-    elif any(k in last_assistant for k in ("发送", "邮件", "发信", "归档")):
-        action = "send_email(..., user_confirmed=True) 或 modify_email(..., user_confirmed=True)"
-    else:
-        action = "create_calendar_event(..., user_confirmed=True)"
-    return (
-        f"{text}。请根据你上一轮提出的方案立刻执行：调用 {action}。"
-        f"不要再追问「确认什么」。上一轮你说：{last_assistant}"
-    )
+
+    def __init__(self, conversations: Conversations | None = None, *, model: Model | None = None) -> None:
+        self._conversations = conversations
+        self._model = model
+        self._pending: dict[str, tuple[Agent, Any, list[dict[str, Any]]]] = {}
+        self._locks: dict[str, asyncio.Lock] = {}
+
+    @property
+    def conversations(self) -> Conversations:
+        return self._conversations or store()
+
+    # ---- 待确认的那一步 ----
+
+    def _pending_path(self, cid: str):
+        return PENDING_DIR / f"{cid}.json"
+
+    def _save_pending(self, cid: str, agent: Agent, state: Any, approvals: list[dict[str, Any]]) -> None:
+        self._pending[cid] = (agent, state, approvals)
+        if self.conversations.db_path == ":memory:":
+            return
+        try:
+            PENDING_DIR.mkdir(parents=True, exist_ok=True)
+            blob = {"approvals": approvals, "state": state.to_string(context_serializer=_turn_to_json)}
+            self._pending_path(cid).write_text(json.dumps(blob, ensure_ascii=False), encoding="utf-8")
+        except Exception as exc:  # noqa: BLE001 — 存不下来也只是重启后要他再说一遍
+            print(f"[WARN] pending approval not persisted: {exc}")
+
+    async def _load_pending(self, cid: str, spoken: bool) -> tuple[Agent, Any, list[dict[str, Any]]] | None:
+        if cid in self._pending:
+            return self._pending[cid]
+        path = self._pending_path(cid)
+        if not path.is_file():
+            return None
+        try:
+            blob = json.loads(path.read_text(encoding="utf-8"))
+            agent = await _assistant(spoken, self._model)
+            state = await RunState.from_string(agent, blob["state"], context_deserializer=_turn_from_json)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[WARN] pending approval could not be restored: {exc}")
+            path.unlink(missing_ok=True)
+            return None
+        self._pending[cid] = (agent, state, blob.get("approvals") or [])
+        return self._pending[cid]
+
+    def _drop_pending(self, cid: str) -> None:
+        self._pending.pop(cid, None)
+        self._pending_path(cid).unlink(missing_ok=True)
+
+    def pending_approvals(self, cid: str) -> list[dict[str, Any]]:
+        if cid in self._pending:
+            return list(self._pending[cid][2])
+        path = self._pending_path(cid)
+        if path.is_file():
+            try:
+                return list(json.loads(path.read_text(encoding="utf-8")).get("approvals") or [])
+            except (OSError, json.JSONDecodeError):
+                return []
+        return []
+
+    # ---- 一轮 ----
+
+    def resolve_conversation(self, cid: str | None) -> str:
+        """页面带来的对话 id 还在就用它；否则接上当前的；都没有就开一个新的。"""
+        convs = self.conversations
+        if cid and convs.exists(cid):
+            return cid
+        return convs.current() or convs.create()
+
+    async def turn(self, cid: str, message: str, *, spoken: bool = False) -> AsyncIterator[dict[str, Any]]:
+        """他说了一句：存进对话，跑 Friday，事件流给页面，最后把她的回复也存进对话。"""
+        lock = self._locks.setdefault(cid, asyncio.Lock())
+        async with lock:
+            convs = self.conversations
+            convs.add_message(cid, "user", message)
+            yield {"type": "conversation", "id": cid}
+
+            pending = await self._load_pending(cid, spoken)
+            texts: list[str] = []
+            tools: list[str] = []
+            undo: list[dict[str, Any]] = []
+            approvals: list[dict[str, Any]] = []
+
+            async def run(agent: Agent, run_input: Any) -> AsyncIterator[dict[str, Any]]:
+                async for event in self._run(cid, agent, run_input, tools, undo, approvals):
+                    if event["type"] == "text":
+                        texts.append(event["text"])
+                    else:
+                        yield event
+
+            if pending is not None:
+                agent, state, waiting = pending
+                choice = approval.decide(message)
+                self._drop_pending(cid)
+                if choice == "approve":
+                    tools.extend(a["name"] for a in waiting if a.get("name") and a["name"] not in tools)
+                for item in state.get_interruptions():
+                    if choice == "approve":
+                        state.approve(item)
+                    else:
+                        state.reject(
+                            item,
+                            rejection_message="他没同意，这一步没做。"
+                            if choice == "reject"
+                            else "他没确认，转而说了别的。这一步没做；简短说一句没做，然后回应他的新话。",
+                        )
+                async for event in run(agent, state):
+                    yield event
+                if choice == "other" and not approvals:
+                    # 他换了话题：上一步已作罢，接着回答他这句
+                    yield {"type": "tool", "name": ""}
+                    agent = await _assistant(spoken, self._model)
+                    async for event in run(agent, message):
+                        yield event
+            else:
+                agent = await _assistant(spoken, self._model)
+                async for event in run(agent, message):
+                    yield event
+
+            reply = "\n\n".join(t for t in texts if t.strip())
+            if approvals:
+                ask = approval.prompt(approvals)
+                reply = f"{reply}\n\n{ask}" if reply else ask
+            message_id = convs.add_message(
+                cid,
+                "assistant",
+                reply,
+                tools=tools,
+                undo=undo,
+                needs_confirm=bool(approvals),
+                approvals=approvals,
+            )
+            yield {
+                "type": "done",
+                "reply": reply,
+                "tools_called": tools,
+                "undo": undo,
+                "needs_confirm": bool(approvals),
+                "approvals": approvals,
+                "message_id": message_id,
+                "conversation_id": cid,
+            }
+
+    async def _run(
+        self,
+        cid: str,
+        agent: Agent,
+        run_input: Any,
+        tools: list[str],
+        undo: list[dict[str, Any]],
+        approvals: list[dict[str, Any]],
+    ) -> AsyncIterator[dict[str, Any]]:
+        """跑一段：delta / tool 原样给页面；最后的文字用 text 事件交回给 turn()。"""
+        session = self.conversations.session(cid)
+        if isinstance(run_input, RunState):
+            result = Runner.run_streamed(agent, run_input, max_turns=12, session=session)
+        else:
+            result = Runner.run_streamed(agent, run_input, max_turns=12, context=Turn(), session=session)
+        async for event in result.stream_events():
+            if event.type == "raw_response_event":
+                if isinstance(event.data, ResponseTextDeltaEvent) and event.data.delta:
+                    yield {"type": "delta", "text": event.data.delta}
+            elif event.type == "run_item_stream_event" and event.name == "tool_called":
+                raw = getattr(event.item, "raw_item", None)
+                name = _get(raw, "name")
+                if name:
+                    if name not in tools:
+                        tools.append(str(name))
+                    yield {"type": "tool", "name": str(name)}
+        turn = getattr(result.context_wrapper, "context", None)
+        undo.extend(getattr(turn, "undo", None) or [])
+        interruptions = list(getattr(result, "interruptions", None) or [])
+        if interruptions:
+            waiting = [_approval_info(item) for item in interruptions]
+            for info in waiting:
+                if info["name"] and info["name"] not in tools:
+                    tools.append(info["name"])
+            approvals.extend(waiting)
+            self._save_pending(cid, agent, result.to_state(), waiting)
+            # 停下之前模型写的那点字照样算这一轮的话
+            partial = "".join(
+                _get(part, "text") or ""
+                for item in result.new_items
+                if getattr(item, "type", "") == "message_output_item"
+                for part in (_get(item.raw_item, "content") or [])
+            )
+            yield {"type": "text", "text": partial}
+            return
+        final = result.final_output
+        yield {"type": "text", "text": final if isinstance(final, str) else str(final or "")}
+
+    # ---- 开场 ----
+
+    async def record_opener(self, cid: str, reply: str, card: dict[str, Any] | None) -> int:
+        """开场卡片和那句话也进对话：换设备能看到，模型也知道自己刚说了什么。"""
+        message_id = self.conversations.add_message(cid, "assistant", reply, agenda=card, tools=[])
+        if reply.strip():
+            await self.conversations.session(cid).add_items([{"role": "assistant", "content": reply}])
+        return message_id
+
+
+friday = Friday()
 
 
 async def run_assistant(
     message: str,
     *,
-    history: list[dict[str, str]] | None = None,
-    pending_confirmation: bool = False,
-    max_turns: int = 12,
+    conversation_id: str | None = None,
+    friday_service: Friday | None = None,
 ) -> dict:
-    """运行一轮助手（非流式，供 CLI / 评测）。"""
-    agent = await _assistant()
-    message = _expand_short_confirmation(message, history, pending_confirmation)
-    result = await Runner.run(
-        agent,
-        _history_to_input(message, history),
-        max_turns=max_turns,
-    )
-    reply = result.final_output
-    if not isinstance(reply, str):
-        reply = str(reply)
+    """非流式地跑一轮（CLI / 评测用）。默认每次一个新的内存对话，不碰他真实的对话记录。
+
+    要接着上一轮（比如评测里先问再「确认」），把返回的 conversation_id 传回来。
+    """
+    service = friday_service or _scratch()
+    cid = conversation_id if conversation_id and service.conversations.exists(conversation_id) else service.conversations.create()
+    result: dict[str, Any] = {}
+    async for event in service.turn(cid, message):
+        if event["type"] == "done":
+            result = event
     return {
-        "reply": reply,
-        "tools_called": extract_tool_names(result),
+        "reply": result.get("reply", ""),
+        "tools_called": result.get("tools_called", []),
+        "needs_confirm": result.get("needs_confirm", False),
+        "conversation_id": cid,
     }
 
 
-async def _stream(
-    agent: Agent,
-    run_input: str | list[dict[str, Any]],
-    *,
-    max_turns: int,
-) -> AsyncIterator[dict[str, Any]]:
-    """把一次运行变成事件流：delta（新文字）/ tool（开始用某个工具）/ done（最终回复和能撤销的事）。"""
-    turn = Turn()
-    result = Runner.run_streamed(agent, run_input, max_turns=max_turns, context=turn)
-    tools: list[str] = []
-    async for event in result.stream_events():
-        if event.type == "raw_response_event":
-            if isinstance(event.data, ResponseTextDeltaEvent) and event.data.delta:
-                yield {"type": "delta", "text": event.data.delta}
-        elif event.type == "run_item_stream_event" and event.name == "tool_called":
-            raw = getattr(event.item, "raw_item", None)
-            name = getattr(raw, "name", None)
-            if name:
-                if name not in tools:
-                    tools.append(str(name))
-                yield {"type": "tool", "name": str(name)}
-    reply = result.final_output
-    yield {
-        "type": "done",
-        "reply": reply if isinstance(reply, str) else str(reply or ""),
-        "tools_called": tools,
-        "undo": turn.undo,
-    }
+_scratch_service: Friday | None = None
 
 
-async def stream_assistant(
-    message: str,
-    *,
-    history: list[dict[str, str]] | None = None,
-    pending_confirmation: bool = False,
-    spoken: bool = False,
-    max_turns: int = 12,
-) -> AsyncIterator[dict[str, Any]]:
-    agent = await _assistant(spoken)
-    message = _expand_short_confirmation(message, history, pending_confirmation)
-    async for event in _stream(agent, _history_to_input(message, history), max_turns=max_turns):
-        yield event
+def _scratch() -> Friday:
+    global _scratch_service
+    if _scratch_service is None:
+        _scratch_service = Friday(Conversations(":memory:"))
+    return _scratch_service
+
+

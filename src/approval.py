@@ -1,58 +1,84 @@
-"""Autonomy / approval policy（薄层，无外部权限系统）。"""
+"""「绝不没经过你就动手」的硬约束：写操作在代码里停下，等他点确认才执行。
+
+以前靠模型自己传 user_confirmed=True，模型想跳过就能跳过；现在用 Agents SDK 的
+needs_approval：工具调用到这里就暂停，服务端把要做的事原样写给他看，他说「确认」才继续。
+确认的永远是那一个具体动作（收件人、正文、时间都定了），不是靠关键词猜他在确认什么。
+"""
 
 from __future__ import annotations
 
-from typing import Literal
+import re
+from typing import Any
 
-# 工具级默认策略：当前实现的工具都是只读 → allow
-# 未来写操作工具应登记为 require_confirmation
-ToolPolicy = Literal["allow", "require_confirmation"]
+from src import ship
 
-TOOL_POLICIES: dict[str, ToolPolicy] = {
-    "get_calendar_events": "allow",
-    "search_files": "allow",
-    "read_file": "allow",
-    "search_emails": "allow",
-    "read_email": "allow",
-    "modify_email": "require_confirmation",  # archive/trash 工具内再细分
-    "get_personal_context": "allow",
-    "remember_fact": "allow",
-    "search_memory": "allow",
-    "forget_fact": "require_confirmation",
-    "note_friction": "allow",
-    "list_friction": "allow",
-    "resolve_friction": "allow",
-    "fix_friction_with_cursor": "require_confirmation",
-    "check_cursor_fix": "allow",
-    "preview_pending_ship": "allow",
-    "ship_pending_fix": "require_confirmation",
-    "request_user_confirmation": "allow",
-    "create_calendar_event": "require_confirmation",
-    "send_email": "require_confirmation",
-    # 待办只进他自己的清单、随时能撤回：直接做，页面给「撤销」
-    "add_task": "allow",
-    "complete_task": "allow",
+# 他回这些就算同意 / 不同意（去掉标点和空白后整句匹配；别的话一律当作换了话题，不执行）
+_YES = {
+    "确认", "确定", "同意", "好", "好的", "好啊", "可以", "行", "嗯", "对", "是", "发吧", "发", "发送",
+    "建吧", "创建", "创建吧", "确认创建", "确认发送", "部署", "部署吧", "确认部署", "上线", "删吧", "删", "改吧",
+    "开工", "去吧", "执行", "ok", "okay", "yes", "y", "sure", "go", "do it", "confirm",
 }
-
-WRITE_ACTION_TYPES = {
-    "create_calendar_event",
-    "update_calendar_event",
-    "delete_calendar_event",
-    "send_email",
-    "modify_email",
-    "archive_email",
-    "trash_email",
-    "forget_fact",
-    "fix_friction_with_cursor",
-    "ship_pending_fix",
-    "share_file",
-    "other_write",
-}
+_NO = re.compile(r"^(取消|不要|不用|别|算了|先不|不发|不建|不删|不部署|停|no\b|nope|cancel|don'?t)", re.IGNORECASE)
+_PUNCT = re.compile(r"[\s。，、！？!?,.~～…：:；;「」\"'（）()]+")
 
 
-def policy_for_tool(tool_name: str) -> ToolPolicy:
-    return TOOL_POLICIES.get(tool_name, "require_confirmation")
+def decide(message: str) -> str:
+    """他对待确认操作的回复 → approve / reject / other。"""
+    text = _PUNCT.sub(" ", message or "").strip().lower()
+    if not text:
+        return "other"
+    if _NO.match(text):
+        return "reject"
+    if text in _YES or text.replace(" ", "") in _YES:
+        return "approve"
+    return "other"
 
 
-def requires_confirmation(action_type: str) -> bool:
-    return action_type in WRITE_ACTION_TYPES or action_type.startswith("write_")
+async def mail_change_needs_approval(_ctx: Any, params: dict[str, Any], _call_id: str) -> bool:
+    """标已读 / 未读直接做；归档、扔垃圾桶先问。"""
+    return params.get("action") in {"archive", "trash"}
+
+
+def _clip(text: str, limit: int = 600) -> str:
+    text = (text or "").strip()
+    return text if len(text) <= limit else text[:limit] + "…"
+
+
+def describe(name: str, args: dict[str, Any]) -> str:
+    """把待确认的那一步原样写给他看。全部由服务端拼，不经过模型。"""
+    if name == "send_email":
+        lines = [f"发邮件给 {args.get('to', '')}"]
+        if args.get("cc"):
+            lines.append(f"抄送 {args['cc']}")
+        lines.append(f"主题：{args.get('subject', '')}")
+        lines.append("")
+        lines.append(_clip(args.get("body", "")))
+        return "\n".join(lines)
+    if name == "create_calendar_event":
+        when = f"{str(args.get('start', '')).replace('T', ' ')} – {str(args.get('end', '')).replace('T', ' ')[-5:]}"
+        text = f"在日历里加「{args.get('title', '')}」：{when}"
+        if args.get("location"):
+            text += f"，{args['location']}"
+        if args.get("notes"):
+            text += f"\n备注：{_clip(args['notes'], 200)}"
+        return text
+    if name == "modify_email":
+        verb = {"archive": "归档", "trash": "扔进垃圾桶"}.get(str(args.get("action")), str(args.get("action")))
+        return f"把这封邮件{verb}（{args.get('message_id', '')}）"
+    if name == "forget_fact":
+        return f"忘掉这条记忆：{args.get('fact_id', '')}"
+    if name == "fix_friction_with_cursor":
+        what = args.get("what") or args.get("friction_id") or "改代码"
+        return f"让 Cursor 改 Friday 的仓库：{what}"
+    if name == "ship_pending_fix":
+        pending = ship.load_pending()
+        preview = ship.preview_text(pending) if pending else "（没找到待部署的改动）"
+        return f"合进 develop 并部署到云上。\n{preview}"
+    shown = "，".join(f"{k}={v}" for k, v in args.items() if v not in (None, ""))
+    return f"{name}（{shown}）"
+
+
+def prompt(approvals: list[dict[str, Any]]) -> str:
+    """待确认时页面上的那段话。"""
+    body = "\n\n".join(describe(a["name"], a.get("arguments") or {}) for a in approvals)
+    return f"{body}\n\n确认就办，取消就不动。"

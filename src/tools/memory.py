@@ -37,22 +37,11 @@ def search_memory(query: str, top: int = 5) -> dict[str, Any]:
     return memory_store.search_facts(query=query, top=top)
 
 
-@function_tool
-def forget_fact(fact_id: str, user_confirmed: bool = False) -> dict[str, Any]:
-    """删除一条长期记忆。必须先 request_user_confirmation，用户同意后
-    以 user_confirmed=True 调用。纠正记忆请用 remember_fact(replaces=...)，不要用这个。
+@function_tool(needs_approval=True)
+def forget_fact(fact_id: str) -> dict[str, Any]:
+    """删除一条长期记忆（系统会先请他确认）。纠正记忆请用 remember_fact(replaces=...)，不要用这个。
 
     Args:
         fact_id: 记忆 id。
-        user_confirmed: 用户是否已确认删除。
     """
-    if not user_confirmed:
-        return {
-            "ok": False,
-            "error": "user_not_confirmed",
-            "message": (
-                "删除记忆需要确认。请先 request_user_confirmation，"
-                "同意后再以 user_confirmed=True 调用。"
-            ),
-        }
     return memory_store.forget_fact(fact_id)

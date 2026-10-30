@@ -13,3 +13,7 @@ os.environ["TASKS_BACKEND"] = "mock"
 os.environ["FRIDAY_ACCESS_TOKEN"] = ""
 os.environ["FRIDAY_URL"] = ""
 os.environ.setdefault("OPENAI_API_KEY", "sk-test-not-used")
+
+from agents import set_tracing_disabled  # noqa: E402
+
+set_tracing_disabled(True)

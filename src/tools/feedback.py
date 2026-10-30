@@ -50,15 +50,13 @@ def resolve_friction(friction_id: str) -> dict[str, Any]:
     return friction.resolve(friction_id)
 
 
-@function_tool
+@function_tool(needs_approval=True)
 def fix_friction_with_cursor(
     friction_id: str = "",
     what: str = "",
     better: str = "",
-    user_confirmed: bool = False,
 ) -> dict[str, Any]:
-    """用 Cursor Agent 改 Friday 的代码。必须先 request_user_confirmation（只问一次），
-    说清要改什么、会动仓库；他点确认后以 user_confirmed=True 调用。
+    """用 Cursor Agent 改 Friday 的代码。直接调用：系统会先请他确认（会动仓库），确认后才开工。
 
     工具会立刻返回「已交给 Cursor」，不要干等几分钟。有 friction_id 就修那条；
     没有就用 what 当场记下再修。
@@ -67,21 +65,10 @@ def fix_friction_with_cursor(
         friction_id: 已有摩擦 id（可选）。
         what: 没有 id 时必填：要改成什么样，一句说清。
         better: 可选，更具体的期望。
-        user_confirmed: 用户是否已确认让 Cursor 改代码。
     """
     fid = (friction_id or "").strip()
     text = (what or "").strip()
     item = next((x for x in friction.open_items(50) if x.get("id") == fid), None) if fid else None
-    label = (item or {}).get("what") or text or fid or "改代码"
-    if not user_confirmed:
-        return {
-            "ok": False,
-            "error": "user_not_confirmed",
-            "message": (
-                "还没确认。请先 request_user_confirmation，说明要用 Cursor 修："
-                f"「{label}」，同意后再以 user_confirmed=True 调用同一参数。"
-            ),
-        }
     if item is None:
         if not text:
             return {
@@ -131,13 +118,9 @@ def preview_pending_ship() -> dict[str, Any]:
     return {"ok": True, "say": refreshed["say"], "files": refreshed.get("files") or []}
 
 
-@function_tool
-def ship_pending_fix(user_confirmed: bool = False) -> dict[str, Any]:
-    """把待部署的 Cursor 改动合进 develop 并部署到云上。必须先确认一次。
-
-    他把「确认部署」或点确认后，以 user_confirmed=True 调用。把返回的 say 原样告诉他。
-
-    Args:
-        user_confirmed: 用户是否已确认合并并部署。
+@function_tool(needs_approval=True)
+def ship_pending_fix() -> dict[str, Any]:
+    """把待部署的 Cursor 改动合进 develop 并部署到云上。直接调用：系统会先把改动给他看，
+    他确认后才合并和部署。把返回的 say 原样告诉他。
     """
-    return ship.ship(user_confirmed=user_confirmed)
+    return ship.ship(user_confirmed=True)

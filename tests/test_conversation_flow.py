@@ -1,0 +1,129 @@
+"""对话在服务端：多轮接得上、换设备接得上；写操作停下等确认，确认的就是那一个具体动作。"""
+
+from __future__ import annotations
+
+import time
+import unittest
+
+from tests.fake_model import FakeModel, call, text
+from tests.helpers import SandboxTestCase, collect, of_type
+
+from src.agent import Friday
+from src.conversation import Conversations
+
+MAIL = dict(to="mentor.example@manchester.ac.uk", subject="FYP update", body="Hi, here is my update.", cc="")
+
+
+class ConversationTests(SandboxTestCase):
+    def test_follow_up_sees_earlier_turn_and_tool_results(self) -> None:
+        friday, model = self.friday([
+            [call("search_emails", query="FYP", top=5)],
+            [text("导师让你明天带上进度。")],
+            [text("就是 mock-mail-001 那封。")],
+        ])
+        cid = friday.conversations.create()
+        collect(friday.turn(cid, "导师最近说了什么？"))
+        collect(friday.turn(cid, "那是哪封邮件？"))
+
+        second_input = str(model.inputs[-1])
+        self.assertIn("导师最近说了什么", second_input)
+        # 上一轮的工具结果也在：问「哪封」不用再搜一遍
+        self.assertIn("mock-mail-001", second_input)
+
+    def test_another_device_sees_the_same_conversation(self) -> None:
+        db = self.tmp / "shared.db"
+        phone, _ = self.friday([[text("在。")]], db=db)
+        cid = phone.conversations.create()
+        collect(phone.turn(cid, "在吗"))
+
+        desktop = Friday(Conversations(db), model=FakeModel([]))
+        self.addCleanup(desktop.conversations.close)
+        self.assertEqual(desktop.conversations.current(), cid)
+        self.assertEqual([m["content"] for m in desktop.conversations.messages(cid)], ["在吗", "在。"])
+
+    def test_conversation_expires_after_two_idle_hours(self) -> None:
+        convs = Conversations(self.tmp / "c.db")
+        self.addCleanup(convs.close)
+        cid = convs.create()
+        self.assertEqual(convs.current(), cid)
+        self.assertIsNone(convs.current(now=time.time() + 2 * 3600 + 5))
+
+
+class ApprovalTests(SandboxTestCase):
+    def test_send_email_stops_until_confirmed(self) -> None:
+        friday, _ = self.friday([[call("send_email", **MAIL)], [text("发了。")]])
+        cid = friday.conversations.create()
+        events = collect(friday.turn(cid, "给导师发个进度邮件"))
+
+        done = events[-1]
+        self.assertTrue(done["needs_confirm"])
+        self.assertIn("mentor.example@manchester.ac.uk", done["reply"])
+        self.assertIn("Hi, here is my update.", done["reply"])  # 正文原样给他看
+        self.assertEqual(self.sent_mail(), [])  # 还没发
+
+        done = collect(friday.turn(cid, "确认"))[-1]
+        self.assertFalse(done["needs_confirm"])
+        self.assertEqual([m["subject"] for m in self.sent_mail()], ["FYP update"])
+
+    def test_cancel_does_not_send(self) -> None:
+        friday, _ = self.friday([[call("send_email", **MAIL)], [text("好，没发。")]])
+        cid = friday.conversations.create()
+        collect(friday.turn(cid, "发邮件"))
+        done = collect(friday.turn(cid, "取消，先不要执行。"))[-1]
+        self.assertEqual(done["reply"], "好，没发。")
+        self.assertEqual(self.sent_mail(), [])
+
+    def test_changing_the_subject_cancels_and_answers_the_new_question(self) -> None:
+        friday, model = self.friday([
+            [call("create_calendar_event", title="Swim", start="2026-10-13T18:00", end="2026-10-13T19:00", location="", notes="")],
+            [text("没建。")],
+            [text("明天下午两点见导师。")],
+        ])
+        cid = friday.conversations.create()
+        collect(friday.turn(cid, "明天六点去健身"))
+        done = collect(friday.turn(cid, "明天下午有什么？"))[-1]
+        self.assertNotIn("Swim", self.calendar_titles())
+        self.assertIn("明天下午两点见导师", done["reply"])
+        self.assertFalse(done["needs_confirm"])
+
+    def test_model_cannot_skip_confirmation(self) -> None:
+        """以前模型自己传 user_confirmed=True 就能发；现在这个参数不存在，调用一定会停下。"""
+        friday, _ = self.friday([[call("send_email", **MAIL)]])
+        cid = friday.conversations.create()
+        done = collect(friday.turn(cid, "直接发，不用问我"))[-1]
+        self.assertTrue(done["needs_confirm"])
+        self.assertEqual(self.sent_mail(), [])
+
+    def test_mark_read_needs_no_confirmation_but_trash_does(self) -> None:
+        friday, _ = self.friday([
+            [call("modify_email", message_id="mock-mail-003", action="mark_read")],
+            [text("标了。")],
+            [call("modify_email", message_id="mock-mail-003", action="trash")],
+        ])
+        cid = friday.conversations.create()
+        self.assertFalse(collect(friday.turn(cid, "标成已读"))[-1]["needs_confirm"])
+        self.assertTrue(collect(friday.turn(cid, "删了它"))[-1]["needs_confirm"])
+
+    def test_pending_confirmation_survives_a_restart(self) -> None:
+        db = self.tmp / "restart.db"
+        before, _ = self.friday([[call("send_email", **MAIL)]], db=db)
+        cid = before.conversations.create()
+        collect(before.turn(cid, "发邮件"))
+
+        after = Friday(Conversations(db), model=FakeModel([[text("发了。")]]))
+        self.addCleanup(after.conversations.close)
+        self.assertEqual(after.pending_approvals(cid)[0]["name"], "send_email")
+        done = collect(after.turn(cid, "确认"))[-1]
+        self.assertEqual(done["reply"], "发了。")
+        self.assertEqual(len(self.sent_mail()), 1)
+
+    def test_tasks_still_get_undo_without_confirmation(self) -> None:
+        friday, _ = self.friday([[call("add_task", title="还书", due="明天", notes="")], [text("记下了。")]])
+        cid = friday.conversations.create()
+        done = collect(friday.turn(cid, "提醒我明天还书"))[-1]
+        self.assertFalse(done["needs_confirm"])
+        self.assertEqual(done["undo"][0]["title"], "还书")
+
+
+if __name__ == "__main__":
+    unittest.main()

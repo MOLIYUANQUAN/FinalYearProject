@@ -1,4 +1,3 @@
-from .approval_tools import request_user_confirmation
 from .calendar import create_calendar_event, get_calendar_events
 from .feedback import (
     check_cursor_fix,
@@ -38,7 +37,6 @@ ALL_TOOLS = [
     check_cursor_fix,
     preview_pending_ship,
     ship_pending_fix,
-    request_user_confirmation,
 ]
 
 __all__ = [
@@ -61,7 +59,6 @@ __all__ = [
     "check_cursor_fix",
     "preview_pending_ship",
     "ship_pending_fix",
-    "request_user_confirmation",
     "add_task",
     "complete_task",
     "ALL_TOOLS",

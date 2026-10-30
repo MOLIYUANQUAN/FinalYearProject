@@ -467,11 +467,8 @@
   </main>
 
   <script>
-    const STORE_KEY = "pa.session.v1";
     const ACCESS_KEY = "pa.access"; // 旧版曾把密码存在本机；登录后清掉
-    const IDLE_MS = 2 * 60 * 60 * 1000;
     const CARD_FRESH_MS = 15 * 60 * 1000;
-    const HISTORY_LIMIT = 20;
     const HINTS = {
       get_calendar_events: "看日历",
       create_calendar_event: "写日历",
@@ -588,15 +585,11 @@
       return false;
     }
 
-    function freshSession() {
-      const now = Date.now();
-      return { startedAt: now, lastActiveAt: now, messages: [] };
-    }
-
-    // 同一天、两小时内回来算同一次会话；否则重新开场
-    function expired(s) {
-      const sameDay = new Date(s.startedAt).toDateString() === new Date().toDateString();
-      return !sameDay || Date.now() - s.lastActiveAt > IDLE_MS;
+    // 对话存在服务端：手机上聊的，电脑上打开也在；同一天两小时内回来算同一次，由服务端判断
+    async function freshSession() {
+      const res = await fetch("/api/conversation/new", { method: "POST", credentials: "include", headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      return { id: data.id || null, messages: [] };
     }
 
     // 只看了开场、还没聊：开场过了一刻钟就换成此刻的
@@ -605,19 +598,31 @@
       return !rest.length && !!first && first.role === "assistant" && Date.now() - (first.at || 0) > CARD_FRESH_MS;
     }
 
-    function loadSession() {
+    function fromServer(m) {
+      return {
+        id: m.id,
+        role: m.role,
+        content: m.content || "",
+        tools: m.tools || [],
+        undo: m.undo || [],
+        undone: !!m.undone,
+        agenda: m.agenda || null,
+        needsConfirm: !!m.needs_confirm,
+        at: m.at || 0,
+      };
+    }
+
+    // 当前这段对话；没有（过期了）就是 null
+    async function loadSession() {
       try {
-        const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
-        if (!s || !Array.isArray(s.messages) || expired(s)) return null;
-        return s;
+        const res = await fetch("/api/conversation", { credentials: "include", headers: authHeaders() });
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (!data.id) return null;
+        return { id: data.id, messages: (data.messages || []).map(fromServer) };
       } catch (e) {
         return null;
       }
-    }
-
-    function saveSession() {
-      session.lastActiveAt = Date.now();
-      try { localStorage.setItem(STORE_KEY, JSON.stringify(session)); } catch (e) {}
     }
 
     function escapeHtml(s) {
@@ -737,7 +742,7 @@
             method: "POST",
             credentials: "include",
             headers: authHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify({ items: m.undo }),
+            body: JSON.stringify({ items: m.undo, message_id: m.id }),
           });
           const data = await res.json().catch(() => ({}));
           if (res.status === 401) {
@@ -746,8 +751,6 @@
           }
           if (!res.ok) throw new Error(data.detail || "没撤销成功。");
           m.undone = true;
-          m.content += "（已撤销）";
-          saveSession();
           bar.replaceChildren(el("span", "hint", "已撤销"));
         } catch (e) {
           bar.replaceChildren(el("span", "hint", (e && e.message) || String(e)));
@@ -764,7 +767,8 @@
     function renderSession() {
       logEl.innerHTML = "";
       session.messages.forEach((m, i) => {
-        const div = addMessage(m.role === "user" ? "user" : "bot", m.agenda ? null : m.content);
+        const shown = m.undone ? m.content + "（已撤销）" : m.content;
+        const div = addMessage(m.role === "user" ? "user" : "bot", m.agenda ? null : shown);
         if (m.agenda) drawToday(div, m.agenda).innerHTML = render(m.content);
         if (m.tools && m.tools.length) addDetails(div, m.tools);
         const last = i === session.messages.length - 1;
@@ -772,11 +776,6 @@
         if (m.undo && m.undo.length && !m.undone && last) addUndo(div, m);
       });
       scrollDown();
-    }
-
-    function awaitingConfirmation() {
-      const last = session.messages[session.messages.length - 1];
-      return !!(last && last.role === "assistant" && last.needsConfirm);
     }
 
     // view.el 是正在写字的位置；开场的卡片到了以后它会换成卡片里那句判断
@@ -813,7 +812,9 @@
           buffer = buffer.slice(cut + 2);
           if (!frame.startsWith("data: ")) continue;
           const ev = JSON.parse(frame.slice(6));
-          if (ev.type === "agenda") {
+          if (ev.type === "conversation") {
+            if (session && ev.id) session.id = ev.id;
+          } else if (ev.type === "agenda") {
             view.onAgenda(ev);
             scrollDown();
           } else if (ev.type === "delta") {
@@ -826,7 +827,13 @@
             if (view.onTool) view.onTool();
             showTyping(view.el, HINTS[ev.name]);
           } else if (ev.type === "done") {
-            result = { reply: ev.reply || text, tools: ev.tools_called || [], undo: ev.undo || [] };
+            result = {
+              reply: ev.reply || text,
+              tools: ev.tools_called || [],
+              undo: ev.undo || [],
+              needsConfirm: !!ev.needs_confirm,
+              id: ev.message_id,
+            };
           } else if (ev.type === "error") {
             throw new Error(ev.message);
           }
@@ -836,15 +843,14 @@
       return result;
     }
 
-    function finish(div, reply, tools, undo = []) {
+    function finish(div, result) {
+      const { reply, tools = [], undo = [], needsConfirm = false, id } = result;
       div.innerHTML = render(reply);
-      const needsConfirm = tools.includes("request_user_confirmation");
-      const m = { role: "assistant", content: reply, tools, needsConfirm, undo };
+      const m = { id, role: "assistant", content: reply, tools, needsConfirm, undo, at: Date.now() };
       if (tools.length) addDetails(div, tools);
       if (needsConfirm) addConfirm(div);
       if (undo.length) addUndo(div, m);
       session.messages.push(m);
-      saveSession();
       scrollDown();
     }
 
@@ -1226,14 +1232,13 @@
         },
       };
       try {
-        const { reply } = await stream("/api/presence/stream", {}, view);
+        const result = await stream("/api/presence/stream", { conversation_id: session.id }, view);
         if (!view.card) {
-          finish(div, reply, []);
+          finish(div, result);
           return;
         }
-        view.el.innerHTML = render(reply);
-        session.messages.push({ role: "assistant", content: reply, tools: [], agenda: view.card, at: Date.now() });
-        saveSession();
+        view.el.innerHTML = render(result.reply);
+        session.messages.push({ id: result.id, role: "assistant", content: result.reply, tools: [], agenda: view.card, at: Date.now() });
         scrollDown();
       } catch (e) {
         if (!view.card) {
@@ -1244,7 +1249,6 @@
         view.el.classList.add("failed");
         view.el.textContent = (e && e.message) || String(e);
         session.messages.push({ role: "assistant", content: "", tools: [], agenda: view.card, at: Date.now() });
-        saveSession();
       } finally {
         setBusy(false);
         input.focus();
@@ -1255,20 +1259,27 @@
       stopSpeaking();
       settleOrb();
       setBusy(true);
-      session = freshSession();
-      saveSession();
       logEl.innerHTML = "";
       ready = await checkHealth();
+      session = ready ? await freshSession() : { id: null, messages: [] };
       setBusy(false);
       if (ready) await presence();
     }
 
-    // 叫回窗口：光标回到输入框；放久了，开场换成此刻的；否则趁他打字先把日历读好
+    // 叫回窗口：光标回到输入框；对话过期了或开场放久了，重新开场；
+    // 别的设备上接着聊过，就把那几句也显示出来；否则趁他打字先把日历读好
     async function onReturn() {
       if (document.visibilityState !== "visible" || busy || !session) return;
       input.focus();
-      if (!ready || expired(session) || onlyStaleOpener(session)) await startOver();
-      else fetch("/api/calendar/warm", { method: "POST", credentials: "include", headers: authHeaders() }).catch(() => {});
+      if (!ready) return startOver();
+      const latest = await loadSession();
+      if (busy) return;
+      if (!latest || latest.id !== session.id || onlyStaleOpener(latest)) return startOver();
+      if (latest.messages.length !== session.messages.length) {
+        session = latest;
+        renderSession();
+      }
+      fetch("/api/calendar/warm", { method: "POST", credentials: "include", headers: authHeaders() }).catch(() => {});
     }
 
     // 他打字说「听听你的声音」也要念出来，不只点「说」才开口
@@ -1284,14 +1295,8 @@
       if (!speaker) settleOrb();
       setBusy(true);
       clearActions();
-      const pending = awaitingConfirmation();
-      const history = session.messages
-        .filter((m) => m.content && m.content.trim())
-        .slice(-HISTORY_LIMIT)
-        .map((m) => ({ role: m.role, content: m.content }));
       addMessage("user", message);
-      session.messages.push({ role: "user", content: message });
-      saveSession();
+      session.messages.push({ role: "user", content: message, at: Date.now() });
       const div = addMessage("bot");
       showTyping(div);
       const view = { el: div };
@@ -1300,13 +1305,13 @@
         view.onTool = () => speaker.reset();
       }
       try {
-        const { reply, tools, undo } = await stream(
+        const result = await stream(
           "/api/chat/stream",
-          { message, history, pending_confirmation: pending, spoken: !!speaker },
+          { message, conversation_id: session.id, spoken: !!speaker },
           view,
         );
-        finish(div, reply, tools, undo);
-        if (speaker) speaker.end(reply);
+        finish(div, result);
+        if (speaker) speaker.end(result.reply);
       } catch (e) {
         const raw = (e && e.message) || String(e);
         const network =
@@ -1403,11 +1408,11 @@
     window.addEventListener("focus", onReturn);
 
     (async () => {
-      session = loadSession();
+      ready = await checkHealth();
+      session = ready ? await loadSession() : null;
       if (session && session.messages.length && !onlyStaleOpener(session)) {
         renderSession();
-        ready = await checkHealth();
-        if (ready) input.focus();
+        input.focus();
       } else {
         await startOver();
       }

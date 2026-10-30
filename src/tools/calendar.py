@@ -51,17 +51,15 @@ def get_calendar_events(
     return query_calendar_events(date=date, time_of_day=time_of_day, days=days)
 
 
-@function_tool
+@function_tool(needs_approval=True)
 def create_calendar_event(
     title: str,
     start: str,
     end: str,
     location: str = "",
     notes: str = "",
-    user_confirmed: bool = False,
 ) -> dict[str, Any]:
-    """在日历中创建事件。必须先 request_user_confirmation，且仅当用户明确同意后
-    才能以 user_confirmed=True 调用。
+    """在日历中创建事件。直接调用：系统会先把要建的事给他看，他确认后才真的创建。
 
     Args:
         title: 事件标题。
@@ -69,18 +67,7 @@ def create_calendar_event(
         end: 结束时间 ISO，建议 YYYY-MM-DDTHH:MM。
         location: 可选地点。
         notes: 可选备注。
-        user_confirmed: 用户是否已在本对话中明确确认创建。未确认必须为 False。
     """
-    if not user_confirmed:
-        return {
-            "ok": False,
-            "error": "user_not_confirmed",
-            "message": (
-                "尚未获得用户确认。请先调用 request_user_confirmation，"
-                "向用户展示计划，待用户明确同意后再以 user_confirmed=True 调用。"
-            ),
-        }
-
     provider = get_calendar_provider()
     create = getattr(provider, "create_event", None)
     if create is None:

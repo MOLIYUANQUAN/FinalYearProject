@@ -378,7 +378,7 @@ def ship(*, user_confirmed: bool) -> dict[str, Any]:
         return {
             "ok": False,
             "error": "user_not_confirmed",
-            "message": "还没确认。请先 request_user_confirmation，说明要合并并部署到云上。",
+            "message": "还没确认：合并并部署要他先点确认。",
             "preview": preview_text(pending) if pending else "",
         }
     pending = load_or_recover_pending()

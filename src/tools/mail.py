@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from agents import function_tool
 
+from src.approval import mail_change_needs_approval
 from src.mail_providers import get_mail_provider
 
 ModifyAction = Literal["mark_read", "mark_unread", "archive", "trash"]
@@ -32,33 +33,21 @@ def read_email(message_id: str) -> dict[str, Any]:
     return get_mail_provider().get_message(message_id)
 
 
-@function_tool
+@function_tool(needs_approval=True)
 def send_email(
     to: str,
     subject: str,
     body: str,
     cc: str = "",
-    user_confirmed: bool = False,
 ) -> dict[str, Any]:
-    """发送一封新邮件。必须先 request_user_confirmation，用户明确同意后
-    才能以 user_confirmed=True 调用。
+    """发送一封新邮件。直接调用：系统会先把收件人、主题和正文给他看，他确认后才真的发。
 
     Args:
         to: 收件人邮箱。
         subject: 主题。
         body: 正文（纯文本）。
         cc: 可选抄送，逗号分隔。
-        user_confirmed: 用户是否已确认发送。
     """
-    if not user_confirmed:
-        return {
-            "ok": False,
-            "error": "user_not_confirmed",
-            "message": (
-                "尚未获得用户确认。请先 request_user_confirmation，"
-                "展示收件人/主题/正文摘要，待同意后再以 user_confirmed=True 调用。"
-            ),
-        }
     provider = get_mail_provider()
     send = getattr(provider, "send_message", None)
     if send is None:
@@ -69,31 +58,19 @@ def send_email(
         return {"ok": False, "error": "send_failed", "message": str(exc)}
 
 
-@function_tool
+@function_tool(needs_approval=mail_change_needs_approval)
 def modify_email(
     message_id: str,
     action: ModifyAction,
-    user_confirmed: bool = False,
 ) -> dict[str, Any]:
     """修改邮件状态：标记已读/未读、归档、移到垃圾桶。
 
-    mark_read / mark_unread 可直接执行；archive / trash 必须先确认且 user_confirmed=True。
+    mark_read / mark_unread 直接执行；archive / trash 系统会先请他确认。
 
     Args:
         message_id: 邮件 ID。
         action: mark_read | mark_unread | archive | trash
-        user_confirmed: archive/trash 时必须为 True。
     """
-    if action in {"archive", "trash"} and not user_confirmed:
-        return {
-            "ok": False,
-            "error": "user_not_confirmed",
-            "message": (
-                f"动作 {action} 需要确认。请先 request_user_confirmation，"
-                "同意后再以 user_confirmed=True 调用。"
-            ),
-        }
-
     add: list[str] = []
     remove: list[str] = []
     if action == "mark_read":

@@ -22,7 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src import agenda, todos, usage_log, voice
-from src.agent import run_assistant, stream_assistant
+from src.agent import friday, run_assistant
 from src.presence import stream_presence
 from src.access import gate, router as access_router
 from src.state_sync import router as state_router
@@ -97,27 +97,25 @@ app.include_router(access_router)
 app.include_router(state_router)
 
 
-class ChatTurn(BaseModel):
-    role: str = Field(..., pattern="^(user|assistant)$")
-    content: str = Field(..., min_length=1)
-
-
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, description="用户自然语言输入")
-    history: list[ChatTurn] = Field(
-        default_factory=list,
-        description="本次会话此前的对话（不含本轮 message）",
-    )
-    pending_confirmation: bool = Field(
-        False,
-        description="上一轮是否在等他确认写操作；只有这时「确认/好的」才算同意",
+    conversation_id: str | None = Field(
+        None,
+        max_length=64,
+        description="页面上这段对话的 id；没有或过期了就接上当前对话 / 开新的。历史在服务端，不用传。",
     )
     spoken: bool = Field(False, description="他是开口说的：回答会被念出来")
+
+
+class PresenceRequest(BaseModel):
+    conversation_id: str | None = Field(None, max_length=64)
 
 
 class ChatResponse(BaseModel):
     reply: str
     tools_called: list[str]
+    needs_confirm: bool = False
+    conversation_id: str = ""
     calendar_backend: str = "mock"
     effective_today: str = ""
     effective_tomorrow: str = ""
@@ -179,13 +177,11 @@ def _require_key() -> None:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-def _parse_chat(body: ChatRequest) -> tuple[str, list[dict[str, str]]]:
+def _parse_chat(body: ChatRequest) -> str:
     message = body.message.strip()
     if not message:
         raise HTTPException(status_code=400, detail="消息不能为空")
-    history = [{"role": t.role, "content": t.content.strip()} for t in body.history]
-    # 限制历史长度，避免上下文过长
-    return message, history[-20:]
+    return message
 
 
 def _sse(kind: str, events: AsyncIterator[dict[str, Any]]) -> StreamingResponse:
@@ -224,11 +220,40 @@ def _sse(kind: str, events: AsyncIterator[dict[str, Any]]) -> StreamingResponse:
     )
 
 
+@app.get("/api/conversation")
+def conversation_current() -> dict:
+    """页面打开时：接上当前这段对话（手机上聊的，电脑上也看得到）；过期了就是空的。"""
+    cid = friday.conversations.current()
+    if not cid:
+        return {"id": None, "messages": []}
+    messages = friday.conversations.messages(cid)
+    # 待确认的那一步如果已经没了（比如很久以前的），按钮就别再显示
+    if messages and messages[-1].get("needs_confirm") and not friday.pending_approvals(cid):
+        messages[-1]["needs_confirm"] = False
+    return {"id": cid, "messages": messages}
+
+
+@app.post("/api/conversation/new")
+def conversation_new() -> dict:
+    return {"id": friday.conversations.create()}
+
+
+async def _presence_events(cid: str) -> AsyncIterator[dict[str, Any]]:
+    card: dict[str, Any] | None = None
+    async for event in stream_presence():
+        if event["type"] == "agenda":
+            card = {k: v for k, v in event.items() if k != "type"}
+        if event["type"] == "done":
+            event = {**event, "message_id": await friday.record_opener(cid, event.get("reply") or "", card)}
+        yield event
+
+
 @app.post("/api/presence/stream")
-async def presence_stream() -> StreamingResponse:
-    """打开时的「今天」：真实日历排成的卡片，加一句此刻最该知道的话。"""
+async def presence_stream(body: PresenceRequest | None = None) -> StreamingResponse:
+    """打开时的「今天」：真实日历排成的卡片，加一句此刻最该知道的话。也记进这段对话。"""
     _require_key()
-    return _sse("presence", stream_presence())
+    cid = friday.resolve_conversation(body.conversation_id if body else None)
+    return _sse("presence", _presence_events(cid))
 
 
 @app.post("/api/calendar/warm", status_code=204)
@@ -246,6 +271,7 @@ class UndoItem(BaseModel):
 
 class UndoRequest(BaseModel):
     items: list[UndoItem] = Field(..., min_length=1)
+    message_id: int | None = Field(None, description="对话里那条消息：撤销后标上「已撤销」，换设备也看得到")
 
 
 @app.post("/api/undo")
@@ -256,41 +282,34 @@ def undo(body: UndoRequest) -> dict:
     except Exception as exc:  # noqa: BLE001
         reason = str(exc).splitlines()[0] if isinstance(exc, RuntimeError) else "待办这次没连上"
         raise HTTPException(status_code=502, detail=f"没撤销成功：{reason}") from exc
+    if body.message_id is not None:
+        friday.conversations.update_message(body.message_id, undone=True)
     return {"ok": True}
 
 
 @app.post("/api/chat/stream")
 async def chat_stream(body: ChatRequest) -> StreamingResponse:
     _require_key()
-    message, history = _parse_chat(body)
-    return _sse(
-        "chat",
-        stream_assistant(
-            message,
-            history=history,
-            pending_confirmation=body.pending_confirmation,
-            spoken=body.spoken,
-        ),
-    )
+    message = _parse_chat(body)
+    cid = friday.resolve_conversation(body.conversation_id)
+    return _sse("chat", friday.turn(cid, message, spoken=body.spoken))
 
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(body: ChatRequest) -> ChatResponse:
     """非流式版本，供 CLI / 评测脚本使用。"""
     _require_key()
-    message, history = _parse_chat(body)
+    message = _parse_chat(body)
     try:
-        result = await run_assistant(
-            message,
-            history=history,
-            pending_confirmation=body.pending_confirmation,
-        )
+        result = await run_assistant(message, conversation_id=body.conversation_id)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"助手运行失败: {exc}") from exc
 
     return ChatResponse(
         reply=result["reply"],
         tools_called=result["tools_called"],
+        needs_confirm=result["needs_confirm"],
+        conversation_id=result["conversation_id"],
         calendar_backend=get_calendar_backend(),
         effective_today=effective_today(),
         effective_tomorrow=effective_tomorrow(),
