@@ -1000,6 +1000,8 @@
     // 她说错了：点一下就记进错误清单（附上问题和工具），之后补一条测试；Tuesday test 里数「说错几次」
     function addWrong(div, m) {
       if (!m.id) return;
+      // 只在最新一条回复下面留着；点过的（已记下）保留
+      logEl.querySelectorAll(".wrong:not([disabled])").forEach((b) => b.remove());
       const b = el("button", "wrong", m.wrong ? "已记下" : "说错了");
       b.type = "button";
       b.disabled = !!m.wrong;

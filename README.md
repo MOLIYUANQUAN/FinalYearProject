@@ -93,6 +93,49 @@ Turning it on:
 
 Opening a notification is counted in the usage log, so `usage_report.py` shows whether nudges are worth it.
 
+## Engineering line
+
+With `GITHUB_TOKEN` on Fly, the workbench also shows his engineering work:
+
+- **需要你:**
+  - a Cursor change that is ready ("上线" → "确认上线", or "看改动");
+  - a red `develop` ("交给 Cursor 修", "看日志").
+- **在跑的:** Cursor working, a deploy in progress, open non-draft PRs, and which commit is live. The section is hidden when nothing is moving.
+- **Pushes:**
+  - "Cursor 改好了";
+  - "上线了", sent once the new commit is actually serving;
+  - "develop 测试红了".
+
+  The first two answer something he started, so they ignore the daily quota and quiet hours.
+
+Shipping still goes through the test gate: a change whose tests fail is not merged.
+
+## Hand it to Friday from anywhere
+
+- **"嘿 Siri，告诉 Friday":**
+  - An iOS Shortcut posts a sentence to `/api/capture`.
+  - Friday handles it in the current conversation and answers in plain text that Siri reads aloud.
+  - Writes that need a look are not read out ("打开 Friday 看一眼，点确认就办").
+  - Setup takes two minutes at `/siri`. The token there only opens `/api/capture` and can be rotated.
+- **Share sheet:** a second Shortcut, "交给 Friday", sends whatever is shared.
+- **Voice in the app:** hold the mic and release to send, or tap and Friday sends after 1.4 s of silence.
+
+## Automatic test and deploy
+
+Run this once:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\connect_github_fly.py
+```
+
+It puts a Fly deploy token into GitHub Secrets (`FLY_API_TOKEN`) and a GitHub token onto Fly (`GITHUB_TOKEN`). It is fully automatic with the GitHub CLI; without it, you paste twice.
+
+After that, every push to `develop`:
+
+1. runs the offline tests;
+2. deploys to Fly;
+3. waits until `/api/health` reports exactly that commit (`git_sha`).
+
 **Confirmation is enforced in code, not in the prompt.** Outward or destructive tools are registered with the Agents SDK's `needs_approval`, so the run pauses before they execute. The server writes out exactly what will happen (recipient, subject, body, time, changed files), and only an explicit yes ("确认", "好的", "发吧", the Confirm button…) resumes that exact action. "取消" or anything else cancels it. The paused step is saved to disk, so a restart in between does not lose it. For mail, "改一下" lets him edit the subject and body in the card. Friday must re-issue the call with exactly the edited text before it is sent; if anything differs, he is asked again.
 
 Every reply has a small **说错了** ("that's wrong") button. One tap records the question, the answer and the tools used in `mistakes.jsonl`, and `usage_report.py` counts them per day. The target is zero.
@@ -210,7 +253,6 @@ Then follow Environment → API key → Open above. Details in [docs/baseline-v1
    Input: `帮我准备明天的 FYP meeting。`  
    Expected: calendar first, then files; outputs a meeting brief (time and place, project summary, discussion points).
 
-The page shows which tools were used under each reply ("细节").
 
 ## Repository layout
 
