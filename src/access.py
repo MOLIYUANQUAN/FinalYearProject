@@ -24,6 +24,7 @@ PUBLIC_PATHS = {
     "/api/logout",
     "/api/session",
     "/sw.js",  # Service Worker 脚本本身不含数据；推送、订阅接口仍要登录
+    "/siri",  # 设置说明页本身不含数据；令牌要登录后才取得到
 }
 
 COOKIE_NAME = "friday_session"
@@ -95,6 +96,12 @@ async def gate(request: Request, call_next: Any) -> Response:
         return await call_next(request)
     if authorized(request):
         return await call_next(request)
+    if path == "/api/capture":
+        # 快捷指令用自己的令牌，只能进这一个口
+        from src.capture import capture_authorized
+
+        if capture_authorized(request):
+            return await call_next(request)
     return JSONResponse(
         {"detail": "需要登录：在本页输入密码，或用桌面快捷方式打开。"},
         status_code=401,

@@ -364,6 +364,7 @@
       font-size: 0.85rem;
       color: var(--muted);
     }
+    .push-offer a { color: var(--ink); text-underline-offset: 3px; }
     .push-offer button {
       font: inherit;
       font-size: 0.8rem;
@@ -414,6 +415,10 @@
       white-space: nowrap;
     }
     #mic {
+      /* 按住说话：长按不要弹出选字、放大镜 */
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
       position: relative;
       background: transparent;
       color: var(--ink);
@@ -852,16 +857,6 @@
       return foot;
     }
 
-    function addDetails(div, tools) {
-      const d = document.createElement("details");
-      d.className = "details";
-      const s = document.createElement("summary");
-      s.textContent = "细节";
-      const body = document.createElement("div");
-      body.textContent = tools.join(" → ");
-      d.append(s, body);
-      footOf(div).appendChild(d);
-    }
 
     // ---- 来找你：iPhone 主屏幕上的 Friday、电脑上的 Friday 窗口都能收到她主动发的提醒 ----
     const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
@@ -915,7 +910,10 @@
         });
         if (!res.ok) throw new Error("没订上，再点一次。");
         await fetch("/api/push/test", { method: "POST", credentials: "include", headers: authHeaders() });
-        say("好了。早上开工、要紧的会之前、截止没划掉的时候，我会来找你。");
+        line.replaceChildren(
+          el("span", "", "好了，我会来找你。不打开我也能交代事："),
+          Object.assign(el("a", "", "设置「嘿 Siri，告诉 Friday」"), { href: "/siri" }),
+        );
       } catch (e) {
         say((e && e.message) || "没订上，再点一次。");
       }
@@ -923,7 +921,7 @@
 
     // 开场卡片下面：这台设备还没订上，就问一句
     async function offerPush(div) {
-      if (await pushSubscribed()) return;
+      if (await pushSubscribed()) return offerSiri(div);
       const line = el("div", "push-offer");
       if (isIOS && !standalone) {
         line.append(el("span", "", "想让我主动找你：在 Safari 点「分享 → 添加到主屏幕」，再从主屏幕打开我。"));
@@ -935,6 +933,20 @@
         b.onclick = () => enablePush(line);
         line.append(el("span", "", "想让我主动来找你？"), b);
       }
+      div.appendChild(line);
+    }
+
+    // 提醒开好了、Siri 还没用过：开场卡片下面提一句，用过一次就再也不出现
+    async function offerSiri(div) {
+      if (!isIOS) return;
+      try {
+        const data = await (await fetch("/api/capture/setup", { credentials: "include" })).json();
+        if (data.used_at) return;
+      } catch (e) {
+        return;
+      }
+      const line = el("div", "push-offer");
+      line.append(el("span", "", "不打开我也能交代事："), Object.assign(el("a", "", "嘿 Siri，告诉 Friday"), { href: "/siri" }));
       div.appendChild(line);
     }
 
@@ -1110,7 +1122,6 @@
         const shown = m.undone ? m.content + "（已撤销）" : m.content;
         const div = addMessage(m.role === "user" ? "user" : "bot", m.agenda ? null : shown);
         if (m.agenda) drawToday(div, m.agenda).innerHTML = render(m.content);
-        if (m.tools && m.tools.length) addDetails(div, m.tools);
         if (m.role === "assistant") addWrong(div, m);
         const last = i === session.messages.length - 1;
         if (m.needsConfirm && last) addConfirm(div, m);
@@ -1189,7 +1200,6 @@
       const { reply, tools = [], undo = [], needsConfirm = false, approvals = [], id } = result;
       div.innerHTML = render(reply);
       const m = { id, role: "assistant", content: reply, tools, needsConfirm, approvals, undo, at: Date.now() };
-      if (tools.length) addDetails(div, tools);
       addWrong(div, m);
       if (needsConfirm) addConfirm(div, m);
       if (undo.length) addUndo(div, m);
@@ -1453,7 +1463,7 @@
     function setRecording(on) {
       micBtn.classList.toggle("recording", !!on);
       micBtn.textContent = on ? "完" : "说";
-      micBtn.title = on ? "说完了，点一下发送" : "点一下开始说，再说完点一下";
+      micBtn.title = on ? "说完停一下就发，或者点一下" : "按住说话，松手发送";
       sendBtn.disabled = !!on || busy;
     }
 
@@ -1501,12 +1511,36 @@
       mediaRecorder.start();
       setRecording(true);
       orbSet("listening");
+      watchSilence();
       recordTimer = setTimeout(() => {
         if (mediaRecorder && mediaRecorder.state === "recording") stopRecordingAndSend();
       }, RECORD_MAX_MS);
     }
 
+    // 点一下开始的那种：听到他说话以后，安静 1.4 秒就当说完了（按住的那种松手才发）
+    const SILENCE_MS = 1400;
+    let silenceTimer = 0;
+    function watchSilence() {
+      clearInterval(silenceTimer);
+      if (!micAnalyser) return;
+      let heard = false;
+      let quietSince = 0;
+      silenceTimer = setInterval(() => {
+        if (!recordingNow()) return clearInterval(silenceTimer);
+        if (pressAt) return; // 还按着：等他松手
+        const level = micLevel();
+        if (level > 0.2) {
+          heard = true;
+          quietSince = 0;
+        } else if (heard) {
+          quietSince = quietSince || Date.now();
+          if (Date.now() - quietSince > SILENCE_MS) stopRecordingAndSend();
+        }
+      }, 100);
+    }
+
     function stopRecordingAndSend() {
+      clearInterval(silenceTimer);
       if (!mediaRecorder || mediaRecorder.state !== "recording") return;
       const recorder = mediaRecorder;
       const mime = recorder.mimeType || "audio/webm";
@@ -1710,7 +1744,29 @@
       ask(message);
     });
 
-    micBtn.addEventListener("click", () => { toggleMic(); });
+    // 说话：按住说、松手就发；或者点一下开始，说完停一会儿自己发（也可以再点一下）
+    const HOLD_MS = 350;
+    let pressAt = 0;
+    const recordingNow = () => !!(mediaRecorder && mediaRecorder.state === "recording");
+    micBtn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      if (recordingNow()) {
+        stopRecordingAndSend();
+        return;
+      }
+      pressAt = Date.now();
+      toggleMic();
+    });
+    const release = () => {
+      const held = pressAt && Date.now() - pressAt > HOLD_MS;
+      pressAt = 0;
+      if (held && recordingNow()) stopRecordingAndSend();
+    };
+    micBtn.addEventListener("pointerup", release);
+    micBtn.addEventListener("pointercancel", release);
+    micBtn.addEventListener("contextmenu", (e) => e.preventDefault());
+    // 键盘（Enter / 空格）没有 pointer 事件，照旧点一下开、再点一下发
+    micBtn.addEventListener("click", (e) => { if (e.detail === 0) toggleMic(); });
 
     orbEl.addEventListener("click", () => {
       if (orbState === "listening") stopRecordingAndSend();
