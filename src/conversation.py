@@ -117,13 +117,6 @@ class Conversations:
             )
             self._conn.commit()
 
-    def conversation_of(self, message_id: int) -> str | None:
-        with self._lock:
-            row = self._conn.execute(
-                "SELECT conversation_id FROM conversation_messages WHERE id = ?", (message_id,)
-            ).fetchone()
-        return row["conversation_id"] if row else None
-
     def messages(self, cid: str) -> list[dict[str, Any]]:
         with self._lock:
             rows = self._conn.execute(

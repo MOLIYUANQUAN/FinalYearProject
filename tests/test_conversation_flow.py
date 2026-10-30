@@ -125,6 +125,25 @@ class ApprovalTests(SandboxTestCase):
         self.assertEqual(done["undo"][0]["title"], "还书")
 
 
+class MistakeTests(SandboxTestCase):
+    def test_saying_wrong_is_enough_to_count_a_mistake(self) -> None:
+        """没有「说错了」按钮：他说一句「不对」，她改正并记下，说错的账照样数得出来。"""
+        from src import mistakes
+
+        mistakes.MISTAKES_PATH.unlink(missing_ok=True)
+        self.addCleanup(mistakes.MISTAKES_PATH.unlink, missing_ok=True)
+        friday, _ = self.friday([
+            [text("明天下午有实验课。")],
+            [call("note_mistake", said="明天下午有实验课", correct="明天下午是见导师")],
+            [text("对，是见导师。记下了。")],
+        ])
+        cid = friday.conversations.create()
+        collect(friday.turn(cid, "明天下午有什么"))
+        collect(friday.turn(cid, "不对，是见导师"))
+        item = mistakes.all_items()[-1]
+        self.assertEqual((item["said"], item["note"]), ("明天下午有实验课", "明天下午是见导师"))
+
+
 class SelfOnlyAndEditTests(SandboxTestCase):
     EVENT = dict(title="写报告", start="2026-10-15T14:00", end="2026-10-15T16:00", location="", notes="")
 

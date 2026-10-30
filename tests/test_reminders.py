@@ -119,13 +119,44 @@ class Flow(SandboxTestCase):
         self.assertEqual(self.tick(datetime(2026, 10, 30, 16, 0)), [])
         self.assertEqual(reminders.pending(), [])
 
-    def test_the_evening_before_a_deadline(self) -> None:
-        push.subscribe(SUB, "iPhone")
-        tasks = [{"id": "t", "title": "交 Lab 3", "due": "2026-10-31"}]
-        sent = self.tick(datetime(2026, 10, 30, 20, 5), tasks)
-        self.assertEqual([n["kind"] for n in sent], ["eve"])
-        self.assertIn("明天截止：交 Lab 3", self.sent[0]["body"].replace(" ", " "))
+    def test_wrap_up_closes_the_day_and_names_tomorrows_deadline(self) -> None:
+        from src import closed
 
+        closed.CLOSED_PATH.unlink(missing_ok=True)
+        self.addCleanup(closed.CLOSED_PATH.unlink, missing_ok=True)
+        push.subscribe(SUB, "iPhone")
+        with patch("src.closed.effective_now", return_value=datetime(2026, 10, 30, 15, 0)):
+            closed.record("task", "交 Lab 2", ref="task:a")
+            closed.record("ship", "开场不再催", ref="")
+        tasks = [{"id": "t", "title": "交 Lab 3", "due": "2026-10-31"}, {"id": "u", "title": "回导师", "due": "2026-10-30"}]
+        self.assertEqual([n["kind"] for n in self.tick(datetime(2026, 10, 30, 20, 30), tasks)], ["due"])  # 收工要等九点
+        sent = self.tick(datetime(2026, 10, 30, 21, 5), tasks)
+        self.assertEqual([n["kind"] for n in sent], ["wrap"])
+        body = self.sent[0]["body"].replace("\u00a0", " ")
+        self.assertIn("今天替你关掉了 2 件：交 Lab 2、开场不再催。", body)
+        self.assertIn("还没做完：回导师。", body)
+        self.assertIn("明天截止：交 Lab 3。", body)
+
+    def test_sunday_adds_the_week(self) -> None:
+        from src import closed
+
+        closed.CLOSED_PATH.unlink(missing_ok=True)
+        self.addCleanup(closed.CLOSED_PATH.unlink, missing_ok=True)
+        push.subscribe(SUB, "iPhone")
+        for when in (datetime(2026, 10, 26, 12), datetime(2026, 10, 28, 12), datetime(2026, 11, 1, 12)):  # 周一、周三、周日
+            with patch("src.closed.effective_now", return_value=when):
+                closed.record("task", f"事 {when.day}", ref=f"task:{when.day}")
+        self.tick(datetime(2026, 11, 1, 21, 5), [{"id": "x", "title": "周一的事", "due": "2026-11-02"}])
+        self.assertIn("这周替你关掉了 3 件。", self.sent[0]["body"].replace("\u00a0", " "))
+
+    def test_undo_takes_it_off_the_count(self) -> None:
+        from src import closed
+
+        closed.CLOSED_PATH.unlink(missing_ok=True)
+        self.addCleanup(closed.CLOSED_PATH.unlink, missing_ok=True)
+        closed.record("task", "交 Lab 2", ref="task:a")
+        closed.remove("task:a")
+        self.assertEqual(closed.on_day(closed.effective_now().date()), [])
 
 if __name__ == "__main__":
     unittest.main()

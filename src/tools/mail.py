@@ -53,9 +53,14 @@ def send_email(
     if send is None:
         return {"ok": False, "error": "send_not_supported", "source": provider.name}
     try:
-        return send(to=to, subject=subject, body=body, cc=cc)
+        sent = send(to=to, subject=subject, body=body, cc=cc)
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": "send_failed", "message": str(exc)}
+    if sent.get("ok"):
+        from src import closed
+
+        closed.record("mail", f"发给 {to}：{subject}")
+    return sent
 
 
 @function_tool(needs_approval=mail_change_needs_approval)

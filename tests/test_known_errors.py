@@ -132,7 +132,7 @@ class WriteGuards(unittest.TestCase):
         # 只给他自己的：直接做、给撤销（待办、自己的日程），或说一句就能纠正（记忆、摩擦）
         unguarded_writes = {
             "add_task", "complete_task", "create_calendar_event", "remind_me", "cancel_reminder",
-            "remember_fact", "note_friction", "resolve_friction",
+            "remember_fact", "note_friction", "note_mistake", "resolve_friction",
         }
         for tool in ALL_TOOLS + TASK_TOOLS:
             if tool.name in unguarded_writes or tool.name in WRITE_TOOLS:

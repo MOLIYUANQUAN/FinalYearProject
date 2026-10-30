@@ -8,7 +8,7 @@ from typing import Any
 
 from agents import RunContextWrapper, function_tool
 
-from src import todos
+from src import closed, todos
 from src.config import effective_now
 from src.tasks_providers import get_tasks_provider
 from src.turn import Turn
@@ -93,5 +93,6 @@ def complete_task(ctx: RunContextWrapper[Any], which: str) -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": "complete_failed", "message": _reason(exc)}
     todos.forget()
+    closed.record("task", task["title"], ref=f"task:{task['id']}")
     _offer_undo(ctx, {"kind": "task_completed", "id": task["id"], "title": task["title"]})
     return {"ok": True, "title": task["title"], "say": f"划掉了：{task['title']}。"}

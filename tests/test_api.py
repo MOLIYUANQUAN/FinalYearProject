@@ -12,7 +12,6 @@ from tests.fake_model import call, text
 from tests.helpers import SandboxTestCase
 
 import src.main as main
-from src import mistakes
 
 
 def sse(response) -> list[dict]:
@@ -52,19 +51,6 @@ class ApiTests(SandboxTestCase):
         last = self.client.get("/api/conversation").json()["messages"][-1]
         self.assertTrue(last["needs_confirm"])
         self.assertIn("a@b.c", last["content"])
-
-    def test_wrong_button_records_question_and_answer(self) -> None:
-        self.use([[text("明天有实验课。")]])
-        mistakes.MISTAKES_PATH.unlink(missing_ok=True)
-        cid = self.client.post("/api/conversation/new").json()["id"]
-        done = sse(self.client.post("/api/chat/stream", json={"message": "明天有什么课", "conversation_id": cid}))[-1]
-
-        self.assertTrue(self.client.post("/api/wrong", json={"message_id": done["message_id"]}).json()["ok"])
-        item = mistakes.all_items()[-1]
-        self.assertEqual((item["asked"], item["said"]), ("明天有什么课", "明天有实验课。"))
-        self.assertTrue(self.client.get("/api/conversation").json()["messages"][-1]["wrong"])
-        self.assertEqual(self.client.post("/api/wrong", json={"message_id": 999999}).status_code, 404)
-
 
     def test_revise_only_while_waiting_and_only_subject_or_body(self) -> None:
         self.use([[call("send_email", to="a@b.c", subject="hi", body="hello", cc="")], [call("send_email", to="a@b.c", subject="hi", body="hello!!", cc="")], [text("发了。")]])

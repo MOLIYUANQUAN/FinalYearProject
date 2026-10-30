@@ -332,58 +332,6 @@
     }
     .details summary::-webkit-details-marker { display: none; }
     .details summary:hover { opacity: 1; color: var(--ink); }
-    /* 「说错了」：和「细节」一样不抢眼；点一下记进错误清单，不经过模型 */
-    .wrong {
-      display: block;
-      margin-top: 8px;
-      padding: 0;
-      border: 0;
-      background: none;
-      font-family: var(--mono);
-      font-size: 0.7rem;
-      color: var(--muted);
-      opacity: 0.4;
-      cursor: pointer;
-    }
-    .wrong:hover { opacity: 1; color: var(--ink); }
-    /* 「来找你」：开场卡片下面一行，订阅过就不再出现 */
-    /* 确认卡片里改邮件 */
-    .editor { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
-    .editor input, .editor textarea {
-      font: inherit;
-      font-size: 0.95rem;
-      padding: 8px 10px;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      background: var(--bg);
-      color: var(--ink);
-      resize: vertical;
-    }
-    .editor .actions { margin-top: 0; }
-    .editor .hint { margin-left: 0; }
-    .push-offer {
-      margin-top: 14px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-      font-size: 0.85rem;
-      color: var(--muted);
-    }
-    .push-offer button {
-      font: inherit;
-      font-size: 0.8rem;
-      padding: 4px 10px;
-      border-radius: 999px;
-      border: 1px solid var(--ink);
-      background: var(--ink);
-      color: var(--bg);
-      cursor: pointer;
-    }
-    .wrong:disabled { cursor: default; opacity: 0.7; }
-    /* 「细节」「说错了」并排放在回复下面一行 */
-    .msg .foot { display: flex; align-items: baseline; gap: 12px; margin-top: 8px; }
-    .msg .foot .details, .msg .foot .wrong { margin-top: 0; }
     form {
       display: flex;
       gap: 8px;
@@ -738,7 +686,6 @@
         tools: m.tools || [],
         undo: m.undo || [],
         undone: !!m.undone,
-        wrong: !!m.wrong,
         agenda: m.agenda || null,
         needsConfirm: !!m.needs_confirm,
         approvals: m.approvals || [],
@@ -915,7 +862,6 @@
         clearActions();
         const m = { id: data.message_id, role: "assistant", content: data.say, tools: [], undo: data.undo, at: Date.now() };
         const div = addMessage("bot", data.say);
-        addWrong(div, m);
         if (m.undo && m.undo.length) addUndo(div, m);
         session.messages.push(m);
       } catch (e) {
@@ -935,14 +881,6 @@
       target.append(el("span", "fresh", chunk));
     }
 
-    function footOf(div) {
-      let foot = Array.from(div.children).find((c) => c.classList.contains("foot"));
-      if (!foot) {
-        foot = el("div", "foot");
-        div.appendChild(foot);
-      }
-      return foot;
-    }
 
 
     // ---- 来找你：iPhone 主屏幕上的 Friday、电脑上的 Friday 窗口都能收到她主动发的提醒 ----
@@ -1055,34 +993,6 @@
       history.replaceState({}, "", u.pathname + u.search + u.hash);
     })();
 
-    // 她说错了：点一下就记进错误清单（附上问题和工具），之后补一条测试；Tuesday test 里数「说错几次」
-    function addWrong(div, m) {
-      if (!m.id) return;
-      // 只在最新一条回复下面留着；点过的（已记下）保留
-      logEl.querySelectorAll(".wrong:not([disabled])").forEach((b) => b.remove());
-      const b = el("button", "wrong", m.wrong ? "已记下" : "说错了");
-      b.type = "button";
-      b.disabled = !!m.wrong;
-      b.onclick = async () => {
-        b.disabled = true;
-        try {
-          const res = await fetch("/api/wrong", {
-            method: "POST",
-            credentials: "include",
-            headers: authHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify({ message_id: m.id }),
-          });
-          if (!res.ok) throw new Error();
-          m.wrong = true;
-          b.textContent = "已记下";
-        } catch (e) {
-          b.disabled = false;
-          b.textContent = "没记上，再点一次";
-        }
-      };
-      footOf(div).appendChild(b);
-    }
-
     function addConfirm(div, m) {
       const bar = document.createElement("div");
       bar.className = "actions";
@@ -1194,7 +1104,6 @@
         const shown = m.undone ? m.content + "（已撤销）" : m.content;
         const div = addMessage(m.role === "user" ? "user" : "bot", m.agenda ? null : shown);
         if (m.agenda) drawToday(div, m.agenda).innerHTML = render(m.content);
-        if (m.role === "assistant") addWrong(div, m);
         const last = i === session.messages.length - 1;
         if (m.needsConfirm && last) addConfirm(div, m);
         if (m.undo && m.undo.length && !m.undone && last) addUndo(div, m);
@@ -1272,7 +1181,6 @@
       const { reply, tools = [], undo = [], needsConfirm = false, approvals = [], id } = result;
       div.innerHTML = render(reply);
       const m = { id, role: "assistant", content: reply, tools, needsConfirm, approvals, undo, at: Date.now() };
-      addWrong(div, m);
       if (needsConfirm) addConfirm(div, m);
       if (undo.length) addUndo(div, m);
       session.messages.push(m);
@@ -1737,7 +1645,6 @@
         }
         view.el.innerHTML = render(result.reply);
         const opener = { id: result.id, role: "assistant", content: result.reply, tools: [], agenda: view.card, at: Date.now() };
-        addWrong(div, opener);
         offerPush(div);
         session.messages.push(opener);
         scrollDown();

@@ -1,11 +1,13 @@
 """Friday 主动来找他：什么时候、说什么，全部由服务端从日历和待办算出来，不经过模型。
 
-三种情况，宁可漏也不吵：
-- 开工简报：工作日 08:30（周末 10:00）以后、中午以前，今天有安排或有要交的才发。
+一天里的几个时刻，宁可漏也不吵：
+- 开工：工作日 08:30（周末 10:00）以后、中午以前，今天有安排或有要交的才发。
 - 会快到了：今天要紧的会（导师、开会、截止、考试……）开始前 20 分钟到 2 小时，点开就准备要点。
 - 今天截止还没划掉：下午 5 点以后。
+- 收工：晚上 9 点，今天替他关掉了哪几件、还有什么没做完、明天第一件和明天截止的；周日再加一句这周关掉了几件。
 
-每天最多 FRIDAY_PUSH_DAILY_MAX 条（默认 2），22:00–08:00 不打扰；同一件事只说一次。
+他亲口交代的提醒到点就发（不在这些规矩里）。每天最多 FRIDAY_PUSH_DAILY_MAX 条（默认 3），
+22:00–08:00 不打扰；同一件事只说一次。
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ from datetime import date, datetime, time, timedelta
 from typing import Any, Callable
 from urllib.parse import quote
 
-from src import agenda, engineering, push, reminders, todos, usage_log
+from src import agenda, closed, engineering, push, reminders, todos, usage_log
 from src.agenda import Timed
 from src.config import effective_now
 from src.presence import IMPORTANT, _clock, _spaced, _there
@@ -26,10 +28,10 @@ SENT_PATH = PUSH_DIR / "sent.jsonl"
 QUIET_FROM, QUIET_UNTIL = time(22, 0), time(8, 0)
 BRIEF_UNTIL = time(12, 0)
 DUE_FROM = time(17, 0)
-EVE_FROM, EVE_UNTIL = time(20, 0), time(22, 0)
+WRAP_FROM, WRAP_UNTIL = time(21, 0), time(22, 0)
 MEETING_AHEAD = (timedelta(minutes=20), timedelta(hours=2))
 # 同时满足时谁先说：会快到了最要紧
-PRIORITY = {"meeting": 0, "eve": 1, "brief": 2, "due": 3}
+PRIORITY = {"meeting": 0, "brief": 1, "due": 2, "wrap": 3}
 # 工程消息是他自己发起的事的回音（Cursor 改好了、上线了），不占每天两条的名额；
 # 他刚让 Cursor 改、刚点了上线，晚上也照样告诉他。测试红了等到白天再说
 ENGINEERING_ANYTIME = {"cursor", "live"}
@@ -37,9 +39,9 @@ ENGINEERING_ANYTIME = {"cursor", "live"}
 
 def daily_max() -> int:
     try:
-        return max(0, int(os.getenv("FRIDAY_PUSH_DAILY_MAX") or 2))
+        return max(0, int(os.getenv("FRIDAY_PUSH_DAILY_MAX") or 3))
     except ValueError:
-        return 2
+        return 3
 
 
 def _morning(day: date) -> time:
@@ -130,24 +132,40 @@ def _due(now: datetime, tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
     return {"kind": "due", "key": key, "title": "Friday · 截止", "body": _spaced(text), "url": f"/?n={quote(key)}"}
 
 
-def _eve(now: datetime, tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """有截止日的待办：前一晚 8 点到 10 点提一句（当天早上的开工简报里还会再说一次）。"""
-    if not (EVE_FROM <= now.time() < EVE_UNTIL):
+def _wrap(now: datetime, timed: list[Timed], tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """收工：关掉了什么、还差什么、明天第一件和明天截止的；周日加上这一周。什么都没有就不发。"""
+    if not (WRAP_FROM <= now.time() < WRAP_UNTIL):
         return None
-    tomorrow = now.date() + timedelta(days=1)
-    names = [task["title"] for task, day in todos.ordered(tasks) if day == tomorrow]
-    if not names:
+    today = now.date()
+    tomorrow = today + timedelta(days=1)
+    parts = []
+    done = closed.on_day(today)
+    if done:
+        parts.append(f"今天替你关掉了 {len(done)} 件：{_names([r['title'] for r in done])}。")
+    due, overdue = _due_today(now, tasks)
+    if due or overdue:
+        parts.append(f"还没做完：{_names(due + overdue)}。")
+    first = next(((s, ev) for s, _, ev in timed if s.date() == tomorrow), None)
+    if first:
+        parts.append(f"明天第一件：{_clock(first[0])} {agenda.spoken(first[1])}{_there(first[1])}。")
+    tomorrow_due = [task["title"] for task, day in todos.ordered(tasks) if day == tomorrow]
+    if tomorrow_due:
+        parts.append(f"明天截止：{_names(tomorrow_due)}。")
+    if not parts:
         return None
-    key = f"eve:{tomorrow.isoformat()}"
-    return {"kind": "eve", "key": key, "title": "Friday · 明天截止", "body": _spaced(f"明天截止：{_names(names)}。"),
-            "url": f"/?n={quote(key)}"}
+    if today.weekday() == 6:
+        week = closed.in_week(today)
+        if week:
+            parts.append(f"这周替你关掉了 {len(week)} 件。")
+    key = f"wrap:{today.isoformat()}"
+    return {"kind": "wrap", "key": key, "title": "Friday · 收工", "body": _spaced("".join(parts)), "url": f"/?n={quote(key)}"}
 
 
 def candidates(now: datetime, events: list[dict[str, Any]], tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """此刻值得来找他的事（还没去掉说过的、也没管上限），按要紧程度排。"""
     timed, _all_day = agenda.split(events)
     found = _meetings(now, timed)
-    for one in (_brief(now, timed, tasks), _due(now, tasks), _eve(now, tasks)):
+    for one in (_brief(now, timed, tasks), _due(now, tasks), _wrap(now, timed, tasks)):
         if one:
             found.append(one)
     return sorted(found, key=lambda n: PRIORITY[n["kind"]])

@@ -12,7 +12,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from src import engineering, ship, todos
+from src import closed, engineering, ship, todos
 from src.agent import friday
 from src.config import effective_now
 from src.tasks_providers import get_tasks_provider
@@ -57,6 +57,7 @@ async def _ship_action(body: ActBody) -> dict:
     engineering.forget()
     if result.get("merged") or result.get("ok"):
         engineering.record_shipped(summary)
+        closed.record("ship", summary.splitlines()[0] if summary else "上线了一版")
     say = result.get("say") or result.get("message") or ("已合进 develop，正在上线。" if result.get("ok") else "没上成。")
     return await _record(body.conversation_id, say)
 
@@ -72,6 +73,7 @@ async def act(body: ActBody) -> dict:
     try:
         if body.action == "done":
             provider.complete(task["id"])
+            closed.record("task", task["title"], ref=f"task:{task['id']}")
             undo = {"kind": "task_completed", "id": task["id"], "title": task["title"]}
             say = f"划掉了：{task['title']}。"
         else:

@@ -83,9 +83,9 @@ Web Push reaches the iPhone home-screen app and the desktop Friday window. When 
 | Weekdays after 08:30, weekends after 10:00, before noon | Morning brief: today's items and what is due (skipped on an empty day) |
 | 20 min – 2 h before an important meeting | "下午 2 点：FYP meeting… 点开，我把要点备好" — tapping it opens Friday and prepares the brief |
 | After 17:00 | What is due today and still not done |
-| 20:00–22:00 the evening before | What is due tomorrow |
+| 21:00 | Wrap-up: what she closed for you today, what is still open, tomorrow's first thing and tomorrow's deadlines. On Sunday it adds "这周替你关掉了 N 件". Nothing is moved to tomorrow behind your back: a deadline that has passed is reported as passed |
 
-- At most two a day (`FRIDAY_PUSH_DAILY_MAX`), never between 22:00 and 08:00, and each thing only once.
+- At most three a day (`FRIDAY_PUSH_DAILY_MAX`), never between 22:00 and 08:00, and each thing only once. Reminders he asked for are outside these rules.
 - The scheduler runs only on Fly (`FLY_APP_NAME` + Google calendar), so the desktop and the cloud never both send. Override it with `FRIDAY_NUDGES=on/off`.
 - Encryption (RFC 8291) and VAPID (RFC 8292) are implemented with `cryptography`; the keys live in `FRIDAY_STATE_DIR/push/`.
 
@@ -143,7 +143,7 @@ After that, every push to `develop`:
 
 **Confirmation is enforced in code, not in the prompt.** Outward or destructive tools are registered with the Agents SDK's `needs_approval`, so the run pauses before they execute. The server writes out exactly what will happen (recipient, subject, body, time, changed files), and only an explicit yes ("确认", "好的", "发吧", the Confirm button…) resumes that exact action. "取消" or anything else cancels it. The paused step is saved to disk, so a restart in between does not lose it. For mail, "改一下" lets him edit the subject and body in the card. Friday must re-issue the call with exactly the edited text before it is sent; if anything differs, he is asked again.
 
-Every reply has a small **说错了** ("that's wrong") button. One tap records the question, the answer and the tools used in `mistakes.jsonl`, and `usage_report.py` counts them per day. The target is zero.
+When she gets something wrong, just say "不对". She corrects it and records the mistake (`note_mistake` → `mistakes.jsonl`), and `usage_report.py` counts mistakes per day. The target is zero. There is no button for it.
 
 ## How "tomorrow" is resolved
 
@@ -272,7 +272,7 @@ Then follow Environment → API key → Open above. Details in [docs/baseline-v1
 │   ├── baseline-v1.md             # reproduction and acceptance
 │   └── evaluation/                # evidence for the report (frozen)
 ├── src/
-│   ├── main.py                    # FastAPI: page, streaming chat, opener, undo, "that's wrong"
+│   ├── main.py                    # FastAPI: page, streaming chat, opener, undo
 │   ├── agent.py                   # Friday: voice, instructions, one turn with sessions and approvals
 │   ├── conversation.py            # server-side conversations (SQLite)
 │   ├── approval.py                # what needs confirmation, and how it is shown
@@ -280,6 +280,7 @@ Then follow Environment → API key → Open above. Details in [docs/baseline-v1
 │   ├── todos.py                   # to-dos
 │   ├── memory_store.py            # long-term memory
 │   ├── friction.py / mistakes.py  # what you dislike / what she got wrong
+│   ├── reminders.py / closed.py   # on-time reminders / what she closed for you
 │   ├── cursor_fix.py / ship.py    # Cursor fixes, preview, test gate, merge and deploy
 │   ├── state_sync.py              # import/export state, cloud usage log
 │   ├── config.py                  # paths, FRIDAY_STATE_DIR, demo date, backends

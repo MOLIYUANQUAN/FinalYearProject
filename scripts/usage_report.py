@@ -66,7 +66,7 @@ def main() -> None:
 
     today = date.today()
     days = [(today - timedelta(days=i)).isoformat() for i in range(args.days - 1, -1, -1)]
-    print(f"{'date':<12}{'opens':>7}{'chats':>7}{'first_ms':>10}{'total_ms':>10}{'errors':>8}{'wrong':>7}")
+    print(f"{'date':<12}{'opens':>7}{'chats':>7}{'first_ms':>10}{'total_ms':>10}{'errors':>8}{'wrong':>7}{'closed':>8}")
     active = 0
     for day in days:
         entries = by_day.get(day, [])
@@ -77,10 +77,12 @@ def main() -> None:
         errors = sum(1 for e in entries if not e.get("ok", True))
         # 他点了「说错了」的次数：目标是 0
         wrong = sum(1 for e in entries if e.get("kind") == "wrong")
+        # 替他关掉了几件：KPI
+        done = sum(1 for e in entries if e.get("kind") == "closed")
         first = [e["first_token_ms"] for e in entries if e.get("first_token_ms") is not None]
         total = [e["total_ms"] for e in entries if e.get("total_ms") is not None]
         print(
-            f"{day:<12}{opens:>7}{chats:>7}{_median(first):>10}{_median(total):>10}{errors:>8}{wrong:>7}"
+            f"{day:<12}{opens:>7}{chats:>7}{_median(first):>10}{_median(total):>10}{errors:>8}{wrong:>7}{done:>8}"
         )
     print(f"\n最近 {args.days} 天里有 {active} 天在用。")
 

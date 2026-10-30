@@ -6,7 +6,7 @@ from typing import Any
 
 from agents import function_tool
 
-from src import cursor_fix, friction, ship
+from src import cursor_fix, friction, mistakes, ship, usage_log
 
 
 @function_tool
@@ -21,6 +21,21 @@ def note_friction(what: str, better: str = "") -> dict[str, Any]:
         better: 可选，他希望怎样，例如「明天只出现在日程分区，不进需要你」。
     """
     return friction.note(what=what, better=better)
+
+
+@function_tool
+def note_mistake(said: str, correct: str = "") -> dict[str, Any]:
+    """他说你刚才说错了（「不对」「你说错了」「不是这样」，指你说的事实）：先改正，再调这个记一笔。
+
+    这是「说错 0 次」的账：每一次都要记。不用道歉表演。
+
+    Args:
+        said: 你说错的那句（原话）。
+        correct: 对的是什么（他说了就填）。
+    """
+    mistakes.record(asked="", said=said, tools=[], note=correct)
+    usage_log.record("wrong", ok=True, first_token_ms=None, total_ms=0, tools=[])
+    return {"ok": True}
 
 
 @function_tool
@@ -129,5 +144,9 @@ def ship_pending_fix() -> dict[str, Any]:
         from src import engineering
 
         engineering.forget()
-        engineering.record_shipped(pending.get("summary") or pending.get("branch") or "")
+        summary = pending.get("summary") or pending.get("branch") or ""
+        engineering.record_shipped(summary)
+        from src import closed
+
+        closed.record("ship", summary.splitlines()[0] if summary else "上线了一版")
     return result

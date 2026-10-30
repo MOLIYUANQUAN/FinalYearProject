@@ -129,13 +129,14 @@ class Delivery(unittest.TestCase):
         self.assertEqual(self.tick(at("08:40")), [])
         self.assertEqual(self.sent, [])
 
-    def test_each_thing_once_and_at_most_two_a_day(self) -> None:
+    def test_each_thing_once_and_at_most_three_a_day(self) -> None:
         push.subscribe(SUB, "iPhone")
         self.assertEqual([n["kind"] for n in self.tick(at("08:40"))], ["brief"])
         self.assertEqual(self.tick(at("08:41")), [])  # 说过了
         self.assertEqual([n["kind"] for n in self.tick(at("12:30"))], ["meeting"])
-        self.assertEqual(self.tick(at("17:30")), [])  # 今天两条用完了
-        self.assertEqual(len(self.sent), 2)
+        self.assertEqual([n["kind"] for n in self.tick(at("17:30"))], ["due"])
+        self.assertEqual(self.tick(at("21:10")), [])  # 今天三条用完了：收工这条让给了更要紧的
+        self.assertEqual(len(self.sent), 3)
         self.assertIn("do=prepare", self.sent[1]["url"])
 
     def test_dead_device_is_removed(self) -> None:
