@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - develop
+  workflow_dispatch:
 
 concurrency:
   group: deploy-friday
@@ -49,6 +50,18 @@ jobs:
 
       - name: Deploy
         if: steps.token.outputs.set == 'true'
-        run: flyctl deploy --remote-only --app friday-jimmy --ha=false
+        run: flyctl deploy --remote-only --app friday-jimmy --ha=false --env FRIDAY_GIT_SHA=${{ github.sha }}
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      # 上线以后确认线上跑的就是这一版（/api/health 报的 git_sha），不是旧的
+      - name: Verify live version
+        if: steps.token.outputs.set == 'true'
+        run: |
+          for i in $(seq 1 30); do
+            live=$(curl -fsS https://friday-jimmy.fly.dev/api/health | python3 -c "import json,sys; print(json.load(sys.stdin).get('git_sha',''))" || true)
+            if [ "$live" = "${{ github.sha }}" ]; then echo "Live: $live"; exit 0; fi
+            sleep 10
+          done
+          echo "::error::friday-jimmy.fly.dev is not serving ${{ github.sha }} (got '$live')"
+          exit 1

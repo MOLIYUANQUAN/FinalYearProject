@@ -201,7 +201,9 @@ def main() -> None:
     _ensure_volume(fly)
 
     print("Deploying…")
-    _run(fly, "deploy", "--app", APP, "--ha=false", capture=False)
+    sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, capture_output=True, check=False).stdout.strip()
+    extra = ["--env", f"FRIDAY_GIT_SHA={sha}"] if sha else []
+    _run(fly, "deploy", "--app", APP, "--ha=false", *extra, capture=False)
 
     # hostname
     status = _run(fly, "status", "--app", APP, "--json", check=False)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import sys
 import time
 from collections.abc import AsyncIterator
@@ -168,6 +169,8 @@ def health() -> dict:
     return {
         "ok": True,
         "code_version": CODE_VERSION,
+        # 云上部署时带进来的提交号：部署工作流靠它确认线上就是刚推的那一版
+        "git_sha": (os.getenv("FRIDAY_GIT_SHA") or "").strip(),
         "has_openai_api_key": has_key,
         "calendar_backend": backend,
         "mail_backend": mail,
