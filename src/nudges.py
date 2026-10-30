@@ -16,7 +16,7 @@ from datetime import date, datetime, time, timedelta
 from typing import Any, Callable
 from urllib.parse import quote
 
-from src import agenda, push, todos, usage_log
+from src import agenda, engineering, push, todos, usage_log
 from src.agenda import Timed
 from src.config import effective_now
 from src.presence import IMPORTANT, _clock, _spaced, _there
@@ -29,6 +29,9 @@ DUE_FROM = time(17, 0)
 MEETING_AHEAD = (timedelta(minutes=20), timedelta(hours=2))
 # 同时满足时谁先说：会快到了最要紧
 PRIORITY = {"meeting": 0, "brief": 1, "due": 2}
+# 工程消息是他自己发起的事的回音（Cursor 改好了、上线了），不占每天两条的名额；
+# 他刚让 Cursor 改、刚点了上线，晚上也照样告诉他。测试红了等到白天再说
+ENGINEERING_ANYTIME = {"cursor", "live"}
 
 
 def daily_max() -> int:
@@ -159,17 +162,23 @@ def _mark_sent(nudge: dict[str, Any], now: datetime, delivered: int) -> None:
         f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
-def due_now(now: datetime, events: list[dict[str, Any]], tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """此刻真要发的：不在安静时段、没说过、没超过今天的上限。"""
-    if quiet(now):
-        return []
+def due_now(
+    now: datetime,
+    events: list[dict[str, Any]],
+    tasks: list[dict[str, Any]],
+    work: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """此刻真要发的：没说过；日历和待办的不在安静时段、不超过今天的上限；工程消息另算。"""
     sent = _sent()
     said = {row["key"] for row in sent}
-    today = sum(1 for row in sent if row.get("day") == now.date().isoformat())
+    out = [n for n in work or [] if n["key"] not in said and (n["kind"] in ENGINEERING_ANYTIME or not quiet(now))]
+    if quiet(now):
+        return out
+    today = sum(1 for row in sent if row.get("day") == now.date().isoformat() and row.get("kind") in PRIORITY)
     room = daily_max() - today
-    if room <= 0:
-        return []
-    return [n for n in candidates(now, events, tasks) if n["key"] not in said][:room]
+    if room > 0:
+        out += [n for n in candidates(now, events, tasks) if n["key"] not in said][:room]
+    return out
 
 
 def tick(now: datetime | None = None, *, deliver: Callable[..., int] = push.deliver) -> list[dict[str, Any]]:
@@ -186,8 +195,13 @@ def tick(now: datetime | None = None, *, deliver: Callable[..., int] = push.deli
         tasks = todos.read()[0]
     except Exception:  # noqa: BLE001
         tasks = []
+    try:
+        work = engineering.events(now)
+    except Exception as exc:  # noqa: BLE001 — GitHub / Cursor 读不到就这一轮不说工程的事
+        print(f"[WARN] nudges: engineering unavailable: {exc}")
+        work = []
     sent = []
-    for nudge in due_now(now, events, tasks):
+    for nudge in due_now(now, events, tasks, work):
         message = {"title": nudge["title"], "body": nudge["body"], "url": nudge["url"], "tag": nudge["key"]}
         delivered = deliver(message, urgency=nudge.get("urgency", "normal"))
         if delivered:

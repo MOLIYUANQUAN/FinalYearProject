@@ -8,7 +8,7 @@ from collections.abc import AsyncIterator
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from src import agenda, todos
+from src import agenda, engineering, todos
 from src.agenda import Timed, day_label, title, when
 from src.config import effective_now
 from src.context import greeting, his_name, weekday_zh
@@ -265,9 +265,10 @@ async def presence_input() -> tuple[dict[str, Any], str]:
         "error": "",
     }
 
-    calendar, todo = await asyncio.gather(
+    calendar, todo, work = await asyncio.gather(
         asyncio.to_thread(agenda.read, CARD_FRESH_S),
         asyncio.to_thread(todos.read, CARD_FRESH_S),
+        asyncio.to_thread(engineering.card),
         return_exceptions=True,
     )
     if isinstance(calendar, BaseException):
@@ -277,7 +278,21 @@ async def presence_input() -> tuple[dict[str, Any], str]:
     card["sections"], say = today_view(now, calendar[0], tasks)
     if isinstance(todo, BaseException):
         card["sections"].append({"label": "待办", "meta": "", "rows": [], "empty": _reason(todo, "这次没读到。")})
+    if not isinstance(work, BaseException):
+        _add_engineering(card["sections"], *work)
     return card, say
+
+
+def _add_engineering(sections: list[dict[str, Any]], decisions: list[dict[str, Any]], running: dict[str, Any] | None) -> None:
+    """工程线：要拍板的（改好了要不要上线、测试红了）放进「需要你」最前面；在跑的放最后。"""
+    if decisions:
+        needs = next((s for s in sections if s.get("attention")), None)
+        if needs is None:
+            needs = {"label": "需要你", "meta": "", "rows": [], "empty": "", "attention": True}
+            sections.insert(0, needs)
+        needs["rows"] = (decisions + needs["rows"])[:NEEDS_YOU_MAX]
+    if running:
+        sections.append(running)
 
 
 async def stream_presence() -> AsyncIterator[dict[str, Any]]:

@@ -123,4 +123,11 @@ def ship_pending_fix() -> dict[str, Any]:
     """把待部署的 Cursor 改动合进 develop 并部署到云上。直接调用：系统会先把改动给他看，
     他确认后才合并和部署。把返回的 say 原样告诉他。
     """
-    return ship.ship(user_confirmed=True)
+    pending = ship.load_pending() or {}
+    result = ship.ship(user_confirmed=True)
+    if result.get("merged") or result.get("ok"):
+        from src import engineering
+
+        engineering.forget()
+        engineering.record_shipped(pending.get("summary") or pending.get("branch") or "")
+    return result

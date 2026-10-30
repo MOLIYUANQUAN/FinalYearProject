@@ -13,6 +13,8 @@ os.environ["TASKS_BACKEND"] = "mock"
 os.environ["FRIDAY_ACCESS_TOKEN"] = ""
 os.environ["FRIDAY_URL"] = ""
 os.environ.setdefault("OPENAI_API_KEY", "sk-test-not-used")
+# 测试不去真的 GitHub（要测的地方自己 mock）
+os.environ["FRIDAY_GITHUB_OFFLINE"] = "1"
 
 from agents import set_tracing_disabled  # noqa: E402
 

@@ -796,7 +796,17 @@
         b.type = "button";
         b.onclick = (e) => {
           e.stopPropagation();
-          doRow(line, row, action.id, bar);
+          if (action.url) {
+            window.open(action.url, "_blank", "noopener");
+            return;
+          }
+          // 上线这种动作：第一下变成「确认上线」，再点一下才办
+          if (action.confirm && !b.dataset.armed) {
+            b.dataset.armed = "1";
+            b.textContent = action.confirm;
+            return;
+          }
+          doRow(line, row, action, bar);
         };
         bar.append(b);
       }
@@ -805,18 +815,19 @@
 
     async function doRow(line, row, action, bar) {
       if (busy || !ready) return;
-      if (action === "prepare") {
+      if (action.id === "prepare" || action.ask) {
         bar.remove();
-        await ask("帮我准备 " + row.title);
+        await ask(action.ask || "帮我准备 " + row.title);
         return;
       }
       bar.querySelectorAll("button").forEach((b) => (b.disabled = true));
+      if (action.id === "ship") bar.replaceChildren(el("span", "hint", "正在合并上线…"));
       try {
         const res = await fetch("/api/items/act", {
           method: "POST",
           credentials: "include",
           headers: authHeaders({ "Content-Type": "application/json" }),
-          body: JSON.stringify({ key: row.key, action, conversation_id: session && session.id }),
+          body: JSON.stringify({ key: row.key, action: action.id, conversation_id: session && session.id }),
         });
         const data = await res.json().catch(() => ({}));
         if (res.status === 401) {
@@ -825,11 +836,12 @@
         }
         if (!res.ok) throw new Error(data.detail || "没办成。");
         bar.remove();
-        line.classList.add("handled");
+        if (action.id !== "preview") line.classList.add("handled");
         clearActions();
         const m = { id: data.message_id, role: "assistant", content: data.say, tools: [], undo: data.undo, at: Date.now() };
         const div = addMessage("bot", data.say);
-        addUndo(div, m);
+        addWrong(div, m);
+        if (m.undo && m.undo.length) addUndo(div, m);
         session.messages.push(m);
       } catch (e) {
         bar.replaceChildren(el("span", "hint", (e && e.message) || String(e)));
