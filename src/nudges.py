@@ -68,7 +68,7 @@ def _due_today(now: datetime, tasks: list[dict[str, Any]]) -> tuple[list[str], l
     pairs = todos.ordered(tasks)
     return (
         [task["title"] for task, day in pairs if day == today],
-        [task["title"] for task, day in pairs if day is not None and day < today],
+        [task["title"] for task, day in pairs if day is not None and day < today and not todos.is_stale(day, today)],
     )
 
 

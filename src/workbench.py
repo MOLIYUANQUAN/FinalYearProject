@@ -22,7 +22,7 @@ router = APIRouter(tags=["workbench"])
 
 class ActBody(BaseModel):
     key: str = Field(..., max_length=200, description="卡片那一行的 key，例如 task:abc")
-    action: str = Field(..., pattern="^(done|tomorrow|preview|ship)$")
+    action: str = Field(..., pattern="^(done|drop|tomorrow|preview|ship)$")
     conversation_id: str | None = Field(None, max_length=64)
 
 
@@ -67,7 +67,7 @@ async def act(body: ActBody) -> dict:
     kind, _, item_id = body.key.partition(":")
     if body.key == "ship:pending" and body.action in {"preview", "ship"}:
         return await _ship_action(body)
-    if kind != "task" or not item_id or body.action not in {"done", "tomorrow"}:
+    if kind != "task" or not item_id or body.action not in {"done", "drop", "tomorrow"}:
         raise HTTPException(status_code=400, detail="这一行不能这样办。")
     provider, task = _task(item_id)
     try:
@@ -76,6 +76,11 @@ async def act(body: ActBody) -> dict:
             closed.record("task", task["title"], ref=f"task:{task['id']}")
             undo = {"kind": "task_completed", "id": task["id"], "title": task["title"]}
             say = f"划掉了：{task['title']}。"
+        elif body.action == "drop":
+            # 不要了：从清单上拿掉，但不算替他「关掉」的事
+            provider.complete(task["id"])
+            undo = {"kind": "task_completed", "id": task["id"], "title": task["title"]}
+            say = f"好，不再提：{task['title']}。"
         else:
             tomorrow = effective_now().date() + timedelta(days=1)
             provider.set_due(task["id"], tomorrow)

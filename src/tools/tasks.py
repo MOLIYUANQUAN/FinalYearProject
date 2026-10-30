@@ -25,6 +25,11 @@ def _offer_undo(ctx: RunContextWrapper[Any], item: dict[str, Any]) -> None:
         ctx.context.undo.append(item)
 
 
+# 「明天中午十二点开会」这种带钟点的不是待办；标题里也不留「明天」这类过一天就错的词
+_CLOCK = re.compile(r"(\d{1,2}|[一二两三四五六七八九十]{1,3})\s*(点|时|:|：)\d{0,2}|\d{1,2}:\d{2}|分钟后|小时后")
+_DAY_PREFIX = re.compile(r"^(今天|明天|后天|大后天|今晚|明早|明晚|(下下|下|这|本)?(周|星期|礼拜)[一二三四五六日天])(之前|以前|前)?[，,]?")
+
+
 def _norm(text: str) -> str:
     return re.sub(r"[\W_]+", "", text).casefold()
 
@@ -41,6 +46,13 @@ def add_task(ctx: RunContextWrapper[Any], title: str, due: str = "", notes: str 
     provider = get_tasks_provider()
     if provider is None:
         return NOT_CONNECTED
+    if _CLOCK.search(f"{title} {due}"):
+        return {
+            "ok": False,
+            "error": "has_clock_time",
+            "message": "有具体钟点，不是待办：要到点叫他就 remind_me（when 用他的原话）；约好的会、课就 create_calendar_event。",
+        }
+    title = _DAY_PREFIX.sub("", title).strip() or title
     today = effective_now().date()
     due_day = todos.parse_due(due, today) if due.strip() else None
     if due.strip() and due_day is None:

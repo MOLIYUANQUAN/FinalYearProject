@@ -76,6 +76,19 @@ class NowTests(unittest.TestCase):
         ])
         self.assertEqual(card["明天 · 周三"]["rows"][-1]["title"], "续借图书馆的书")
 
+    def test_something_left_for_days_is_not_now(self) -> None:
+        """10/18 的旧待办放了 12 天：不顶到最上面，也不推送；时间线上问一句「做完了 / 不要了」。"""
+        stale = [{"id": "t-stale", "title": "明天中午十二点开会", "due": "2026-10-01"}]
+        card, say, focus = view(at("09:00"), stale)
+        self.assertIsNone(focus)
+        self.assertNotIn("明天中午十二点开会", say)
+        row = card["今天"]["rows"][-1]
+        self.assertEqual((row["time"], [a["id"] for a in row["actions"]]), ("放了 12 天", ["done", "drop"]))
+
+        from src import nudges
+
+        self.assertEqual(nudges._due_today(at("17:30"), stale), ([], []))
+
     def test_rows_still_carry_their_actions(self) -> None:
         card, _, _ = view(at("09:00", "2026-10-12"), self.TASKS[1:])
         rows = {r["title"]: r for r in card["明天 · 周二"]["rows"]}
@@ -117,6 +130,17 @@ class ActTests(SandboxTestCase):
             data = self.client.post("/api/items/act", json={"key": "task:t1", "action": "tomorrow"}).json()
         self.assertEqual(set_due.call_args.args[0], "t1")
         self.assertEqual(data["undo"][0]["due"], "2026-10-11")
+
+    def test_drop_takes_it_off_without_counting_it_as_closed(self) -> None:
+        from src import closed
+
+        closed.CLOSED_PATH.unlink(missing_ok=True)
+        self.addCleanup(closed.CLOSED_PATH.unlink, missing_ok=True)
+        with patch.object(self.provider, "complete", return_value=self.tasks[0]) as complete:
+            data = self.client.post("/api/items/act", json={"key": "task:t1", "action": "drop"}).json()
+        complete.assert_called_once_with("t1")
+        self.assertEqual(data["say"], "好，不再提：交 Lab 2。")
+        self.assertEqual(closed.on_day(closed.effective_now().date()), [])
 
     def test_unknown_or_gone_rows(self) -> None:
         self.assertEqual(self.client.post("/api/items/act", json={"key": "task:nope", "action": "done"}).status_code, 404)

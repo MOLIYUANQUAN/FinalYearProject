@@ -68,6 +68,7 @@ def _spaced(text: str) -> str:
 # 卡片上每一行能点的动作：点了直接办（待办），或者交给 Friday 去办（准备）
 PREPARE = {"id": "prepare", "label": "帮我准备"}
 DONE = {"id": "done", "label": "做完了"}
+DROP = {"id": "drop", "label": "不要了"}
 TOMORROW = {"id": "tomorrow", "label": "明天再说"}
 NEEDS_YOU_AHEAD = timedelta(hours=3)
 
@@ -117,7 +118,9 @@ def _day_rows(
     for task, due in todos.ordered(tasks):
         if due is None:
             continue
-        if day == now.date() and due < day:
+        if day == now.date() and todos.is_stale(due, day):
+            rows.append(_task_row(task, f"放了 {(day - due).days} 天", [DONE, DROP]))
+        elif day == now.date() and due < day:
             rows.append(_task_row(task, f"过了 {(day - due).days} 天", [DONE, TOMORROW]))
         elif due == day:
             rows.append(_task_row(task, "截止", [DONE, TOMORROW] if day == now.date() else [DONE]))
@@ -163,7 +166,7 @@ def _focus(
             return {"say": _spaced(f"{_clock(start)}{agenda.spoken(event)}{_there(event)}，还有 {_span(start - now)}。"),
                     "key": f"event:{event.get('id') or title(event)}", "actions": [PREPARE], "title": title(event)}
     pairs = todos.ordered(tasks)
-    overdue = [task for task, due in pairs if due is not None and due < today]
+    overdue = [task for task, due in pairs if due is not None and due < today and not todos.is_stale(due, today)]
     if overdue:
         return {"say": _spaced(f"过了截止还没划掉：{overdue[0]['title']}。"), "key": f"task:{overdue[0]['id']}",
                 "actions": [DONE, TOMORROW], "title": overdue[0]["title"]}

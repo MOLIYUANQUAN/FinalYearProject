@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 import unittest
+from unittest.mock import patch
 
 from tests.fake_model import FakeModel, call, text
 from tests.helpers import SandboxTestCase, collect, of_type
@@ -116,6 +117,31 @@ class ApprovalTests(SandboxTestCase):
         done = collect(after.turn(cid, "确认"))[-1]
         self.assertEqual(done["reply"], "发了。")
         self.assertEqual(len(self.sent_mail()), 1)
+
+    def test_a_time_makes_it_a_reminder_not_a_todo(self) -> None:
+        """「明天中午十二点开会」当年被记成了待办，12 天后还挂在最上面。带钟点的不再进待办。"""
+        from src import reminders
+
+        self.addCleanup(reminders.REMINDERS_PATH.unlink, missing_ok=True)
+        friday, model = self.friday([
+            [call("add_task", title="明天中午十二点开会", due="明天", notes="")],
+            [call("remind_me", what="开会", when="明天中午十二点")],
+            [text("好，明天中午 12 点叫你：开会。")],
+        ])
+        cid = friday.conversations.create()
+        with patch("src.tools.tasks.get_tasks_provider") as provider:
+            done = collect(friday.turn(cid, "明天中午十二点开会"))[-1]
+        provider.return_value.add.assert_not_called()
+        self.assertIn("has_clock_time", str(model.inputs[1]))
+        self.assertEqual(done["tools_called"], ["add_task", "remind_me"])
+
+    def test_todo_titles_drop_words_like_tomorrow(self) -> None:
+        friday, _ = self.friday([[call("add_task", title="明天交 Lab 3", due="明天", notes="")], [text("记下了。")]])
+        cid = friday.conversations.create()
+        with patch("src.tools.tasks.get_tasks_provider") as provider:
+            provider.return_value.add.return_value = {"id": "t", "title": "交 Lab 3"}
+            collect(friday.turn(cid, "明天交 Lab 3"))
+        self.assertEqual(provider.return_value.add.call_args.args[0], "交 Lab 3")
 
     def test_tasks_still_get_undo_without_confirmation(self) -> None:
         friday, _ = self.friday([[call("add_task", title="还书", due="明天", notes="")], [text("记下了。")]])

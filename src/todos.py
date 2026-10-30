@@ -96,6 +96,14 @@ def parse_due(said: str, today: date) -> date | None:
     return day
 
 
+# 过了截止好几天还挂着的：多半早办完了或者不要了。不再顶到「现在」、不再推送，只在时间线上安静地问一句
+STALE_AFTER_DAYS = 2
+
+
+def is_stale(due: date | None, today: date) -> bool:
+    return due is not None and (today - due).days > STALE_AFTER_DAYS
+
+
 def due_date(task: dict[str, Any]) -> date | None:
     try:
         return date.fromisoformat(str(task.get("due") or ""))
