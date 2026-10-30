@@ -364,7 +364,6 @@
       font-size: 0.85rem;
       color: var(--muted);
     }
-    .push-offer a { color: var(--ink); text-underline-offset: 3px; }
     .push-offer button {
       font: inherit;
       font-size: 0.8rem;
@@ -922,10 +921,7 @@
         });
         if (!res.ok) throw new Error("没订上，再点一次。");
         await fetch("/api/push/test", { method: "POST", credentials: "include", headers: authHeaders() });
-        line.replaceChildren(
-          el("span", "", "好了，我会来找你。不打开我也能交代事："),
-          Object.assign(el("a", "", "设置「嘿 Siri，告诉 Friday」"), { href: "/siri" }),
-        );
+        say("好了，有事我会来找你。");
       } catch (e) {
         say((e && e.message) || "没订上，再点一次。");
       }
@@ -933,7 +929,7 @@
 
     // 开场卡片下面：这台设备还没订上，就问一句
     async function offerPush(div) {
-      if (await pushSubscribed()) return offerSiri(div);
+      if (await pushSubscribed()) return;
       const line = el("div", "push-offer");
       if (isIOS && !standalone) {
         line.append(el("span", "", "想让我主动找你：在 Safari 点「分享 → 添加到主屏幕」，再从主屏幕打开我。"));
@@ -945,20 +941,6 @@
         b.onclick = () => enablePush(line);
         line.append(el("span", "", "想让我主动来找你？"), b);
       }
-      div.appendChild(line);
-    }
-
-    // 提醒开好了、Siri 还没用过：开场卡片下面提一句，用过一次就再也不出现
-    async function offerSiri(div) {
-      if (!isIOS) return;
-      try {
-        const data = await (await fetch("/api/capture/setup", { credentials: "include" })).json();
-        if (data.used_at) return;
-      } catch (e) {
-        return;
-      }
-      const line = el("div", "push-offer");
-      line.append(el("span", "", "不打开我也能交代事："), Object.assign(el("a", "", "嘿 Siri，告诉 Friday"), { href: "/siri" }));
       div.appendChild(line);
     }
 

@@ -110,15 +110,11 @@ With `GITHUB_TOKEN` on Fly, the workbench also shows his engineering work:
 
 Shipping still goes through the test gate: a change whose tests fail is not merged.
 
-## Hand it to Friday from anywhere
+## Talking to Friday
 
-- **"嘿 Siri，告诉 Friday":**
-  - An iOS Shortcut posts a sentence to `/api/capture`.
-  - Friday handles it in the current conversation and answers in plain text that Siri reads aloud.
-  - Writes that need a look are not read out ("打开 Friday 看一眼，点确认就办").
-  - Setup takes two minutes at `/siri`. The token there only opens `/api/capture` and can be rotated.
-- **Share sheet:** a second Shortcut, "交给 Friday", sends whatever is shared.
-- **Voice in the app:** hold the mic and release to send, or tap and Friday sends after 1.4 s of silence.
+Hold the mic and release to send, or tap it once and Friday sends after 1.4 s of silence. Long-press never selects text on iPhone.
+
+There is deliberately no Siri Shortcut or share-sheet setup. Friday is one tap from the home screen and listens as soon as you hold the mic. A second assistant in front of her, plus a hand-built Shortcut, would only add steps.
 
 ## Automatic test and deploy
 
