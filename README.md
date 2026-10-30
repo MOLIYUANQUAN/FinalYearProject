@@ -1,62 +1,93 @@
 # Friday
 
-Manchester CS FYP（Zeep）：**单一 Personal Agent** — 认识你、盯住生活碎片、带主见回应。
+Manchester CS Final Year Project (Zeep): **a single personal agent** that knows you, keeps track of the loose ends in your life, and answers with an opinion.
 
-> **计划与进度（先读这个）：** [docs/plan.md](docs/plan.md) · **工程记录：** [docs/engineering-log.md](docs/engineering-log.md)  
-> 成功标准是 Tuesday test（普通周二愿不愿意打开），不是 Demo 分数。评测扩写 / 合 `main` / 新 tag 在爱用门禁通过前冻结。
+> **Plan and progress (read this first):** [docs/plan.md](docs/plan.md) · **Engineering log:** [docs/engineering-log.md](docs/engineering-log.md)  
+> Success means passing the Tuesday test (would you open it on an ordinary Tuesday?), not a demo score. Expanding the evaluation, merging into `main` and new milestone tags are frozen until the "loved and used" gate is passed.
 
-**学术路线：** Baseline → Application → Evaluation（证据见 [docs/evaluation/](docs/evaluation/)，当前冻结）  
-**Baseline 快照：** tag [`baseline-v1`](https://github.com/MOLIYUANQUAN/FinalYearProject/releases/tag/baseline-v1) · [docs/baseline-v1.md](docs/baseline-v1.md)  
-**接入说明：** [Google Calendar](docs/google-calendar-setup.md) · [Gmail](docs/gmail-setup.md) · Google Tasks（`scripts\auth_google_tasks.py`，`.env` 设 `TASKS_BACKEND=google`） · [云上 + iPhone App](docs/cloud-and-iphone.md) · [隧道过渡](docs/phone-access.md) · [Personal](docs/application-personal-v1.md) · [Memory](docs/application-memory-v1.md)
+**Academic route:** Baseline → Application → Evaluation (evidence in [docs/evaluation/](docs/evaluation/), currently frozen)  
+**Baseline snapshot:** tag [`baseline-v1`](https://github.com/MOLIYUANQUAN/FinalYearProject/releases/tag/baseline-v1) · [docs/baseline-v1.md](docs/baseline-v1.md)  
+**Setup guides:** [Google Calendar](docs/google-calendar-setup.md) · [Gmail](docs/gmail-setup.md) · Google Tasks (`scripts\auth_google_tasks.py`, then set `TASKS_BACKEND=google` in `.env`) · [Cloud + iPhone](docs/cloud-and-iphone.md) · [Tunnel (interim)](docs/phone-access.md) · [Personal](docs/application-personal-v1.md) · [Memory](docs/application-memory-v1.md)
 
-## 成功标准
+## Success criteria (Baseline)
 
-| # | 标准 | 判定 |
-|---|------|------|
-| S1 | 单一 Personal Assistant Agent | 全程只有一个 agent |
-| S2 | 简单输入界面 | 浏览器可输入并看到回复 |
-| S3 | 工具可被调用 | calendar + files 已注册并可执行 |
-| S4 | 单工具：明天下午安排 | 只走日历，回答正确 |
-| S5 | 文件：找 FYP proposal 并概括 | 基于 `data/notes/fyp-proposal.md` |
-| S6 | 多工具链：准备明天 FYP meeting | 日历 → 文件 → meeting brief |
-| S7 | Mock/本地数据 | `data/` 下 JSON/Markdown，无云端 OAuth |
+| # | Criterion | Check |
+|---|-----------|-------|
+| S1 | A single Personal Assistant agent | Only one agent throughout |
+| S2 | Simple input interface | Type in the browser and see the reply |
+| S3 | Tools can be called | Calendar and file tools are registered and run |
+| S4 | Single tool: tomorrow afternoon | Uses only the calendar and answers correctly |
+| S5 | Files: find and summarise the FYP proposal | Based on `data/notes/fyp-proposal.md` |
+| S6 | Multi-tool chain: prepare tomorrow's FYP meeting | Calendar → files → meeting brief |
+| S7 | Mock/local data | JSON/Markdown under `data/`, no cloud OAuth |
 
-## 技术栈
+## Tech stack
 
 - Python 3.11+
-- [OpenAI Agents SDK](https://openai.github.io/openai-agents-python/)（`openai-agents`）
-- FastAPI + 单页静态 HTML
-- 本地数据：`data/calendar.json`、`data/notes/*.md`
+- [OpenAI Agents SDK](https://openai.github.io/openai-agents-python/) (`openai-agents`), including sessions and tool approvals
+- FastAPI + a single static HTML page
+- Fly.io for the always-on cloud Friday, with a mounted volume for her state
+- Demo data: `data/calendar.json`, `data/notes/*.md`, `data/mail/messages.json`, `data/tasks.json`
 
-## 工具
+## One brain
 
-1. `get_calendar_events` / `create_calendar_event` — 日历（创建须确认）  
-2. `search_emails` / `read_email` / `send_email` / `modify_email` — Gmail（发送/归档需确认）  
-3. `search_files` / `read_file` — 本地笔记  
-4. `get_personal_context` — 静态个人偏好  
-5. `remember_fact` / `search_memory` / `forget_fact` — 本地长期记忆  
-6. `request_user_confirmation` — 写操作前请求确认  
+Friday lives in the cloud (`friday-jimmy.fly.dev`). The phone and the desktop window open the same Friday, with the same memory and the same conversation.
 
-Web 聊天支持多轮 `history`（确认 → 创建）。见 [docs/application-calendar-write-v1.md](docs/application-calendar-write-v1.md)。
+- Everything that changes — memory, conversations, friction list, mistakes, usage log, pending Cursor work — lives in `FRIDAY_STATE_DIR`. On Fly that is a volume mounted at `/state`, so deploys and restarts no longer wipe her memory. Locally it defaults to `data/`.
+- Conversations are stored on the server, including tool calls and results. Start on the phone, continue on the desktop. Coming back on the same day within two hours continues the conversation; otherwise she starts a fresh one with the day's card.
+- With `FRIDAY_URL=https://friday-jimmy.fly.dev` in `.env`, Ctrl+Alt+F opens the cloud Friday and no local server is started. Without it, the local server is used (for development).
 
-## 「明天」如何解析（重要）
+Switching to the cloud brain for the first time:
 
-演示使用**固定的模拟「今天」**，不依赖你机器上的真实日期：
+```powershell
+.\.venv\Scripts\python.exe scripts\deploy_fly.py              # creates the friday_state volume if missing
+# add FRIDAY_URL=https://friday-jimmy.fly.dev to .env
+.\.venv\Scripts\python.exe scripts\sync_to_cloud.py --backup  # merge local memory and friction into the cloud (safe to repeat)
+.\.venv\Scripts\python.exe scripts\open_agent.py --stop       # stop the local server, then press Ctrl+Alt+F
+```
 
-| 概念 | 值 |
-|------|-----|
-| 模拟今天 `MOCK_TODAY` | `2026-10-12` |
-| 「明天」 | `2026-10-13` |
+## Tools
 
-- Agent 的 instructions 会告知模型：今天 = `2026-10-12`，明天 = `2026-10-13`。  
-- 调用 `get_calendar_events` 时，`date` 必须是 `YYYY-MM-DD`（例如明天 → `2026-10-13`）。  
-- Mock 日历里 **FYP meeting** 安排在 `2026-10-13T14:00–15:00`（Kilburn Building），因此「明天下午」会命中该会议。  
+| Tool | What it does | Needs your confirmation |
+|------|--------------|-------------------------|
+| `get_calendar_events` | Read the calendar (including the imported university timetable) | |
+| `create_calendar_event` | Add an event | yes |
+| `search_emails` / `read_email` | Search and read Gmail | |
+| `send_email` | Send an email | yes |
+| `modify_email` | Mark read/unread (direct) or archive/trash (confirmed) | archive / trash |
+| `search_files` / `read_file` | Local notes | |
+| `get_personal_context` | Static profile | |
+| `remember_fact` / `search_memory` | Long-term memory | |
+| `forget_fact` | Delete a memory | yes |
+| `add_task` / `complete_task` | Google Tasks; done directly with an "Undo" button | |
+| `note_friction` / `list_friction` / `resolve_friction` | Things you dislike about Friday | |
+| `fix_friction_with_cursor` | Ask a Cursor agent to change Friday's code | yes |
+| `check_cursor_fix` / `preview_pending_ship` | Progress and diff of the Cursor change | |
+| `ship_pending_fix` | Merge into `develop` and deploy | yes |
 
-修改演示日期：编辑 `src/config.py` 中的 `MOCK_TODAY` / `MOCK_TOMORROW`，并同步更新 `data/calendar.json` 中的事件日期。
+**Confirmation is enforced in code, not in the prompt.** Write tools are registered with the Agents SDK's `needs_approval`, so the run pauses before they execute. The server writes out exactly what will happen (recipient, subject, body, time, changed files), and only an explicit yes ("确认", "好的", "发吧", the Confirm button…) resumes that exact action. "取消" or anything else cancels it. The paused step is saved to disk, so a restart in between does not lose it.
 
-## 如何运行
+Every reply has a small **说错了** ("that's wrong") button. One tap records the question, the answer and the tools used in `mistakes.jsonl`, and `usage_report.py` counts them per day. The target is zero.
 
-### 1. 环境
+## How "tomorrow" is resolved
+
+With `CALENDAR_BACKEND=mock`, the demo uses a **fixed "today"** so it does not depend on your machine's date:
+
+| Concept | Value |
+|---------|-------|
+| Mock today `MOCK_TODAY` | `2026-10-12` (Monday, 09:00) |
+| "Tomorrow" | `2026-10-13` |
+
+- Every turn, the server writes the current time, today-to-next-Sunday's calendar (split into this week / next week, with dates, weekdays and counts), open to-dos, the profile and memories into the agent's instructions. The model does not work out dates or counts itself.
+- `get_calendar_events` takes `date` as `YYYY-MM-DD` (e.g. tomorrow → `2026-10-13`).
+- The mock calendar has the **FYP meeting** at `2026-10-13T14:00–15:00` (Kilburn Building), so "tomorrow afternoon" finds it.
+- With `CALENDAR_BACKEND=google`, the real local date is used. Calendar times are always converted to London time; on Fly, `TZ=Europe/London` is set in `fly.toml`.
+
+To change the demo date, edit `MOCK_TODAY` / `MOCK_TOMORROW` in `src/config.py` and update the event dates in `data/calendar.json`.
+
+## Running it
+
+### 1. Environment
 
 ```bash
 cd FinalYearProject
@@ -65,121 +96,136 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. API Key
+### 2. API key
 
 ```bash
 cp .env.example .env
-# 编辑 .env，填入：
+# edit .env and set:
 # OPENAI_API_KEY=sk-...
 ```
 
-若未配置 `OPENAI_API_KEY`：
+If `OPENAI_API_KEY` is missing:
 
-- 启动时终端会打印明确警告；
-- 页面健康检查显示「缺少 OPENAI_API_KEY」；
-- `/api/chat` 返回 **503** 与中文错误说明。
+- the terminal prints a clear warning on startup;
+- the page says the key is missing;
+- `/api/chat` returns **503** with an explanation.
 
-### 3. 打开
+### 3. Open
 
-第一次运行一下，桌面和开始菜单里就有 Friday，开机后它会在后台准备好：
+Run this once; Friday then appears on the desktop and in the Start menu, and is ready in the background after boot:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\install_shortcuts.py
 ```
 
-之后按 **Ctrl+Alt+F**：Friday 在独立窗口里出现，先开口告诉你此刻最该知道的事；它在最前面时再按一次就收起。也可以点桌面上的 Friday，或者双击仓库里的 `Friday.cmd`。服务在跑且代码没变就直接用，代码变了才换新进程。窗口用自己的浏览器资料（`data/browser/`，不进 Git），不带主浏览器的扩展。
+After that, press **Ctrl+Alt+F**. Friday appears in her own window and opens with the one thing you most need to know right now; press it again while she is in front to hide her. You can also click Friday on the desktop or double-click `Friday.cmd` in the repo. The window uses its own browser profile (`data/browser/`, not in Git) without your main browser's extensions.
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\install_shortcuts.py --remove  # 撤掉快捷方式和开机常驻
-.\.venv\Scripts\python.exe scripts\open_agent.py --restart        # 强制重启服务
-.\.venv\Scripts\python.exe scripts\open_agent.py --stop           # 停掉服务和快捷键
-.\.venv\Scripts\python.exe scripts\usage_report.py                # Tuesday test：最近 7 天用了几天、首字多快
+.\.venv\Scripts\python.exe scripts\install_shortcuts.py --remove  # remove shortcuts and the startup entry
+.\.venv\Scripts\python.exe scripts\open_agent.py --restart        # force-restart the local server
+.\.venv\Scripts\python.exe scripts\open_agent.py --stop           # stop the local server and the hotkey
+.\.venv\Scripts\python.exe scripts\usage_report.py                # Tuesday test: days used, first-token time, mistakes (cloud log when FRIDAY_URL is set)
 ```
 
-### 4. 可选 CLI 三条 Demo
+### 4. Tests
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -t .
+```
+
+The tests use a scripted fake model, so they run offline, cost nothing and need no keys. They cover:
+
+- the seven kinds of mistakes from real use, one guard each;
+- the confirmation boundary (no write tool can run without approval);
+- server-side conversations (follow-ups, switching devices, expiry);
+- the HTTP API;
+- the ship gate.
+
+GitHub runs them on every push and pull request (`.github/workflows/tests.yml`). Shipping a Cursor change refuses to merge if they fail, and the deploy workflow tests before deploying.
+
+### 5. Optional CLI demos
 
 ```bash
 python scripts/demo_cli.py
-# 同时写入 Evaluation 证据 JSON：
+# also save Evaluation evidence JSON:
 python scripts/demo_cli.py --save
 ```
 
-### 5. 从 tag 复现 Baseline（报告用）
+### 6. Reproducing the Baseline from the tag (for the report)
 
 ```bash
 git fetch --tags
 git checkout baseline-v1
 ```
 
-然后按上面「环境 → API Key → 启动」步骤操作。详细说明见 [docs/baseline-v1.md](docs/baseline-v1.md)。
+Then follow Environment → API key → Open above. Details in [docs/baseline-v1.md](docs/baseline-v1.md).
 
-## 分支约定
+## Branches
 
-| 引用 | 用途 |
-|------|------|
-| `develop` | 日常开发 |
-| `main` | 重大里程碑 |
-| tag `baseline-v1` | 报告复现 Baseline |
+| Ref | Purpose |
+|-----|---------|
+| `develop` | Day-to-day development (pushing it runs tests, then deploys to Fly) |
+| `main` | Major milestones |
+| tag `baseline-v1` | Reproducing the Baseline for the report |
 
-## Demo 脚本（验收）
+## Demo script (acceptance)
 
-1. **明天下午安排**  
-   输入：`我明天下午有什么安排？`  
-   期望：调用 `get_calendar_events`（date=`2026-10-13`, afternoon），提到 FYP meeting（14:00、Kilburn Building）。
+1. **Tomorrow afternoon**  
+   Input: `我明天下午有什么安排？`  
+   Expected: answered from the calendar; mentions the FYP meeting (14:00, Kilburn Building).
 
 2. **FYP proposal**  
-   输入：`找到我的 FYP proposal，告诉我项目在做什么。`  
-   期望：`search_files` → `read_file`，概括个人 AI 助手 / Baseline 目标（内容来自文件）。
+   Input: `找到我的 FYP proposal，告诉我项目在做什么。`  
+   Expected: `search_files` → `read_file`; summarises the personal AI assistant / Baseline goals from the file.
 
-3. **准备明天 FYP meeting（硬验收）**  
-   输入：`帮我准备明天的 FYP meeting。`  
-   期望：先日历、后文件（两类工具都出现），输出 meeting brief（时间地点、项目摘要、讨论点等）。
+3. **Prepare tomorrow's FYP meeting (hard acceptance)**  
+   Input: `帮我准备明天的 FYP meeting。`  
+   Expected: calendar first, then files; outputs a meeting brief (time and place, project summary, discussion points).
 
-页面回复下方会显示本轮「工具调用」序列，便于对照验收。
+The page shows which tools were used under each reply ("细节").
 
-## 仓库结构
+## Repository layout
 
 ```
 ├── README.md
 ├── requirements.txt
 ├── .env.example
+├── fly.toml / Dockerfile          # cloud Friday (volume at /state, TZ=Europe/London)
 ├── docs/
-│   ├── baseline-v1.md              # 复现与验收
-│   └── evaluation/                 # 报告对照证据
+│   ├── plan.md                    # direction and standards
+│   ├── engineering-log.md         # how things were built and why
+│   ├── baseline-v1.md             # reproduction and acceptance
+│   └── evaluation/                # evidence for the report (frozen)
 ├── src/
-│   ├── main.py          # FastAPI 入口
-│   ├── agent.py         # Personal Assistant + 工具绑定
-│   ├── config.py        # MOCK_TODAY、路径、API Key
-│   └── tools/
-│       ├── calendar.py
-│       └── files.py
-├── data/
-│   ├── calendar.json
-│   └── notes/
-│       ├── fyp-proposal.md
-│       └── meeting-notes.md
-├── static/
-│   └── index.html
-└── scripts/
-    └── demo_cli.py
+│   ├── main.py                    # FastAPI: page, streaming chat, opener, undo, "that's wrong"
+│   ├── agent.py                   # Friday: voice, instructions, one turn with sessions and approvals
+│   ├── conversation.py            # server-side conversations (SQLite)
+│   ├── approval.py                # what needs confirmation, and how it is shown
+│   ├── presence.py / agenda.py    # opener card and the one line, computed without the model
+│   ├── todos.py                   # to-dos
+│   ├── memory_store.py            # long-term memory
+│   ├── friction.py / mistakes.py  # what you dislike / what she got wrong
+│   ├── cursor_fix.py / ship.py    # Cursor fixes, preview, test gate, merge and deploy
+│   ├── state_sync.py              # import/export state, cloud usage log
+│   ├── config.py                  # paths, FRIDAY_STATE_DIR, demo date, backends
+│   └── tools/                     # tools the agent can call
+├── static/index.html
+├── scripts/                       # open_agent, deploy_fly, sync_to_cloud, usage_report, demos…
+├── tests/                         # offline tests (fake model)
+└── data/                          # demo data and the profile (state lives in FRIDAY_STATE_DIR)
 ```
 
-## Out of scope（Baseline）
+## Out of scope
 
-为避免过度设计，**本阶段明确不做**（与 preliminary outline 一致）：
+To avoid over-engineering, these are deliberately not built:
 
-- Mobile App
-- Long-term memory（含 Zep / Letta）
-- Database
-- Multi-agent
-- Browser / Computer Use / Cloud sandbox
-- Voice
-- Gmail / Drive（日历可选 Google 只读，见 docs/google-calendar-setup.md）
-- Proactive notifications
-- 复杂权限系统
-- Production-level UI / 网页搜索
-- MCP 作为运行时依赖（可调研，Baseline 不接入）
+- App Store app / native iPhone shell (Safari "Add to Home Screen" instead)
+- Multi-agent, "AI employees"
+- Memory admin UI, dashboards for their own sake
+- Browser / computer use
+- Dozens of notifications a day or fake "proactive" noise
+- General news reader, unattended trading or posting
 
-## 许可与署名
+## License and attribution
 
-学术项目代码。Git 提交作者应为学生身份（`MOLIYUANQUAN`）。
+Academic project code. Git commits are authored under the student's identity (`MOLIYUANQUAN`).
