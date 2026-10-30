@@ -200,7 +200,6 @@
     .today .more { color: var(--soft); }
     .today .row.handled { opacity: 0.45; }
     .today .row.handled .what { text-decoration: line-through; }
-    .today section.attention h3 { color: var(--ink); font-weight: 600; }
     .today .row-actions {
       display: flex;
       flex-wrap: wrap;
@@ -232,13 +231,20 @@
       padding: 3px 0;
       color: var(--muted);
     }
+    /* 「现在」：此刻最该做的那一件，一句大字、一个动作；下面才是今天安静的时间线 */
     .today .say {
-      margin-top: 16px;
+      margin-top: 6px;
+      white-space: pre-wrap;
+      font-size: 1.28rem;
+      font-weight: 600;
+      line-height: 1.4;
+      letter-spacing: -0.02em;
+    }
+    .today .row-actions.focus-actions { margin: 12px 0 0; }
+    .today .say + section, .today .focus-actions + section {
+      margin-top: 20px;
       padding-top: 14px;
       border-top: 1px solid var(--line);
-      white-space: pre-wrap;
-      font-size: 1.05rem;
-      letter-spacing: -0.015em;
     }
     .today .say:empty { display: none; }
     .today .say.failed { color: var(--danger); }
@@ -795,8 +801,13 @@
       div.className = "msg bot today";
       div.replaceChildren(el("div", "hello", card.hello));
       if (card.error) div.append(el("p", "empty", card.error));
+      const say = el("div", "say");
+      div.append(say);
+      if (card.focus && card.focus.actions && card.focus.actions.length) {
+        div.append(focusActions(div, card.focus));
+      }
       for (const section of card.sections || []) {
-        const box = el("section", section.attention ? "attention" : "");
+        const box = el("section");
         // 空的日子只占一行、退到后面；版面留给真要去的事
         const head = el("h3");
         head.append(el("span", "", section.label));
@@ -810,6 +821,7 @@
           if (row.now) what.append(el("span", "tag", "进行中"));
           if (row.where) what.append(el("span", "where", row.where));
           line.append(el("time", "", row.time), what);
+          if (row.key) line.dataset.key = row.key;
           box.append(line);
           if (row.actions && row.actions.length) {
             line.classList.add("tappable");
@@ -818,9 +830,31 @@
         }
         div.append(box);
       }
-      const say = el("div", "say");
-      div.append(say);
       return say;
+    }
+
+    // 「现在」那句话下面的按钮：和时间线上同一件事是同一个动作，办完那一行也划掉
+    function focusActions(div, focus) {
+      const bar = el("div", "row-actions focus-actions");
+      for (const action of focus.actions) {
+        const b = el("button", "", action.label);
+        b.type = "button";
+        b.onclick = () => {
+          if (action.url) {
+            window.open(action.url, "_blank", "noopener");
+            return;
+          }
+          if (action.confirm && !b.dataset.armed) {
+            b.dataset.armed = "1";
+            b.textContent = action.confirm;
+            return;
+          }
+          const line = div.querySelector('.row[data-key="' + CSS.escape(focus.key) + '"]') || el("div");
+          doRow(line, focus, action, bar);
+        };
+        bar.append(b);
+      }
+      return bar;
     }
 
     // 卡片上的一行：点开出动作；「帮我准备」交给她，「做完了 / 明天再说」直接办、给撤销

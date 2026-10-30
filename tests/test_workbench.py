@@ -23,38 +23,65 @@ def at(hhmm: str, day: str = "2026-10-13") -> datetime:
     return datetime.fromisoformat(f"{day}T{hhmm}")
 
 
-def sections(now: datetime, tasks: list[dict]) -> dict[str, dict]:
-    found, _say = presence.today_view(now, EVENTS, tasks)
-    return {s["label"]: s for s in found}
+def view(now: datetime, tasks: list[dict], decisions: list[dict] | None = None):
+    found, say, focus = presence.today_view(now, EVENTS, tasks, decisions)
+    return {s["label"]: s for s in found}, say.replace("\u00a0", " "), focus
 
 
-class CardTests(unittest.TestCase):
+class NowTests(unittest.TestCase):
+    """打开就是「现在」：一句话、一个动作；下面一条时间线，没有分区标题。"""
+
     TASKS = [
         {"id": "t-old", "title": "交 Lab 2", "due": "2026-10-11"},
         {"id": "t-today", "title": "准备进度汇报", "due": "2026-10-13"},
         {"id": "t-tomorrow", "title": "续借图书馆的书", "due": "2026-10-14"},
     ]
+    SHIP = {"time": "改好了", "title": "开场不再催", "say": "Cursor 改好了：开场不再催，等你上线。", "key": "ship:pending",
+            "actions": [{"id": "ship", "label": "上线"}]}
 
-    def test_needs_you_only_holds_decisions(self) -> None:
-        card = sections(at("12:00"), self.TASKS)
-        needs = card["需要你"]
-        self.assertEqual(list(card)[0], "需要你")  # 放在最上面
-        titles = [r["title"] for r in needs["rows"]]
-        self.assertEqual(titles, ["FYP meeting with mentor", "交 Lab 2"])  # 三小时内的要紧会 + 过了截止的
-        self.assertNotIn("准备进度汇报", titles)  # 今天截止的还不用拍板
-        self.assertEqual([a["id"] for a in needs["rows"][1]["actions"]], ["done", "tomorrow"])
+    def test_important_meeting_soon_comes_first(self) -> None:
+        _, say, focus = view(at("12:00"), self.TASKS, [self.SHIP])
+        self.assertEqual(say, "下午 2 点 FYP meeting with mentor，在 Kilburn Building，还有 2 小时。")
+        self.assertEqual([a["id"] for a in focus["actions"]], ["prepare"])
 
-    def test_no_needs_you_when_nothing_needs_him(self) -> None:
-        card = sections(at("09:00", "2026-10-12"), [{"id": "t", "title": "x", "due": "2026-10-13"}])
-        self.assertNotIn("需要你", card)  # 明天的会、明天截止的都不进来
+    def test_then_overdue_then_engineering_then_due_today(self) -> None:
+        _, say, focus = view(at("09:00"), self.TASKS, [self.SHIP])
+        self.assertEqual((say, focus["key"]), ("过了截止还没划掉：交 Lab 2。", "task:t-old"))
+        _, say, focus = view(at("09:00"), self.TASKS[1:], [self.SHIP])
+        self.assertEqual(focus["key"], "ship:pending")
+        _, say, focus = view(at("09:00"), self.TASKS[1:])
+        self.assertEqual(say, "今天截止：准备进度汇报。")
+        self.assertEqual([a["id"] for a in focus["actions"]], ["done", "tomorrow"])
 
-    def test_rows_carry_actions(self) -> None:
-        card = sections(at("09:00", "2026-10-12"), self.TASKS[1:])
-        meeting = next(r for r in card["明天 · 周二"]["rows"] if r["title"] == "FYP meeting with mentor")
-        lecture = next(r for r in card["明天 · 周二"]["rows"] if r["title"] == "Comp30291 lecture")
-        self.assertEqual([a["id"] for a in meeting["actions"]], ["prepare"])
-        self.assertEqual(lecture["actions"], [])  # 讲座不用准备
-        self.assertEqual(card["待办"]["rows"][0]["key"], "task:t-today")
+    def test_nothing_pressing_falls_back_to_the_calendar_line(self) -> None:
+        _, say, focus = view(at("09:00", "2026-10-12"), [])
+        self.assertIsNone(focus)
+        self.assertIn("明天下午 2 点", say)
+
+    def test_one_timeline_per_day_with_reminders_and_deadlines(self) -> None:
+        from src import reminders
+
+        reminders.REMINDERS_PATH.unlink(missing_ok=True)
+        self.addCleanup(reminders.REMINDERS_PATH.unlink, missing_ok=True)
+        reminders.add("给妈妈打电话", at("15:30"))
+        card, _, _ = view(at("09:00"), self.TASKS)
+        self.assertEqual(list(card), ["今天", "明天 · 周三"])  # 没有「需要你」「待办」这些分区
+        today = [(r["time"], r["title"]) for r in card["今天"]["rows"]]
+        self.assertEqual(today, [
+            ("10:00–11:00", "Comp30291 lecture"),
+            ("14:00–15:00", "FYP meeting with mentor"),
+            ("15:30", "提醒：给妈妈打电话"),
+            ("过了 2 天", "交 Lab 2"),
+            ("截止", "准备进度汇报"),
+        ])
+        self.assertEqual(card["明天 · 周三"]["rows"][-1]["title"], "续借图书馆的书")
+
+    def test_rows_still_carry_their_actions(self) -> None:
+        card, _, _ = view(at("09:00", "2026-10-12"), self.TASKS[1:])
+        rows = {r["title"]: r for r in card["明天 · 周二"]["rows"]}
+        self.assertEqual([a["id"] for a in rows["FYP meeting with mentor"]["actions"]], ["prepare"])
+        self.assertEqual(rows["Comp30291 lecture"]["actions"], [])  # 讲座不用准备
+        self.assertEqual(rows["准备进度汇报"]["key"], "task:t-today")
 
 
 class ActTests(SandboxTestCase):

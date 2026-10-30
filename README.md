@@ -69,7 +69,8 @@ Switching to the cloud brain for the first time:
 
 Opening Friday shows today's work, not a blank chat:
 
-- **需要你 (needs you)** appears only when something needs a decision: an important meeting starting within three hours, or a to-do past its due date. It shows at most three rows; tomorrow's things never go in.
+- **现在 (now)** is one sentence in large type with one action: the single thing that matters most right now. The order is: an important meeting within three hours ("帮我准备"), then a to-do past its due date, then an engineering decision (a ready change to ship, a red `develop`), then what is due today. If none of these apply, the line is her judgement of the calendar.
+- **Below it is a quiet timeline** for today and tomorrow: classes, meetings, reminders and deadlines in time order. There are no section headers such as "需要你" or "待办".
 - **Every row can be tapped.** Important meetings offer "帮我准备" (Friday prepares the brief). To-dos offer "做完了" and "明天再说"; these run directly, come with "Undo", and are recorded in the conversation.
 
 ## Friday comes to find you

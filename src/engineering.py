@@ -115,6 +115,7 @@ def card(gh: dict[str, Any] | None = None) -> tuple[list[dict[str, Any]], dict[s
             {
                 "time": "改好了",
                 "title": what,
+                "say": f"Cursor 改好了：{what}，等你上线。",
                 "where": f"Cursor · {n} 个文件" if n else "Cursor",
                 "now": False,
                 "key": "ship:pending",
@@ -134,6 +135,7 @@ def card(gh: dict[str, Any] | None = None) -> tuple[list[dict[str, Any]], dict[s
             {
                 "time": "测试红了",
                 "title": tests["message"] or "develop",
+                "say": f"develop 测试红了：{tests['message'] or tests['sha'][:7]}。",
                 "where": f"develop · {tests['sha'][:7]}",
                 "now": False,
                 "key": f"ci:{tests['sha']}",

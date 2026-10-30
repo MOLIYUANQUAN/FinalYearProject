@@ -68,10 +68,14 @@ class CardTests(unittest.TestCase):
         self.assertEqual([r["time"] for r in running["rows"]], ["在改", "上线中", "PR #7"])  # 草稿 PR 不占地方
         self.assertEqual(running["meta"], "线上 1234567")
 
-    def test_decisions_go_on_top_of_needs_you(self) -> None:
+    def test_leftover_decisions_join_the_running_block_at_the_end(self) -> None:
         sections = [{"label": "今天", "rows": []}]
-        presence._add_engineering(sections, [{"time": "改好了"}], {"label": "在跑的", "rows": [{}]})
-        self.assertEqual([s["label"] for s in sections], ["需要你", "今天", "在跑的"])
+        presence._add_engineering(sections, [{"time": "测试红了"}], {"label": "在跑的", "rows": [{"time": "上线中"}]})
+        self.assertEqual([s["label"] for s in sections], ["今天", "在跑的"])
+        self.assertEqual([r["time"] for r in sections[1]["rows"]], ["测试红了", "上线中"])
+        quiet = [{"label": "今天", "rows": []}]
+        presence._add_engineering(quiet, [], None)
+        self.assertEqual(len(quiet), 1)
 
 
 class EventTests(SandboxTestCase):

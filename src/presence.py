@@ -8,7 +8,7 @@ from collections.abc import AsyncIterator
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from src import agenda, engineering, todos
+from src import agenda, engineering, reminders, todos
 from src.agenda import Timed, day_label, title, when
 from src.config import effective_now
 from src.context import greeting, his_name, weekday_zh
@@ -69,7 +69,6 @@ def _spaced(text: str) -> str:
 PREPARE = {"id": "prepare", "label": "帮我准备"}
 DONE = {"id": "done", "label": "做完了"}
 TOMORROW = {"id": "tomorrow", "label": "明天再说"}
-NEEDS_YOU_MAX = 3
 NEEDS_YOU_AHEAD = timedelta(hours=3)
 
 
@@ -95,60 +94,51 @@ def _task_row(task: dict[str, Any], word: str, actions: list[dict[str, str]]) ->
     return {"time": word, "title": task["title"], "where": "", "now": False, "key": f"task:{task['id']}", "actions": actions}
 
 
-def _task_section(tasks: list[dict[str, Any]], today: date) -> dict[str, Any] | None:
-    """今天和明天截止的待办（过了截止的在「需要你」里）；别的不占卡片。"""
+def _reminder_rows(day: date) -> list[tuple[datetime, dict[str, Any]]]:
+    """他交代过的提醒，排进那天的时间线（到点会推给他）。"""
     rows = []
+    for item in reminders.pending():
+        at = datetime.fromisoformat(item["at"])
+        if at.date() == day:
+            rows.append((at, {"time": f"{at:%H:%M}", "title": f"提醒：{item['what']}", "where": "", "now": False}))
+    return rows
+
+
+def _day_rows(
+    day: date, now: datetime, timed: list[Timed], all_day: list[tuple[date, str]], tasks: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """一天的时间线：全天的、按钟点排的日程和提醒，最后是这天截止的（今天的还带上过了截止的）。"""
+    timeline: list[tuple[datetime, dict[str, Any]]] = [
+        (s, _row(ev, s, e, now=s <= now)) for s, e, ev in timed if s.date() == day and (e or s) > now
+    ]
+    timeline += _reminder_rows(day)
+    timeline.sort(key=lambda pair: pair[0])
+    rows = _all_day_rows([t for d, t in all_day if d == day]) + [row for _, row in timeline]
     for task, due in todos.ordered(tasks):
-        if due is None or due < today or due > today + timedelta(days=1):
+        if due is None:
             continue
-        if due == today:
-            rows.append(_task_row(task, "今天", [DONE, TOMORROW]))
-        else:
-            rows.append(_task_row(task, "明天", [DONE]))
-    return {"label": "待办", "meta": "", "rows": rows, "empty": ""} if rows else None
-
-
-def _needs_you(now: datetime, timed: list[Timed], tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """只放要他拍板的：过了截止还没划掉的（做完了，还是改日子），和三小时内要开始、要紧的会。
-    明天的事不进来；没有就整块不出现。"""
-    rows = []
-    for start, end, event in timed:
-        if start.date() == now.date() and timedelta(0) < start - now <= NEEDS_YOU_AHEAD and IMPORTANT.search(title(event)):
-            rows.append(_row(event, start, end))
-    for task, due in todos.ordered(tasks):
-        if due is not None and due < now.date():
-            rows.append(_task_row(task, f"过了 {(now.date() - due).days} 天", [DONE, TOMORROW]))
-    if not rows:
-        return None
-    return {"label": "需要你", "meta": "", "rows": rows[:NEEDS_YOU_MAX], "empty": "", "attention": True}
+        if day == now.date() and due < day:
+            rows.append(_task_row(task, f"过了 {(day - due).days} 天", [DONE, TOMORROW]))
+        elif due == day:
+            rows.append(_task_row(task, "截止", [DONE, TOMORROW] if day == now.date() else [DONE]))
+    return rows
 
 
 def _sections(
     now: datetime, timed: list[Timed], all_day: list[tuple[date, str]], tasks: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    """他眼前的卡片：今天还剩的、明天的；两天都空就给下一件；最后是快到期的待办。"""
+    """「现在」下面那条安静的时间线：今天还剩的、明天的；两天都空就给下一件。"""
     today = now.date()
     tomorrow = today + timedelta(days=1)
-    remaining = [(s, e, ev) for s, e, ev in timed if s.date() == today and (e or s) > now]
     finished = sum(1 for s, e, _ in timed if s.date() == today and (e or s) <= now)
-    upcoming = [(s, e, ev) for s, e, ev in timed if s.date() == tomorrow]
-
+    today_rows = _day_rows(today, now, timed, all_day, tasks)
+    tomorrow_rows = _day_rows(tomorrow, now, timed, all_day, tasks)
     sections = [
-        {
-            "label": "今天",
-            "meta": f"已结束 {finished} 项" if finished else "",
-            "rows": _all_day_rows([t for d, t in all_day if d == today])
-            + [_row(ev, s, e, now=s <= now) for s, e, ev in remaining],
-            "empty": "都结束了" if finished else "没有安排",
-        },
-        {
-            "label": f"明天 · {weekday_zh(tomorrow)}",
-            "meta": "",
-            "rows": _all_day_rows([t for d, t in all_day if d == tomorrow]) + [_row(ev, s, e) for s, e, ev in upcoming],
-            "empty": "没有安排",
-        },
+        {"label": "今天", "meta": f"已结束 {finished} 项" if finished else "", "rows": today_rows,
+         "empty": "都结束了" if finished else "没有安排"},
+        {"label": f"明天 · {weekday_zh(tomorrow)}", "meta": "", "rows": tomorrow_rows, "empty": "没有安排"},
     ]
-    if not remaining and not upcoming:
+    if not today_rows and not tomorrow_rows:
         later = next((item for item in timed if item[0].date() > tomorrow), None)
         if later:
             start, end, event = later
@@ -157,9 +147,35 @@ def _sections(
             )
         else:
             sections.append({"label": "到下周日", "meta": "", "rows": [], "empty": "都没有安排"})
-    due = _task_section(tasks, today)
-    needs = _needs_you(now, timed, tasks)
-    return ([needs] if needs else []) + sections + ([due] if due else [])
+    return sections
+
+
+def _focus(
+    now: datetime, timed: list[Timed], tasks: list[dict[str, Any]], decisions: list[dict[str, Any]]
+) -> dict[str, Any] | None:
+    """此刻最该做的那一件，带一个动作。顺序：三小时内要紧的会 → 过了截止的 → 工程上要他拍板的 → 今天截止的。
+    正在上课 / 开会，或者都没有：返回 None，用日历上那句判断。"""
+    today = now.date()
+    if any(e and s <= now < e for s, e, _ in timed):
+        return None
+    for start, _end, event in timed:
+        if start.date() == today and timedelta(0) < start - now <= NEEDS_YOU_AHEAD and IMPORTANT.search(title(event)):
+            return {"say": _spaced(f"{_clock(start)}{agenda.spoken(event)}{_there(event)}，还有 {_span(start - now)}。"),
+                    "key": f"event:{event.get('id') or title(event)}", "actions": [PREPARE], "title": title(event)}
+    pairs = todos.ordered(tasks)
+    overdue = [task for task, due in pairs if due is not None and due < today]
+    if overdue:
+        return {"say": _spaced(f"过了截止还没划掉：{overdue[0]['title']}。"), "key": f"task:{overdue[0]['id']}",
+                "actions": [DONE, TOMORROW], "title": overdue[0]["title"]}
+    if decisions:
+        first = decisions[0]
+        return {"say": _spaced(first["say"]), "key": first["key"], "actions": first["actions"], "title": first["title"]}
+    due = [task for task, day in pairs if day == today]
+    if due:
+        rest = f"，还有 {len(due) - 1} 件" if len(due) > 1 else ""
+        return {"say": _spaced(f"今天截止：{due[0]['title']}{rest}。"), "key": f"task:{due[0]['id']}",
+                "actions": [DONE, TOMORROW], "title": due[0]["title"]}
+    return None
 
 
 def _names(titles: list[str]) -> str:
@@ -242,13 +258,17 @@ def _calendar_say(now: datetime, timed: list[Timed], all_day: list[tuple[date, s
 
 
 def today_view(
-    now: datetime, events: list[dict[str, Any]], tasks: list[dict[str, Any]] | None = None
-) -> tuple[list[dict[str, Any]], str]:
-    """同一份日历和待办：卡片分区、此刻那一句。"""
+    now: datetime,
+    events: list[dict[str, Any]],
+    tasks: list[dict[str, Any]] | None = None,
+    decisions: list[dict[str, Any]] | None = None,
+) -> tuple[list[dict[str, Any]], str, dict[str, Any] | None]:
+    """同一份日历、待办和工程状态：时间线、此刻那一句、那一句要不要带动作（focus）。"""
     timed, all_day = agenda.split(events)
     tasks = tasks or []
-    say = _say(now, timed, all_day, tasks)
-    return _sections(now, timed, all_day, tasks), say
+    focus = _focus(now, timed, tasks, decisions or [])
+    say = focus["say"] if focus else _say(now, timed, all_day, tasks)
+    return _sections(now, timed, all_day, tasks), say, focus
 
 
 def _reason(exc: BaseException, fallback: str) -> str:
@@ -275,24 +295,23 @@ async def presence_input() -> tuple[dict[str, Any], str]:
         card["error"] = _reason(calendar, "日历这次没读到。")
         return card, ""
     tasks = [] if isinstance(todo, BaseException) else todo[0]
-    card["sections"], say = today_view(now, calendar[0], tasks)
+    decisions, running = ([], None) if isinstance(work, BaseException) else work
+    card["sections"], say, focus = today_view(now, calendar[0], tasks, decisions)
+    if focus:
+        card["focus"] = {"key": focus["key"], "actions": focus["actions"], "title": focus["title"]}
     if isinstance(todo, BaseException):
         card["sections"].append({"label": "待办", "meta": "", "rows": [], "empty": _reason(todo, "这次没读到。")})
-    if not isinstance(work, BaseException):
-        _add_engineering(card["sections"], *work)
+    _add_engineering(card["sections"], [d for d in decisions if not focus or d["key"] != focus["key"]], running)
     return card, say
 
 
 def _add_engineering(sections: list[dict[str, Any]], decisions: list[dict[str, Any]], running: dict[str, Any] | None) -> None:
-    """工程线：要拍板的（改好了要不要上线、测试红了）放进「需要你」最前面；在跑的放最后。"""
-    if decisions:
-        needs = next((s for s in sections if s.get("attention")), None)
-        if needs is None:
-            needs = {"label": "需要你", "meta": "", "rows": [], "empty": "", "attention": True}
-            sections.insert(0, needs)
-        needs["rows"] = (decisions + needs["rows"])[:NEEDS_YOU_MAX]
-    if running:
-        sections.append(running)
+    """工程线：没放进「现在」的那些拍板事、和在跑的，排在最后一块「在跑的」；都没有就不出现。"""
+    if not decisions and not running:
+        return
+    block = running or {"label": "在跑的", "meta": "", "rows": [], "empty": ""}
+    block["rows"] = decisions + block["rows"]
+    sections.append(block)
 
 
 async def stream_presence() -> AsyncIterator[dict[str, Any]]:
