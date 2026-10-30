@@ -51,9 +51,9 @@ Switching to the cloud brain for the first time:
 | Tool | What it does | Needs your confirmation |
 |------|--------------|-------------------------|
 | `get_calendar_events` | Read the calendar (including the imported university timetable) | |
-| `create_calendar_event` | Add an event | yes |
+| `create_calendar_event` | Add an event to his own calendar | no — done directly with "Undo" |
 | `search_emails` / `read_email` | Search and read Gmail | |
-| `send_email` | Send an email | yes |
+| `send_email` | Send an email (subject/body editable in the card) | yes |
 | `modify_email` | Mark read/unread (direct) or archive/trash (confirmed) | archive / trash |
 | `search_files` / `read_file` | Local notes | |
 | `get_personal_context` | Static profile | |
@@ -65,7 +65,35 @@ Switching to the cloud brain for the first time:
 | `check_cursor_fix` / `preview_pending_ship` | Progress and diff of the Cursor change | |
 | `ship_pending_fix` | Merge into `develop` and deploy | yes |
 
-**Confirmation is enforced in code, not in the prompt.** Write tools are registered with the Agents SDK's `needs_approval`, so the run pauses before they execute. The server writes out exactly what will happen (recipient, subject, body, time, changed files), and only an explicit yes ("确认", "好的", "发吧", the Confirm button…) resumes that exact action. "取消" or anything else cancels it. The paused step is saved to disk, so a restart in between does not lose it.
+## The workbench
+
+Opening Friday shows today's work, not a blank chat:
+
+- **需要你 (needs you)** appears only when something needs a decision: an important meeting starting within three hours, or a to-do past its due date. It shows at most three rows; tomorrow's things never go in.
+- **Every row can be tapped.** Important meetings offer "帮我准备" (Friday prepares the brief). To-dos offer "做完了" and "明天再说"; these run directly, come with "Undo", and are recorded in the conversation.
+
+## Friday comes to find you
+
+Web Push reaches the iPhone home-screen app and the desktop Friday window. When and what to say is computed on the server from the calendar and to-dos, without the model:
+
+| When | What |
+|------|------|
+| Weekdays after 08:30, weekends after 10:00, before noon | Morning brief: today's items and what is due (skipped on an empty day) |
+| 20 min – 2 h before an important meeting | "下午 2 点：FYP meeting… 点开，我把要点备好" — tapping it opens Friday and prepares the brief |
+| After 17:00 | What is due today and still not done |
+
+- At most two a day (`FRIDAY_PUSH_DAILY_MAX`), never between 22:00 and 08:00, and each thing only once.
+- The scheduler runs only on Fly (`FLY_APP_NAME` + Google calendar), so the desktop and the cloud never both send. Override it with `FRIDAY_NUDGES=on/off`.
+- Encryption (RFC 8291) and VAPID (RFC 8292) are implemented with `cryptography`; the keys live in `FRIDAY_STATE_DIR/push/`.
+
+Turning it on:
+
+- **iPhone:** in Safari, Share → Add to Home Screen. Open Friday from the home screen, log in once, then tap "打开提醒" under the opening card.
+- **Desktop:** tap "打开提醒" in the Friday window. Notifications arrive while the window's browser is running (after the first Ctrl+Alt+F since boot).
+
+Opening a notification is counted in the usage log, so `usage_report.py` shows whether nudges are worth it.
+
+**Confirmation is enforced in code, not in the prompt.** Outward or destructive tools are registered with the Agents SDK's `needs_approval`, so the run pauses before they execute. The server writes out exactly what will happen (recipient, subject, body, time, changed files), and only an explicit yes ("确认", "好的", "发吧", the Confirm button…) resumes that exact action. "取消" or anything else cancels it. The paused step is saved to disk, so a restart in between does not lose it. For mail, "改一下" lets him edit the subject and body in the card. Friday must re-issue the call with exactly the edited text before it is sent; if anything differs, he is asked again.
 
 Every reply has a small **说错了** ("that's wrong") button. One tap records the question, the answer and the tools used in `mistakes.jsonl`, and `usage_report.py` counts them per day. The target is zero.
 
