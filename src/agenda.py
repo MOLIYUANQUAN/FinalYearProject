@@ -10,6 +10,7 @@ from typing import Any, NamedTuple
 
 from src.calendar_providers import get_calendar_provider
 from src.calendar_providers.common import is_background_span
+from src import names
 from src.config import effective_now
 from src.context import module_names, weekday_zh
 
@@ -127,12 +128,18 @@ def title(event: dict[str, Any]) -> str:
 
 
 def spoken(event: dict[str, Any]) -> str:
-    """说出口的名字：「AI and Games 讲座」；不是课表的就用原标题。"""
+    """说出口的名字：「AI and Games 讲座」；不是课表的用起好的短名（「见导师」），还没起好就用原标题。"""
     name = title(event)
     module, sep, kind = name.partition(" · ")
     if not sep:
-        return name
+        return names.short(name)
     return f"{module} {SPOKEN_KINDS.get(kind, kind)}"
+
+
+def shown(event: dict[str, Any]) -> str:
+    """时间线上显示的名字：课表照「AI and Games · Lecture」，别的用短名。"""
+    name = title(event)
+    return name if " · " in name else names.short(name)
 
 
 def where(event: dict[str, Any]) -> str:

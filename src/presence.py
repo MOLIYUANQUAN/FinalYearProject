@@ -49,6 +49,12 @@ def _there(event: dict[str, Any]) -> str:
     return f"，在{place}" if place and place != "在线" else ""
 
 
+def _at(event: dict[str, Any]) -> str:
+    """补充那一行里的地点：「在 Kilburn Building。」；线上的、没写的就不说。"""
+    place = _place(event)
+    return f"在{place}。" if place and place != "在线" else ""
+
+
 def _clock(moment: datetime) -> str:
     """说出口的钟点：「中午 12 点」「下午 3 点半」「晚上 7:15」。"""
     hour, minute = moment.hour, moment.minute
@@ -79,7 +85,7 @@ def _row(event: dict[str, Any], start: datetime, end: datetime | None, *, now: b
     actions = [PREPARE] if IMPORTANT.search(name) and not now else []
     return {
         "time": when(start, end),
-        "title": name,
+        "title": agenda.shown(event),
         "where": _place(event),
         "now": now,
         "key": f"event:{event.get('id') or name}",
@@ -159,7 +165,9 @@ def _focus(
         return None
     for start, _end, event in timed:
         if start.date() == today and timedelta(0) < start - now <= NEEDS_YOU_AHEAD and IMPORTANT.search(title(event)):
-            return {"say": _spaced(f"{_clock(start)}{agenda.spoken(event)}{_there(event)}，还有 {_span(start - now)}。"),
+            place = _place(event)
+            detail = f"{place} · " if place and place != "在线" else ""
+            return {"say": _spaced(f"{_clock(start)}{agenda.spoken(event)}。{detail}还有 {_span(start - now)}。"),
                     "key": f"event:{event.get('id') or title(event)}", "actions": [PREPARE], "title": title(event)}
     pairs = todos.ordered(tasks)
     overdue = [task for task, due in pairs if due is not None and due < today and not todos.is_stale(due, today)]
@@ -212,9 +220,9 @@ def _calendar_say(now: datetime, timed: list[Timed], all_day: list[tuple[date, s
         gap = soon[0] - current[1]
         between = "紧接着是" if gap <= timedelta(0) else f"隔 {_span(gap)}就是"
         left = _span(current[1] - now)
-        return _spaced(f"{spoken(current[2])}还剩 {left}，结束后{between}{spoken(soon[2])}{_there(soon[2])}。"), True
+        return _spaced(f"{spoken(current[2])}还剩 {left}。结束后{between}{spoken(soon[2])}{_there(soon[2])}。"), True
     if soon and soon[0].date() == today and soon[0] - now <= timedelta(hours=1):
-        return _spaced(f"{spoken(soon[2])} {_span(soon[0] - now)}后开始{_there(soon[2])}。"), True
+        return _spaced(f"{_span(soon[0] - now)}后{spoken(soon[2])}。{_at(soon[2])}"), True
 
     if current:
         status = f"眼下的{spoken(current[2])}还剩 {_span(current[1] - now)}。"
@@ -228,7 +236,7 @@ def _calendar_say(now: datetime, timed: list[Timed], all_day: list[tuple[date, s
     for start, _, event in upcoming:
         if start.date() <= tomorrow and IMPORTANT.search(title(event)):
             when_said = f"{_day_word(start.date(), today)}{_clock(start)}"
-            return _spaced(f"最要紧的是{when_said}：{spoken(event)}{_there(event)}。{status}"), False
+            return _spaced(f"{when_said}{spoken(event)}。{_at(event)}{status}"), False
 
     if current:
         left = _span(current[1] - now)

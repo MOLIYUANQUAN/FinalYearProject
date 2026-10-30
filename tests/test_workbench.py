@@ -41,7 +41,8 @@ class NowTests(unittest.TestCase):
 
     def test_important_meeting_soon_comes_first(self) -> None:
         _, say, focus = view(at("12:00"), self.TASKS, [self.SHIP])
-        self.assertEqual(say, "下午 2 点 FYP meeting with mentor，在 Kilburn Building，还有 2 小时。")
+        # 第一句只说最要紧的（大字），地点和还剩多久在后面（小字）
+        self.assertEqual(say, "下午 2 点 FYP meeting with mentor。Kilburn Building · 还有 2 小时。")
         self.assertEqual([a["id"] for a in focus["actions"]], ["prepare"])
 
     def test_then_overdue_then_engineering_then_due_today(self) -> None:

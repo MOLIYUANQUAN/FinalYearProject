@@ -101,10 +101,9 @@ def _meetings(now: datetime, timed: list[Timed]) -> list[dict[str, Any]]:
         ahead = start - now
         if start.date() != now.date() or not (MEETING_AHEAD[0] <= ahead <= MEETING_AHEAD[1]):
             continue
-        name = agenda.title(event)
-        if not IMPORTANT.search(name):
+        if not IMPORTANT.search(agenda.title(event)):
             continue
-        key = f"meeting:{event.get('id') or name}:{start:%Y-%m-%dT%H:%M}"
+        key = f"meeting:{event.get('id') or agenda.title(event)}:{start:%Y-%m-%dT%H:%M}"
         what = agenda.spoken(event)
         out.append(
             {
