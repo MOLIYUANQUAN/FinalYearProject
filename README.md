@@ -120,6 +120,7 @@ Like WeChat: tap "说" and the input bar becomes "按住 说话".
 - Hold to record, release to send, slide up to cancel. A press that is too short says so.
 - The mic opens once and stays open while Friday is in front, so every press records instantly. The iPhone does not keep asking for permission; the mic closes when Friday goes to the background.
 - Your bubble appears the moment you let go and turns into text once transcribed.
+- She answers in text, as if you had typed. She reads aloud only when you ask ("念给我听", "听听你的声音").
 - You can talk while she is speaking: she stops and listens.
 - "打字" switches back. The last mode is remembered.
 

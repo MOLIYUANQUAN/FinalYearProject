@@ -1634,7 +1634,8 @@
         if (!text) throw new Error("没听清，再说一遍？");
         bubble.textContent = text;
         await whenIdle();
-        await ask(text, { speak: true, userDiv: bubble });
+        // 说话只是另一种打字：照常用文字回；他要听（「念给我听」）时 ask 里的 wantsVoice 会让她出声
+        await ask(text, { userDiv: bubble });
       } catch (e) {
         bubble.remove();
         settleOrb();
@@ -1715,7 +1716,7 @@
       fetch("/api/calendar/warm", { method: "POST", credentials: "include", headers: authHeaders() }).catch(() => {});
     }
 
-    // 他打字说「听听你的声音」也要念出来，不只点「说」才开口
+    // 只有他明说要听（「念给我听」「听听你的声音」）才念出来；按住说话的那句也一样
     function wantsVoice(text) {
       return /听听|听你|你的声音|念给|读给|说两句|说句话|hear (your )?voice|speak (to me|up)|say something/i.test(text || "");
     }
