@@ -22,7 +22,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from src import agenda, mistakes, todos, usage_log, voice
+from src import agenda, mistakes, reminders, todos, usage_log, voice
 from src.agent import friday, run_assistant
 from src.calendar_providers import get_calendar_provider
 from src.presence import stream_presence
@@ -276,7 +276,9 @@ def calendar_warm() -> Response:
 
 
 class UndoItem(BaseModel):
-    kind: str = Field(..., pattern="^(task_added|task_completed|task_due_changed|event_created)$")
+    kind: str = Field(
+        ..., pattern="^(task_added|task_completed|task_due_changed|event_created|reminder_added|reminder_cancelled)$"
+    )
     id: str = Field(..., min_length=1)
     due: str | None = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
 
@@ -298,6 +300,11 @@ def undo(body: UndoRequest) -> dict:
         for item in reversed(events):
             get_calendar_provider().delete_event(item["id"])
             agenda.forget()
+        for item in reversed(items):
+            if item["kind"] == "reminder_added":
+                reminders.cancel(item["id"])
+            elif item["kind"] == "reminder_cancelled":
+                reminders.restore(item["id"])
     except Exception as exc:  # noqa: BLE001
         reason = str(exc).splitlines()[0] if isinstance(exc, RuntimeError) else "这次没连上"
         raise HTTPException(status_code=502, detail=f"没撤销成功：{reason}") from exc

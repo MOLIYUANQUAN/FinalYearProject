@@ -16,7 +16,7 @@ from datetime import date, datetime, time, timedelta
 from typing import Any, Callable
 from urllib.parse import quote
 
-from src import agenda, engineering, push, todos, usage_log
+from src import agenda, engineering, push, reminders, todos, usage_log
 from src.agenda import Timed
 from src.config import effective_now
 from src.presence import IMPORTANT, _clock, _spaced, _there
@@ -26,9 +26,10 @@ SENT_PATH = PUSH_DIR / "sent.jsonl"
 QUIET_FROM, QUIET_UNTIL = time(22, 0), time(8, 0)
 BRIEF_UNTIL = time(12, 0)
 DUE_FROM = time(17, 0)
+EVE_FROM, EVE_UNTIL = time(20, 0), time(22, 0)
 MEETING_AHEAD = (timedelta(minutes=20), timedelta(hours=2))
 # 同时满足时谁先说：会快到了最要紧
-PRIORITY = {"meeting": 0, "brief": 1, "due": 2}
+PRIORITY = {"meeting": 0, "eve": 1, "brief": 2, "due": 3}
 # 工程消息是他自己发起的事的回音（Cursor 改好了、上线了），不占每天两条的名额；
 # 他刚让 Cursor 改、刚点了上线，晚上也照样告诉他。测试红了等到白天再说
 ENGINEERING_ANYTIME = {"cursor", "live"}
@@ -129,11 +130,24 @@ def _due(now: datetime, tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
     return {"kind": "due", "key": key, "title": "Friday · 截止", "body": _spaced(text), "url": f"/?n={quote(key)}"}
 
 
+def _eve(now: datetime, tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """有截止日的待办：前一晚 8 点到 10 点提一句（当天早上的开工简报里还会再说一次）。"""
+    if not (EVE_FROM <= now.time() < EVE_UNTIL):
+        return None
+    tomorrow = now.date() + timedelta(days=1)
+    names = [task["title"] for task, day in todos.ordered(tasks) if day == tomorrow]
+    if not names:
+        return None
+    key = f"eve:{tomorrow.isoformat()}"
+    return {"kind": "eve", "key": key, "title": "Friday · 明天截止", "body": _spaced(f"明天截止：{_names(names)}。"),
+            "url": f"/?n={quote(key)}"}
+
+
 def candidates(now: datetime, events: list[dict[str, Any]], tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """此刻值得来找他的事（还没去掉说过的、也没管上限），按要紧程度排。"""
     timed, _all_day = agenda.split(events)
     found = _meetings(now, timed)
-    for one in (_brief(now, timed, tasks), _due(now, tasks)):
+    for one in (_brief(now, timed, tasks), _due(now, tasks), _eve(now, tasks)):
         if one:
             found.append(one)
     return sorted(found, key=lambda n: PRIORITY[n["kind"]])
@@ -186,11 +200,13 @@ def tick(now: datetime | None = None, *, deliver: Callable[..., int] = push.deli
     if not push.devices():
         return []
     now = now or effective_now()
+    # 他亲口交代的提醒先发：不看名额、不看安静时段，也不受日历读不读得到影响
+    sent = _send_reminders(now, deliver)
     try:
         events = agenda.read()[0]
     except Exception as exc:  # noqa: BLE001 — 日历读不到就这一轮不说
         print(f"[WARN] nudges: calendar unavailable: {exc}")
-        return []
+        return sent
     try:
         tasks = todos.read()[0]
     except Exception:  # noqa: BLE001
@@ -200,13 +216,25 @@ def tick(now: datetime | None = None, *, deliver: Callable[..., int] = push.deli
     except Exception as exc:  # noqa: BLE001 — GitHub / Cursor 读不到就这一轮不说工程的事
         print(f"[WARN] nudges: engineering unavailable: {exc}")
         work = []
-    sent = []
     for nudge in due_now(now, events, tasks, work):
         message = {"title": nudge["title"], "body": nudge["body"], "url": nudge["url"], "tag": nudge["key"]}
         delivered = deliver(message, urgency=nudge.get("urgency", "normal"))
         if delivered:
             _mark_sent(nudge, now, delivered)
             usage_log.record("nudge", ok=True, first_token_ms=None, total_ms=0, tools=[nudge["kind"]])
+            sent.append(nudge)
+    return sent
+
+
+def _send_reminders(now: datetime, deliver: Callable[..., int]) -> list[dict[str, Any]]:
+    sent = []
+    for item in reminders.due(now):
+        nudge = {"kind": "reminder", "key": f"reminder:{item['id']}", "title": "Friday", "body": f"{item['what']}。"}
+        message = {**{k: nudge[k] for k in ("title", "body")}, "url": f"/?n={quote(nudge['key'])}", "tag": nudge["key"]}
+        if deliver(message, urgency="high"):
+            reminders.mark_sent(item["id"], now)
+            _mark_sent(nudge, now, 1)
+            usage_log.record("nudge", ok=True, first_token_ms=None, total_ms=0, tools=["reminder"])
             sent.append(nudge)
     return sent
 

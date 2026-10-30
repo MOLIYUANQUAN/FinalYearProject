@@ -12,6 +12,7 @@ from .files import read_file, search_files
 from .mail import modify_email, read_email, search_emails, send_email
 from .memory import forget_fact, remember_fact, search_memory
 from .personal import get_personal_context
+from .reminders import cancel_reminder, remind_me
 from .tasks import add_task, complete_task
 
 # 待办接入了才给模型：没接入时它连「待办」这个词都不该提
@@ -27,6 +28,8 @@ ALL_TOOLS = [
     send_email,
     modify_email,
     get_personal_context,
+    remind_me,
+    cancel_reminder,
     remember_fact,
     search_memory,
     forget_fact,
@@ -49,6 +52,8 @@ __all__ = [
     "send_email",
     "modify_email",
     "get_personal_context",
+    "remind_me",
+    "cancel_reminder",
     "remember_fact",
     "search_memory",
     "forget_fact",

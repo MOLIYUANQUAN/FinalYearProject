@@ -78,9 +78,11 @@ Web Push reaches the iPhone home-screen app and the desktop Friday window. When 
 
 | When | What |
 |------|------|
+| The exact minute he asked for ("下午三点提醒我给妈妈打电话", "20 分钟后叫我") | The reminder, in her words. The time is parsed on the server from his own words; it ignores the daily limit and quiet hours, and can be undone |
 | Weekdays after 08:30, weekends after 10:00, before noon | Morning brief: today's items and what is due (skipped on an empty day) |
 | 20 min – 2 h before an important meeting | "下午 2 点：FYP meeting… 点开，我把要点备好" — tapping it opens Friday and prepares the brief |
 | After 17:00 | What is due today and still not done |
+| 20:00–22:00 the evening before | What is due tomorrow |
 
 - At most two a day (`FRIDAY_PUSH_DAILY_MAX`), never between 22:00 and 08:00, and each thing only once.
 - The scheduler runs only on Fly (`FLY_APP_NAME` + Google calendar), so the desktop and the cloud never both send. Override it with `FRIDAY_NUDGES=on/off`.

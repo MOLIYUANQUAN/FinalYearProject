@@ -19,8 +19,8 @@ from src.config import (
     get_tasks_backend,
     require_openai_api_key,
 )
-from src import approval, cursor_fix, friction
-from src.config import STATE_DIR
+from src import approval, cursor_fix, friction, reminders
+from src.config import STATE_DIR, effective_now
 from src.context import memory_block, now_block, profile_block
 from src.conversation import Conversations, store
 from src.tools import ALL_TOOLS, TASK_TOOLS
@@ -110,6 +110,7 @@ def build_instructions(calendar: str = "", todo: str = "", *, spoken: bool = Fal
         SPOKEN if spoken else "",
         now_block(),
         _connections_line(),
+        reminders.chat_block(effective_now()),
         calendar,
         todo,
         profile_block(),
