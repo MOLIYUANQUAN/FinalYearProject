@@ -79,4 +79,4 @@ CALENDAR_BACKEND=mock
 - 当前 scope 为完整 `calendar`（可读列表 + 可在主日历创建事件）  
 - 创建事件前 Agent 必须先请求你确认；写入只针对 **primary**，不会改导入课表  
 - 若从旧版 readonly 升级，请重新运行 `python scripts/auth_google_calendar.py`
-- Friday 显示「Google 日历需要重新登录」时也是重新运行这条命令（后台服务从不自己弹出授权页）。如果每周都要来一次，多半是 OAuth 应用还在 Testing 状态（刷新令牌 7 天就过期）：在 Google Cloud 控制台的 OAuth consent screen 里把它发布为 In production
+- Friday 显示「Google 登录过期了」时，运行 `scripts\google_login.py`：日历、待办、Gmail 一次授权，并直接带到云上（后台服务从不自己弹出授权页）。如果每周都要来一次，多半是 OAuth 应用还在 Testing 状态（刷新令牌 7 天就过期）：在 Google Cloud 控制台的 OAuth consent screen 里把它发布为 In production

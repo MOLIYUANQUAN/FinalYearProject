@@ -8,7 +8,7 @@ from typing import Any
 from src.config import GOOGLE_CREDENTIALS_PATH, GOOGLE_TASKS_TOKEN_PATH
 
 SCOPES = ["https://www.googleapis.com/auth/tasks"]
-SIGN_IN_AGAIN = "Google Tasks 需要登录：运行 scripts\\auth_google_tasks.py。"
+SIGN_IN_AGAIN = "Google 登录过期了：在电脑上运行 scripts\\google_login.py，日历、待办、邮件一次登好。"
 LIST = "@default"
 
 

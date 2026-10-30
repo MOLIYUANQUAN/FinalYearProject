@@ -15,7 +15,7 @@ from src.config import (
 
 # 读日历列表 + 读写事件；比旧版 readonly 更大，升级后需重新授权
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
-SIGN_IN_AGAIN = "Google 日历需要重新登录：运行 scripts\\auth_google_calendar.py。"
+SIGN_IN_AGAIN = "Google 登录过期了：在电脑上运行 scripts\\google_login.py，日历、待办、邮件一次登好。"
 
 # 日历列表几乎不变，每次都拉一遍要多等一个来回
 CALENDAR_LIST_TTL_S = 600
