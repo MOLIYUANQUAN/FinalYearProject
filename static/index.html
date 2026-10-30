@@ -341,6 +341,20 @@
     }
     .wrong:hover { opacity: 1; color: var(--ink); }
     /* 「来找你」：开场卡片下面一行，订阅过就不再出现 */
+    /* 确认卡片里改邮件 */
+    .editor { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .editor input, .editor textarea {
+      font: inherit;
+      font-size: 0.95rem;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--bg);
+      color: var(--ink);
+      resize: vertical;
+    }
+    .editor .actions { margin-top: 0; }
+    .editor .hint { margin-left: 0; }
     .push-offer {
       margin-top: 14px;
       display: flex;
@@ -361,8 +375,9 @@
       cursor: pointer;
     }
     .wrong:disabled { cursor: default; opacity: 0.7; }
-    .msg .details + .wrong { display: inline-block; margin-left: 12px; }
-    .msg .details { display: inline-block; }
+    /* 「细节」「说错了」并排放在回复下面一行 */
+    .msg .foot { display: flex; align-items: baseline; gap: 12px; margin-top: 8px; }
+    .msg .foot .details, .msg .foot .wrong { margin-top: 0; }
     form {
       display: flex;
       gap: 8px;
@@ -674,6 +689,7 @@
         wrong: !!m.wrong,
         agenda: m.agenda || null,
         needsConfirm: !!m.needs_confirm,
+        approvals: m.approvals || [],
         at: m.at || 0,
       };
     }
@@ -827,6 +843,15 @@
       target.append(el("span", "fresh", chunk));
     }
 
+    function footOf(div) {
+      let foot = Array.from(div.children).find((c) => c.classList.contains("foot"));
+      if (!foot) {
+        foot = el("div", "foot");
+        div.appendChild(foot);
+      }
+      return foot;
+    }
+
     function addDetails(div, tools) {
       const d = document.createElement("details");
       d.className = "details";
@@ -835,7 +860,7 @@
       const body = document.createElement("div");
       body.textContent = tools.join(" → ");
       d.append(s, body);
-      div.appendChild(d);
+      footOf(div).appendChild(d);
     }
 
     // ---- 来找你：iPhone 主屏幕上的 Friday、电脑上的 Friday 窗口都能收到她主动发的提醒 ----
@@ -971,10 +996,10 @@
           b.textContent = "没记上，再点一次";
         }
       };
-      div.appendChild(b);
+      footOf(div).appendChild(b);
     }
 
-    function addConfirm(div) {
+    function addConfirm(div, m) {
       const bar = document.createElement("div");
       bar.className = "actions";
       [
@@ -988,7 +1013,61 @@
         b.onclick = () => ask(message);
         bar.appendChild(b);
       });
+      // 邮件：卡片里直接改主题和正文再发，不用让她重写一遍
+      const mail = ((m && m.approvals) || []).find((a) => a.name === "send_email");
+      if (mail) {
+        const b = el("button", "secondary", "改一下");
+        b.type = "button";
+        b.onclick = () => openMailEditor(div, bar, mail);
+        bar.insertBefore(b, bar.lastChild);
+      }
       div.appendChild(bar);
+    }
+
+    function openMailEditor(div, bar, mail) {
+      const args = mail.arguments || {};
+      const box = el("div", "editor");
+      const subject = el("input");
+      subject.value = args.subject || "";
+      subject.setAttribute("aria-label", "主题");
+      const body = el("textarea");
+      body.value = args.body || "";
+      body.rows = Math.min(14, Math.max(5, (args.body || "").split("\n").length + 1));
+      body.setAttribute("aria-label", "正文");
+      const actions = el("div", "actions");
+      const send = el("button", "", "按这个发");
+      send.type = "button";
+      const cancel = el("button", "secondary", "算了");
+      cancel.type = "button";
+      actions.append(send, cancel);
+      box.append(el("div", "hint", "发给 " + (args.to || "")), subject, body, actions);
+      bar.replaceWith(box);
+      body.focus();
+      cancel.onclick = () => box.replaceWith(bar);
+      send.onclick = () => revise(box, mail, { subject: subject.value, body: body.value });
+    }
+
+    async function revise(box, mail, changes) {
+      if (busy || !ready) return;
+      stopSpeaking();
+      setBusy(true);
+      box.remove();
+      addMessage("user", "（改了一下）按这个发。");
+      session.messages.push({ role: "user", content: "（改了一下）按这个发。", at: Date.now() });
+      const div = addMessage("bot");
+      showTyping(div, HINTS.send_email);
+      try {
+        const result = await stream(
+          "/api/chat/revise",
+          { conversation_id: session.id, call_id: mail.call_id, changes },
+          { el: div },
+        );
+        finish(div, result);
+      } catch (e) {
+        fail(div, e);
+      } finally {
+        setBusy(false);
+      }
     }
 
     // 记下或划掉的待办不先问他，只在下面放一个「撤销」：直接撤回，不经过模型
@@ -1034,7 +1113,7 @@
         if (m.tools && m.tools.length) addDetails(div, m.tools);
         if (m.role === "assistant") addWrong(div, m);
         const last = i === session.messages.length - 1;
-        if (m.needsConfirm && last) addConfirm(div);
+        if (m.needsConfirm && last) addConfirm(div, m);
         if (m.undo && m.undo.length && !m.undone && last) addUndo(div, m);
       });
       scrollDown();
@@ -1094,6 +1173,7 @@
               tools: ev.tools_called || [],
               undo: ev.undo || [],
               needsConfirm: !!ev.needs_confirm,
+              approvals: ev.approvals || [],
               id: ev.message_id,
             };
           } else if (ev.type === "error") {
@@ -1106,12 +1186,12 @@
     }
 
     function finish(div, result) {
-      const { reply, tools = [], undo = [], needsConfirm = false, id } = result;
+      const { reply, tools = [], undo = [], needsConfirm = false, approvals = [], id } = result;
       div.innerHTML = render(reply);
-      const m = { id, role: "assistant", content: reply, tools, needsConfirm, undo, at: Date.now() };
+      const m = { id, role: "assistant", content: reply, tools, needsConfirm, approvals, undo, at: Date.now() };
       if (tools.length) addDetails(div, tools);
       addWrong(div, m);
-      if (needsConfirm) addConfirm(div);
+      if (needsConfirm) addConfirm(div, m);
       if (undo.length) addUndo(div, m);
       session.messages.push(m);
       scrollDown();

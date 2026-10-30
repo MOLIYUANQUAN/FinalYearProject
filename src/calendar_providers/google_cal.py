@@ -123,6 +123,11 @@ class GoogleCalendarProvider:
         }
 
 
+    def delete_event(self, event_id: str) -> None:
+        """撤销 Friday 刚建的事件（只动 primary，导入的课表碰不到）。"""
+        _build_service().events().delete(calendarId="primary", eventId=event_id).execute()
+
+
 def _to_event_time(iso: str) -> dict[str, str]:
     """接受 YYYY-MM-DDTHH:MM 或带时区的 ISO，写成 Google dateTime。"""
     normalized = iso.strip().replace("Z", "+00:00")

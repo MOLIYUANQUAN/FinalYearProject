@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from agents import function_tool
+from agents import RunContextWrapper, function_tool
 
 from src import agenda
 from src.calendar_providers import get_calendar_provider
 from src.calendar_providers.common import TimeOfDay, is_background_span
+from src.turn import Turn
 
 MAX_DAYS = 14
 
@@ -51,15 +52,16 @@ def get_calendar_events(
     return query_calendar_events(date=date, time_of_day=time_of_day, days=days)
 
 
-@function_tool(needs_approval=True)
+@function_tool
 def create_calendar_event(
+    ctx: RunContextWrapper[Any],
     title: str,
     start: str,
     end: str,
     location: str = "",
     notes: str = "",
 ) -> dict[str, Any]:
-    """在日历中创建事件。直接调用：系统会先把要建的事给他看，他确认后才真的创建。
+    """在他自己的日历里建一个事件。只给他自己的，直接建，不用先问：页面会给他「撤销」。
 
     Args:
         title: 事件标题。
@@ -84,4 +86,6 @@ def create_calendar_event(
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": "create_failed", "message": str(exc)}
     agenda.forget()
+    if created.get("ok") and created.get("id") and isinstance(ctx.context, Turn):
+        ctx.context.undo.append({"kind": "event_created", "id": created["id"], "title": title})
     return created

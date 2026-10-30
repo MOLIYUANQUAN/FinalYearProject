@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 
 from src import agenda, mistakes, todos, usage_log, voice
 from src.agent import friday, run_assistant
+from src.calendar_providers import get_calendar_provider
 from src.presence import stream_presence
 from src.access import gate, router as access_router
 from src.push_api import router as push_router, run_scheduler, scheduler_enabled
@@ -272,7 +273,7 @@ def calendar_warm() -> Response:
 
 
 class UndoItem(BaseModel):
-    kind: str = Field(..., pattern="^(task_added|task_completed|task_due_changed)$")
+    kind: str = Field(..., pattern="^(task_added|task_completed|task_due_changed|event_created)$")
     id: str = Field(..., min_length=1)
     due: str | None = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
 
@@ -285,10 +286,17 @@ class UndoRequest(BaseModel):
 @app.post("/api/undo")
 def undo(body: UndoRequest) -> dict:
     """他点了「撤销」：直接撤回刚才那一步，不经过模型。"""
+    items = [item.model_dump() for item in body.items]
+    tasks = [item for item in items if item["kind"].startswith("task_")]
+    events = [item for item in items if item["kind"] == "event_created"]
     try:
-        todos.undo([item.model_dump() for item in body.items])
+        if tasks:
+            todos.undo(tasks)
+        for item in reversed(events):
+            get_calendar_provider().delete_event(item["id"])
+            agenda.forget()
     except Exception as exc:  # noqa: BLE001
-        reason = str(exc).splitlines()[0] if isinstance(exc, RuntimeError) else "待办这次没连上"
+        reason = str(exc).splitlines()[0] if isinstance(exc, RuntimeError) else "这次没连上"
         raise HTTPException(status_code=502, detail=f"没撤销成功：{reason}") from exc
     if body.message_id is not None:
         friday.conversations.update_message(body.message_id, undone=True)
@@ -321,6 +329,31 @@ def wrong(body: WrongRequest) -> dict:
     convs.update_message(body.message_id, wrong=True)
     usage_log.record("wrong", ok=True, first_token_ms=None, total_ms=0, tools=said.get("tools") or [])
     return {"ok": True}
+
+
+class ReviseRequest(BaseModel):
+    conversation_id: str = Field(..., max_length=64)
+    call_id: str = Field(..., max_length=200)
+    changes: dict[str, str] = Field(..., description="他在确认卡片里改过的字段，比如 subject / body")
+
+
+# 卡片里能改的：邮件的主题和正文（收件人不让在这里改，要改就跟她说）
+REVISABLE = {"subject", "body"}
+
+
+@app.post("/api/chat/revise")
+async def chat_revise(body: ReviseRequest) -> StreamingResponse:
+    """他在确认卡片里改了再点「发送」：改过的那份就是他确认的版本。"""
+    _require_key()
+    changes = {k: v for k, v in body.changes.items() if k in REVISABLE}
+    if not changes:
+        raise HTTPException(status_code=400, detail="没有能改的内容。")
+    if not any(a.get("call_id") == body.call_id for a in friday.pending_approvals(body.conversation_id)):
+        raise HTTPException(status_code=409, detail="这一步已经不在等确认了。")
+    return _sse(
+        "chat",
+        friday.turn(body.conversation_id, "（改了一下）按这个发。", revision={"call_id": body.call_id, "changes": changes}),
+    )
 
 
 @app.post("/api/chat/stream")

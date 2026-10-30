@@ -66,5 +66,17 @@ class ApiTests(SandboxTestCase):
         self.assertEqual(self.client.post("/api/wrong", json={"message_id": 999999}).status_code, 404)
 
 
+    def test_revise_only_while_waiting_and_only_subject_or_body(self) -> None:
+        self.use([[call("send_email", to="a@b.c", subject="hi", body="hello", cc="")], [call("send_email", to="a@b.c", subject="hi", body="hello!!", cc="")], [text("发了。")]])
+        cid = self.client.post("/api/conversation/new").json()["id"]
+        call_id = sse(self.client.post("/api/chat/stream", json={"message": "发邮件", "conversation_id": cid}))[-1]["approvals"][0]["call_id"]
+        bad = self.client.post("/api/chat/revise", json={"conversation_id": cid, "call_id": call_id, "changes": {"to": "evil@x.y"}})
+        self.assertEqual(bad.status_code, 400)  # 收件人不能在卡片里偷偷换
+        done = sse(self.client.post("/api/chat/revise", json={"conversation_id": cid, "call_id": call_id, "changes": {"body": "hello!!"}}))[-1]
+        self.assertEqual(done["reply"], "发了。")
+        again = self.client.post("/api/chat/revise", json={"conversation_id": cid, "call_id": call_id, "changes": {"body": "x"}})
+        self.assertEqual(again.status_code, 409)
+
+
 if __name__ == "__main__":
     unittest.main()

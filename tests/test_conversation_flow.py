@@ -75,14 +75,14 @@ class ApprovalTests(SandboxTestCase):
 
     def test_changing_the_subject_cancels_and_answers_the_new_question(self) -> None:
         friday, model = self.friday([
-            [call("create_calendar_event", title="Swim", start="2026-10-13T18:00", end="2026-10-13T19:00", location="", notes="")],
-            [text("没建。")],
+            [call("send_email", **MAIL)],
+            [text("没发。")],
             [text("明天下午两点见导师。")],
         ])
         cid = friday.conversations.create()
-        collect(friday.turn(cid, "明天六点去健身"))
+        collect(friday.turn(cid, "给导师发个进度"))
         done = collect(friday.turn(cid, "明天下午有什么？"))[-1]
-        self.assertNotIn("Swim", self.calendar_titles())
+        self.assertEqual(self.sent_mail(), [])
         self.assertIn("明天下午两点见导师", done["reply"])
         self.assertFalse(done["needs_confirm"])
 
@@ -123,6 +123,53 @@ class ApprovalTests(SandboxTestCase):
         done = collect(friday.turn(cid, "提醒我明天还书"))[-1]
         self.assertFalse(done["needs_confirm"])
         self.assertEqual(done["undo"][0]["title"], "还书")
+
+
+class SelfOnlyAndEditTests(SandboxTestCase):
+    EVENT = dict(title="写报告", start="2026-10-15T14:00", end="2026-10-15T16:00", location="", notes="")
+
+    def test_own_calendar_event_is_created_directly_with_undo(self) -> None:
+        friday, _ = self.friday([[call("create_calendar_event", **self.EVENT)], [text("周四下午两点到四点，留给写报告了。")]])
+        cid = friday.conversations.create()
+        done = collect(friday.turn(cid, "周四下午两点到四点留给写报告"))[-1]
+        self.assertFalse(done["needs_confirm"])
+        self.assertIn("写报告", self.calendar_titles())
+        self.assertEqual(done["undo"][0]["kind"], "event_created")
+
+        from fastapi.testclient import TestClient
+        from unittest.mock import patch
+
+        import src.main as main
+
+        with patch.object(main, "friday", friday):
+            res = TestClient(main.app).post("/api/undo", json={"items": done["undo"], "message_id": done["message_id"]})
+        self.assertEqual(res.status_code, 200)
+        self.assertNotIn("写报告", self.calendar_titles())
+
+    def test_edited_mail_is_sent_exactly_as_edited(self) -> None:
+        edited = {**MAIL, "body": "Hi, update attached. — Zeep"}
+        friday, model = self.friday([
+            [call("send_email", **MAIL)],
+            [call("send_email", **edited)],  # 她照改过的重新调用
+            [text("发了。")],
+        ])
+        cid = friday.conversations.create()
+        call_id = collect(friday.turn(cid, "给导师发进度"))[-1]["approvals"][0]["call_id"]
+        done = collect(friday.turn(cid, "按这个发", revision={"call_id": call_id, "changes": {"body": edited["body"]}}))[-1]
+        self.assertFalse(done["needs_confirm"])
+        self.assertEqual([m["body"] for m in self.sent_mail()], [edited["body"]])
+        self.assertIn(edited["body"], str(model.inputs[1]))  # 改过的内容原样交给了她
+
+    def test_if_she_changes_the_edit_he_is_asked_again(self) -> None:
+        friday, _ = self.friday([
+            [call("send_email", **MAIL)],
+            [call("send_email", **{**MAIL, "body": "她自己又改了一版"})],
+        ])
+        cid = friday.conversations.create()
+        call_id = collect(friday.turn(cid, "发进度"))[-1]["approvals"][0]["call_id"]
+        done = collect(friday.turn(cid, "按这个发", revision={"call_id": call_id, "changes": {"body": "我改的"}}))[-1]
+        self.assertTrue(done["needs_confirm"])  # 和他改的不一样：不放行，再给他看
+        self.assertEqual(self.sent_mail(), [])
 
 
 if __name__ == "__main__":

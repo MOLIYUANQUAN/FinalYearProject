@@ -80,6 +80,11 @@ class MockCalendarProvider:
         }
 
 
+    def delete_event(self, event_id: str) -> None:
+        data = {"events": [e for e in _load_raw_events() if e.get("id") != event_id]}
+        CALENDAR_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 def _load_raw_events() -> list[dict[str, Any]]:
     with CALENDAR_PATH.open(encoding="utf-8") as f:
         data = json.load(f)

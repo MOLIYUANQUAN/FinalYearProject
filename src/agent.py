@@ -76,7 +76,9 @@ VOICE = """你叫 Friday，是 Zeep 的管家，只为他一个人。不是顾�
 
 行动：
 - 读操作直接做，不预告。
-- 写操作（建日程、发邮件、归档或删除邮件、删除记忆、让 Cursor 改代码、部署）：信息齐了就直接调用对应工具，不要先用文字问「要不要」——系统会在执行前把具体内容（时间、收件人、主题、正文）给他看，等他点确认。关键信息缺了（不知道几点、发给谁）才先问一句。他拒绝了就一句话说没做，不重试。成功之前绝不说已完成；工具返回后一句话告诉他结果。
+- 给他自己建日程（create_calendar_event）：时间齐了就直接建，不用问；页面会给他「撤销」。建完一句话说建好了什么（哪天几点）。
+- 对外或删东西的写操作（发邮件、归档或删除邮件、删除记忆、让 Cursor 改代码、部署）：信息齐了就直接调用对应工具，不要先用文字问「要不要」——系统会在执行前把具体内容（收件人、主题、正文）给他看，等他点确认；他也可能在卡片里改了内容，系统会让你照改过的重新调用，那时参数一字不改。
+- 关键信息缺了（不知道几点、发给谁）才先问一句。他拒绝了就一句话说没做，不重试。成功之前绝不说已完成；工具返回后一句话告诉他结果。
 - 帮他准备一场会面或重要对话：先搜相关的邮件和笔记，再写：时间地点（日历里没有就直说）+ 现状一句话 + 三个讨论点。讨论点只能来自真材料（档案、记忆、邮件、笔记）；材料不够就少写几点并直说，不用空话凑数。"""
 
 SPOKEN = """这一轮是他开口说的，你的回答会直接念给他听：
@@ -159,6 +161,14 @@ def _approval_info(item: Any) -> dict[str, Any]:
     return {"call_id": _get(raw, "call_id") or _get(raw, "id"), "name": item.tool_name or _get(raw, "name"), "arguments": parsed}
 
 
+def _same_call(edit: dict[str, Any], info: dict[str, Any]) -> bool:
+    """她重新调用的和他改过的是不是同一件事：名字一样、他改过的每个参数一字不差。"""
+    if edit["name"] != info["name"]:
+        return False
+    args = info.get("arguments") or {}
+    return all(str(args.get(k, "")).strip() == str(v).strip() for k, v in edit["arguments"].items())
+
+
 def _turn_to_json(turn: Any) -> dict[str, Any]:
     return {"undo": list(getattr(turn, "undo", []) or [])}
 
@@ -177,6 +187,8 @@ class Friday:
         self._conversations = conversations
         self._model = model
         self._pending: dict[str, tuple[Agent, Any, list[dict[str, Any]]]] = {}
+        # 他在确认卡片里改过的内容：她照着重新调用、参数一字不差时自动放行
+        self._edits: dict[str, dict[str, Any]] = {}
         self._locks: dict[str, asyncio.Lock] = {}
 
     @property
@@ -240,8 +252,13 @@ class Friday:
             return cid
         return convs.current() or convs.create()
 
-    async def turn(self, cid: str, message: str, *, spoken: bool = False) -> AsyncIterator[dict[str, Any]]:
-        """他说了一句：存进对话，跑 Friday，事件流给页面，最后把她的回复也存进对话。"""
+    async def turn(
+        self, cid: str, message: str, *, spoken: bool = False, revision: dict[str, Any] | None = None
+    ) -> AsyncIterator[dict[str, Any]]:
+        """他说了一句：存进对话，跑 Friday，事件流给页面，最后把她的回复也存进对话。
+
+        revision = {"call_id", "changes"}：他在确认卡片里改了内容再点「发送」。改过的那份就是他确认的版本。
+        """
         lock = self._locks.setdefault(cid, asyncio.Lock())
         async with lock:
             convs = self.conversations
@@ -263,13 +280,24 @@ class Friday:
 
             if pending is not None:
                 agent, state, waiting = pending
-                choice = approval.decide(message)
+                choice = "revise" if revision else approval.decide(message)
                 self._drop_pending(cid)
                 if choice == "approve":
                     tools.extend(a["name"] for a in waiting if a.get("name") and a["name"] not in tools)
                 for item in state.get_interruptions():
+                    info = _approval_info(item)
                     if choice == "approve":
                         state.approve(item)
+                    elif choice == "revise" and info["call_id"] == revision.get("call_id"):
+                        edited = {**info["arguments"], **(revision.get("changes") or {})}
+                        self._edits[cid] = {"name": info["name"], "arguments": edited}
+                        state.reject(
+                            item,
+                            rejection_message=(
+                                f"他把内容改了。马上按下面这份重新调用 {info['name']}，每个参数一字不改，不要再改写："
+                                f"{json.dumps(edited, ensure_ascii=False)}"
+                            ),
+                        )
                     else:
                         state.reject(
                             item,
@@ -343,6 +371,15 @@ class Friday:
         turn = getattr(result.context_wrapper, "context", None)
         undo.extend(getattr(turn, "undo", None) or [])
         interruptions = list(getattr(result, "interruptions", None) or [])
+        edit = self._edits.pop(cid, None)
+        if interruptions and edit and all(_same_call(edit, _approval_info(item)) for item in interruptions):
+            # 她照着他改过的版本重新调用了：那份就是他确认过的，直接放行
+            state = result.to_state()
+            for item in interruptions:
+                state.approve(item)
+            async for event in self._run(cid, agent, state, tools, undo, approvals):
+                yield event
+            return
         if interruptions:
             waiting = [_approval_info(item) for item in interruptions]
             for info in waiting:
