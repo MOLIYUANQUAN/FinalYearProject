@@ -33,10 +33,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 没设 FLY_API_TOKEN 就跳过（本机跑 scripts/deploy_fly.py 部署），不算失败
+      - name: Check Fly token
+        id: token
+        run: |
+          if [ -n "$FLY_API_TOKEN" ]; then echo "set=true" >> "$GITHUB_OUTPUT"; else
+            echo "::notice::FLY_API_TOKEN is not set; skipping deploy. Add it in repo Settings → Secrets → Actions (fly tokens create deploy -a friday-jimmy)."
+          fi
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
       - name: Setup flyctl
+        if: steps.token.outputs.set == 'true'
         uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Deploy
+        if: steps.token.outputs.set == 'true'
         run: flyctl deploy --remote-only --app friday-jimmy --ha=false
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
