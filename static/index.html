@@ -316,6 +316,26 @@
       cursor: pointer;
     }
     .wrong:hover { opacity: 1; color: var(--ink); }
+    /* 「来找你」：开场卡片下面一行，订阅过就不再出现 */
+    .push-offer {
+      margin-top: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .push-offer button {
+      font: inherit;
+      font-size: 0.8rem;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--ink);
+      background: var(--ink);
+      color: var(--bg);
+      cursor: pointer;
+    }
     .wrong:disabled { cursor: default; opacity: 0.7; }
     .msg .details + .wrong { display: inline-block; margin-left: 12px; }
     .msg .details { display: inline-block; }
@@ -730,6 +750,116 @@
       d.append(s, body);
       div.appendChild(d);
     }
+
+    // ---- 来找你：iPhone 主屏幕上的 Friday、电脑上的 Friday 窗口都能收到她主动发的提醒 ----
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+    const pushSupported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+    let swReady = null;
+    if ("serviceWorker" in navigator) {
+      swReady = navigator.serviceWorker.register("/sw.js").then(() => navigator.serviceWorker.ready).catch(() => null);
+      navigator.serviceWorker.addEventListener("message", (e) => {
+        if (e.data && e.data.type === "nudge") handleNudge(e.data.url);
+      });
+    }
+
+    function keyBytes(b64) {
+      const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+      const raw = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
+      return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+    }
+
+    function deviceName() {
+      if (isIOS) return "iPhone";
+      if (/Windows/.test(navigator.userAgent)) return "电脑";
+      if (/Mac/.test(navigator.userAgent)) return "Mac";
+      return "浏览器";
+    }
+
+    async function pushSubscribed() {
+      if (!pushSupported || Notification.permission !== "granted" || !swReady) return false;
+      const reg = await swReady;
+      return !!(reg && (await reg.pushManager.getSubscription()));
+    }
+
+    async function enablePush(line) {
+      const say = (text) => line.replaceChildren(el("span", "", text));
+      try {
+        const reg = await swReady;
+        if (!reg) throw new Error("这个浏览器不支持提醒。");
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") {
+          say("通知被关掉了：到系统设置里给 Friday 打开通知，再点一次。");
+          return;
+        }
+        const { public_key } = await (await fetch("/api/push/key", { credentials: "include" })).json();
+        const sub = (await reg.pushManager.getSubscription()) ||
+          (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(public_key) }));
+        const res = await fetch("/api/push/subscribe", {
+          method: "POST",
+          credentials: "include",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ subscription: sub.toJSON(), device: deviceName() }),
+        });
+        if (!res.ok) throw new Error("没订上，再点一次。");
+        await fetch("/api/push/test", { method: "POST", credentials: "include", headers: authHeaders() });
+        say("好了。早上开工、要紧的会之前、截止没划掉的时候，我会来找你。");
+      } catch (e) {
+        say((e && e.message) || "没订上，再点一次。");
+      }
+    }
+
+    // 开场卡片下面：这台设备还没订上，就问一句
+    async function offerPush(div) {
+      if (await pushSubscribed()) return;
+      const line = el("div", "push-offer");
+      if (isIOS && !standalone) {
+        line.append(el("span", "", "想让我主动找你：在 Safari 点「分享 → 添加到主屏幕」，再从主屏幕打开我。"));
+      } else if (!pushSupported) {
+        return;
+      } else {
+        const b = el("button", "", "打开提醒");
+        b.type = "button";
+        b.onclick = () => enablePush(line);
+        line.append(el("span", "", "想让我主动来找你？"), b);
+      }
+      div.appendChild(line);
+    }
+
+    // 从通知点进来：记一笔「点开了」；会前提醒就直接把要点备好
+    function handleNudge(url) {
+      let target;
+      try {
+        target = new URL(url, location.origin);
+      } catch (e) {
+        return;
+      }
+      const key = target.searchParams.get("n");
+      if (key) {
+        fetch("/api/nudges/opened", {
+          method: "POST",
+          credentials: "include",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ key }),
+        }).catch(() => {});
+      }
+      const what = target.searchParams.get("what");
+      if (target.searchParams.get("do") === "prepare" && what) pendingAsk = "帮我准备 " + what;
+      if (pendingAsk && ready && !busy) {
+        const message = pendingAsk;
+        pendingAsk = "";
+        ask(message);
+      }
+    }
+
+    let pendingAsk = "";
+    (function takeNudgeFromUrl() {
+      const u = new URL(location.href);
+      if (!u.searchParams.has("n")) return;
+      handleNudge(location.href);
+      ["n", "do", "what"].forEach((k) => u.searchParams.delete(k));
+      history.replaceState({}, "", u.pathname + u.search + u.hash);
+    })();
 
     // 她说错了：点一下就记进错误清单（附上问题和工具），之后补一条测试；Tuesday test 里数「说错几次」
     function addWrong(div, m) {
@@ -1286,6 +1416,7 @@
         view.el.innerHTML = render(result.reply);
         const opener = { id: result.id, role: "assistant", content: result.reply, tools: [], agenda: view.card, at: Date.now() };
         addWrong(div, opener);
+        offerPush(div);
         session.messages.push(opener);
         scrollDown();
       } catch (e) {
@@ -1463,6 +1594,12 @@
         input.focus();
       } else {
         await startOver();
+      }
+      // 从「会快到了」的提醒点进来：开场之后直接准备
+      if (pendingAsk && ready) {
+        const message = pendingAsk;
+        pendingAsk = "";
+        await ask(message);
       }
     })();
   </script>

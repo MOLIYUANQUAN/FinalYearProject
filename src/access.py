@@ -23,6 +23,7 @@ PUBLIC_PATHS = {
     "/api/login",
     "/api/logout",
     "/api/session",
+    "/sw.js",  # Service Worker 脚本本身不含数据；推送、订阅接口仍要登录
 }
 
 COOKIE_NAME = "friday_session"

@@ -25,6 +25,7 @@ from src import agenda, mistakes, todos, usage_log, voice
 from src.agent import friday, run_assistant
 from src.presence import stream_presence
 from src.access import gate, router as access_router
+from src.push_api import router as push_router, run_scheduler, scheduler_enabled
 from src.state_sync import router as state_router
 from src.config import (
     STATIC_DIR,
@@ -84,7 +85,11 @@ async def lifespan(_app: FastAPI):
     else:
         print("[WARN] FRIDAY_ACCESS_TOKEN unset — set it before exposing Friday on the public internet")
     _warm = asyncio.create_task(asyncio.to_thread(_warm_calendar)) if backend == "google" else None
+    nudger = asyncio.create_task(run_scheduler()) if scheduler_enabled() else None
+    print(f"[OK] nudges {'on' if nudger else 'off'}")
     yield
+    if nudger:
+        nudger.cancel()
 
 
 app = FastAPI(
@@ -95,6 +100,7 @@ app = FastAPI(
 app.middleware("http")(gate)
 app.include_router(access_router)
 app.include_router(state_router)
+app.include_router(push_router)
 
 
 class ChatRequest(BaseModel):
