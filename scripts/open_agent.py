@@ -49,7 +49,8 @@ def _health() -> dict | None:
         token = get_access_token()
         if token:
             request.add_header("Authorization", f"Bearer {token}")
-        with _local.open(request, timeout=1) as response:
+        opener = urllib.request.build_opener() if desktop.REMOTE else _local
+        with opener.open(request, timeout=5 if desktop.REMOTE else 1) as response:
             return json.loads(response.read().decode("utf-8"))
     except (OSError, ValueError):
         return None
@@ -119,6 +120,9 @@ def _wait_until_up(timeout: float = 20.0) -> bool:
 
 
 def _ensure_server(restart: bool = False) -> None:
+    if desktop.REMOTE:
+        # 大脑在云上：本机不起服务，窗口直接开云上的 Friday（页面自己会说连不上）
+        return
     running = _health()
     if running and not restart and running.get("code_version") == code_version():
         return

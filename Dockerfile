@@ -9,6 +9,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     HOST=0.0.0.0 \
     PORT=8080
 
+# TZ=Europe/London 需要系统时区数据（slim 镜像一般自带，没有就装上）
+RUN test -e /usr/share/zoneinfo/Europe/London \
+    || (apt-get update && apt-get install -y --no-install-recommends tzdata && rm -rf /var/lib/apt/lists/*)
+
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 

@@ -19,7 +19,7 @@ from typing import Any
 import requests
 
 from src import friction, ship
-from src.config import DATA_DIR, load_env
+from src.config import FEEDBACK_DIR, load_env
 
 DEFAULT_REPO = "https://github.com/MOLIYUANQUAN/FinalYearProject"
 DEFAULT_REF = "develop"
@@ -27,7 +27,7 @@ DEFAULT_MODEL = "composer-2.5"
 API = "https://api.cursor.com/v1"
 POLL_S = 5
 TIMEOUT_S = 20 * 60
-JOB_PATH = DATA_DIR / "feedback" / "cursor_job.json"
+JOB_PATH = FEEDBACK_DIR / "cursor_job.json"
 
 _lock = threading.Lock()
 _bg_started_for: str | None = None

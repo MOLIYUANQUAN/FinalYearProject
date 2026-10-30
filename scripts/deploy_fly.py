@@ -17,6 +17,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = "friday-jimmy"
+REGION = "lhr"
+VOLUME = "friday_state"
 ENV_PATH = ROOT / ".env"
 
 
@@ -90,6 +92,22 @@ def _file_json(path: Path) -> str | None:
         return None
     # one line so fly secrets CLI stays happy
     return json.dumps(json.loads(path.read_text(encoding="utf-8")), ensure_ascii=False, separators=(",", ":"))
+
+
+def _ensure_volume(fly: str) -> None:
+    """fly.toml 把 friday_state 挂到 /state：记忆和对话放在上面。没有就建一个 1GB 的。"""
+    listed = _run(fly, "volumes", "list", "--app", APP, "--json", check=False)
+    try:
+        volumes = json.loads(listed.stdout or "[]") if listed.returncode == 0 else []
+    except json.JSONDecodeError:
+        volumes = []
+    if any((v.get("name") or v.get("Name")) == VOLUME for v in volumes if isinstance(v, dict)):
+        return
+    print(f"Creating volume {VOLUME} (1GB, {REGION})…")
+    created = _run(fly, "volumes", "create", VOLUME, "--app", APP, "--region", REGION, "--size", "1", "--yes", check=False)
+    if created.returncode != 0:
+        print(created.stderr or created.stdout or "")
+        _fail(f"Could not create volume. Run: flyctl volumes create {VOLUME} -a {APP} -r {REGION} -s 1")
 
 
 def main() -> None:
@@ -179,6 +197,8 @@ def main() -> None:
     if imp.returncode != 0:
         print(imp.stderr or imp.stdout)
         _fail("fly secrets import failed")
+
+    _ensure_volume(fly)
 
     print("Deploying…")
     _run(fly, "deploy", "--app", APP, "--ha=false", capture=False)

@@ -9,16 +9,24 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
+# 下面的路径和 DEFAULT_MODEL 在 import 时就读环境变量：先把 .env 读进来
+load_dotenv(ROOT_DIR / ".env")
+
 DATA_DIR = ROOT_DIR / "data"
+# 会变的东西（记忆、摩擦、对话、使用记录）放在 STATE_DIR：本机默认就是 data/，
+# 云上指到挂载的磁盘（fly.toml 里 FRIDAY_STATE_DIR=/state），部署和重启都不丢
+STATE_DIR = Path(os.getenv("FRIDAY_STATE_DIR") or DATA_DIR)
 CALENDAR_PATH = DATA_DIR / "calendar.json"
 NOTES_DIR = DATA_DIR / "notes"
 PERSONAL_DIR = DATA_DIR / "personal"
 PROFILE_PATH = PERSONAL_DIR / "profile.md"
 MAIL_DIR = DATA_DIR / "mail"
 MAIL_MOCK_PATH = MAIL_DIR / "messages.json"
-MEMORY_DIR = DATA_DIR / "memory"
+MEMORY_DIR = STATE_DIR / "memory"
 MEMORY_FACTS_PATH = MEMORY_DIR / "facts.json"
-USAGE_LOG_PATH = DATA_DIR / "usage" / "events.jsonl"
+USAGE_LOG_PATH = STATE_DIR / "usage" / "events.jsonl"
+FEEDBACK_DIR = STATE_DIR / "feedback"
+CONVERSATIONS_DB = STATE_DIR / "conversations.db"
 STATIC_DIR = ROOT_DIR / "static"
 SECRETS_DIR = ROOT_DIR / "secrets"
 

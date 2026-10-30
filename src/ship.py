@@ -10,10 +10,10 @@ from typing import Any
 
 import requests
 
-from src.config import DATA_DIR, ROOT_DIR, load_env
+from src.config import FEEDBACK_DIR, ROOT_DIR, load_env
 from src import friction
 
-PENDING_PATH = DATA_DIR / "feedback" / "pending_ship.json"
+PENDING_PATH = FEEDBACK_DIR / "pending_ship.json"
 GITHUB_API = "https://api.github.com"
 DEFAULT_REPO = "MOLIYUANQUAN/FinalYearProject"
 DEFAULT_BASE = "develop"

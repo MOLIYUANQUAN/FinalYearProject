@@ -176,3 +176,23 @@ def forget_fact(fact_id: str) -> dict[str, Any]:
         return {"ok": False, "error": "not_found", "id": fid}
     _save(kept)
     return {"ok": True, "action": "deleted", "id": fid}
+
+
+def merge_facts(incoming: list[dict[str, Any]]) -> dict[str, int]:
+    """把另一台机器上的记忆并进来（按 id；同一条取更新时间较新的）。"""
+    facts = {f.get("id"): f for f in _load() if f.get("id")}
+    added = updated = 0
+    for fact in incoming:
+        fid = fact.get("id") if isinstance(fact, dict) else None
+        if not fid or not (fact.get("content") or "").strip():
+            continue
+        mine = facts.get(fid)
+        if mine is None:
+            facts[fid] = fact
+            added += 1
+        elif (fact.get("updated_at") or "") > (mine.get("updated_at") or ""):
+            facts[fid] = fact
+            updated += 1
+    if added or updated:
+        _save(list(facts.values()))
+    return {"added": added, "updated": updated, "total": len(facts)}

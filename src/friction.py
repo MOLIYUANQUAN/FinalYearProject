@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from src.config import DATA_DIR
+from src.config import FEEDBACK_DIR
 
-FRICTION_PATH = DATA_DIR / "feedback" / "friction.jsonl"
+FRICTION_PATH = FEEDBACK_DIR / "friction.jsonl"
 INJECT_LIMIT = 12
 
 
@@ -101,3 +101,28 @@ def chat_block() -> str:
             line += f"（更好：{row['better']}）"
         lines.append(line)
     return "他还嫌弃、没改掉的（照着避开，别辩护；别复述整段清单）：\n" + "\n".join(lines)
+
+
+def all_items() -> list[dict[str, Any]]:
+    return _read_all()
+
+
+def merge_items(incoming: list[dict[str, Any]]) -> dict[str, int]:
+    """把另一台机器上的摩擦清单并进来（按 id；已经划掉的以划掉为准）。"""
+    items = _read_all()
+    by_id = {row["id"]: row for row in items}
+    added = updated = 0
+    for row in incoming:
+        if not isinstance(row, dict) or not row.get("id") or not row.get("what"):
+            continue
+        mine = by_id.get(row["id"])
+        if mine is None:
+            items.append(row)
+            by_id[row["id"]] = row
+            added += 1
+        elif row.get("status") == "resolved" and mine.get("status") != "resolved":
+            mine.update(status="resolved", resolved_at=row.get("resolved_at"))
+            updated += 1
+    if added or updated:
+        _rewrite(items)
+    return {"added": added, "updated": updated, "total": len(items)}

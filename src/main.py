@@ -25,6 +25,7 @@ from src import agenda, todos, usage_log, voice
 from src.agent import run_assistant, stream_assistant
 from src.presence import stream_presence
 from src.access import gate, router as access_router
+from src.state_sync import router as state_router
 from src.config import (
     STATIC_DIR,
     effective_now,
@@ -93,6 +94,7 @@ app = FastAPI(
 )
 app.middleware("http")(gate)
 app.include_router(access_router)
+app.include_router(state_router)
 
 
 class ChatTurn(BaseModel):

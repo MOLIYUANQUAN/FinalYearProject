@@ -6,6 +6,16 @@ primary_region = "lhr"
 
 [build]
 
+[env]
+  # 日历、开场那句话、「此刻」都按伦敦时间算；云上机器默认是 UTC，夏令时会差一小时
+  TZ = "Europe/London"
+  # 记忆、对话、摩擦、使用记录写在挂载的磁盘上：部署和重启都不丢
+  FRIDAY_STATE_DIR = "/state"
+
+[mounts]
+  source = "friday_state"
+  destination = "/state"
+
 [http_service]
   internal_port = 8080
   force_https = true

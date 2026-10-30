@@ -5,6 +5,7 @@ from __future__ import annotations
 import ctypes
 import ctypes.wintypes as wt
 import json
+import os
 import subprocess
 import time
 import webbrowser
@@ -13,8 +14,22 @@ from collections.abc import Callable
 from pathlib import Path
 
 APP_NAME = "Friday"
-BASE_URL = "http://127.0.0.1:8765/"
+LOCAL_URL = "http://127.0.0.1:8765/"
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+
+
+def _base_url() -> str:
+    """.env 里设了 FRIDAY_URL（例如 https://friday-jimmy.fly.dev）就打开云上那个 Friday：
+    手机和电脑是同一个大脑；没设才用本机服务（开发时）。"""
+    from src.config import load_env
+
+    load_env()
+    url = (os.getenv("FRIDAY_URL") or "").strip()
+    return (url.rstrip("/") + "/") if url else LOCAL_URL
+
+
+BASE_URL = _base_url()
+REMOTE = BASE_URL != LOCAL_URL
 
 
 def page_url() -> str:
