@@ -120,7 +120,6 @@
       transition: padding-bottom 0.3s ease;
     }
     /* 白环出来时给最后一句让位 */
-    #log.voice { padding-bottom: 108px; }
     .msg {
       max-width: 88%;
       line-height: 1.65;
@@ -332,6 +331,40 @@
     }
     .details summary::-webkit-details-marker { display: none; }
     .details summary:hover { opacity: 1; color: var(--ink); }
+    /* 确认卡片里改邮件 */
+    .editor { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .editor input, .editor textarea {
+      font: inherit;
+      font-size: 0.95rem;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--bg);
+      color: var(--ink);
+      resize: vertical;
+    }
+    .editor .actions { margin-top: 0; }
+    .editor .hint { margin-left: 0; }
+    /* 「来找你」：开场卡片下面一行，订阅过就不再出现 */
+    .push-offer {
+      margin-top: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .push-offer button {
+      font: inherit;
+      font-size: 0.8rem;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--ink);
+      background: var(--ink);
+      color: var(--bg);
+      cursor: pointer;
+    }
     form {
       display: flex;
       gap: 8px;
@@ -388,40 +421,6 @@
     #send { transition: opacity 0.2s ease, transform 0.15s ease; }
     #send:active:not(:disabled), #mic:active:not(:disabled) { transform: scale(0.97); }
     /* 白环跟着真实的声音起伏：你说话时听麦克风，她说话时听她自己；点一下就停 */
-    #orb {
-      --l: 0;
-      position: fixed;
-      left: 50%;
-      bottom: calc(108px + env(safe-area-inset-bottom, 0px));
-      width: 72px;
-      height: 72px;
-      margin-left: -36px;
-      opacity: 0;
-      transform: translateY(16px) scale(0.6);
-      pointer-events: none;
-      transition: opacity 0.3s ease, transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
-      z-index: 10;
-    }
-    #orb.on { opacity: 1; transform: none; pointer-events: auto; cursor: pointer; }
-    #orb b, #orb i { position: absolute; inset: 0; border-radius: 50%; }
-    #orb b {
-      background: radial-gradient(closest-side, var(--ink), transparent);
-      opacity: calc(0.12 + var(--l) * 0.33);
-      transform: scale(calc(1.1 + var(--l) * 0.9));
-    }
-    #orb i {
-      border: 2px solid var(--ink);
-      background: var(--bg);
-      transform: scale(calc(0.88 + var(--l) * 0.2));
-    }
-    #orb.thinking b { animation: halo-breathe 1.8s ease-in-out infinite; }
-    #orb.thinking i { animation: ring-breathe 1.8s ease-in-out infinite; }
-    @keyframes ring-breathe { 50% { transform: scale(0.97); } }
-    @keyframes halo-breathe { 50% { opacity: 0.3; transform: scale(1.5); } }
-    @media (prefers-reduced-motion: reduce) {
-      #orb, #orb b, #orb i { transition: opacity 0.3s ease; transform: none; }
-      #orb.thinking b, #orb.thinking i { animation: none; }
-    }
     #send {
       background: var(--brand);
       color: var(--on-brand);
@@ -447,6 +446,24 @@
     form.voice #hold { display: block; }
     form.voice #input, form.voice #send { display: none; }
     #hold.holding { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+    /* 声音就画在手指按着的这条上：你说话时跟着你的响度跳，她说话时跟着她的；没有声音就不画 */
+    #hold .wave { display: none; align-items: center; gap: 3px; height: 20px; margin-right: 10px; vertical-align: middle; }
+    #hold[data-voice] .wave { display: inline-flex; }
+    #hold .wave i {
+      width: 3px;
+      height: calc(4px + var(--l, 0) * var(--k) * 16px);
+      border-radius: 2px;
+      background: currentColor;
+      opacity: 0.85;
+    }
+    #hold .wave i:nth-child(1) { --k: 0.45; }
+    #hold .wave i:nth-child(2) { --k: 0.8; }
+    #hold .wave i:nth-child(3) { --k: 1; }
+    #hold .wave i:nth-child(4) { --k: 0.65; }
+    #hold .wave i:nth-child(5) { --k: 0.9; }
+    #hold .wave i:nth-child(6) { --k: 0.55; }
+    #hold .wave i:nth-child(7) { --k: 0.35; }
+    #hold .label { vertical-align: middle; }
     #hold.cancel { background: var(--danger); color: #fff; border-color: var(--danger); }
     #voiceHint {
       position: fixed;
@@ -535,12 +552,11 @@
     </div>
 
     <div id="log" role="log" aria-live="polite"></div>
-    <div id="orb" aria-hidden="true" title="点一下停"><b></b><i></i></div>
 
     <form id="form">
       <button id="mic" type="button" aria-label="切换到说话">说</button>
       <textarea id="input" rows="1" placeholder="问我，或者告诉我一件事" autocomplete="off" enterkeyhint="send"></textarea>
-      <button id="hold" type="button">按住 说话</button>
+      <button id="hold" type="button"><span class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="label">按住 说话</span></button>
       <button id="send" type="submit">发送</button>
     </form>
     <div id="voiceHint" aria-live="polite"></div>
@@ -1198,7 +1214,6 @@
     }
 
     // ---- 声音：你说话时听麦克风；她一句写完就念一句；白环跟着真实的响度起伏 ----
-    const orbEl = document.getElementById("orb");
     const voiceOut = new Audio();
     const SENTENCE_STOPS = "。！？!?；;…\n";
     const ENVELOPE_HZ = 50; // 她的声音每 20ms 记一个响度
@@ -1248,17 +1263,25 @@
       const target = orbState === "listening" ? micLevel() : orbState === "speaking" ? voiceLevel(now) : 0;
       // 起得快、落得慢，像呼吸
       orbLevel += (target - orbLevel) * (target > orbLevel ? 0.5 : 0.12);
-      orbEl.style.setProperty("--l", orbLevel.toFixed(3));
+      holdBtn.style.setProperty("--l", orbLevel.toFixed(3));
       orbFrame = orbState || orbLevel > 0.01 ? requestAnimationFrame(orbTick) : 0;
     }
 
+    // 声音的状态只画在输入栏上：听你说（listening）、她在说（speaking）；想的时候不画，气泡里的三个点就够了
     function orbSet(state) {
       clearTimeout(orbHide);
       orbState = state;
-      orbEl.className = state ? "on " + state : "";
-      logEl.classList.toggle("voice", !!state);
-      if (state) setTimeout(scrollDown, 320);
+      if (state === "listening" || state === "speaking") holdBtn.dataset.voice = state;
+      else delete holdBtn.dataset.voice;
+      voiceLabels();
       if (state && !orbFrame) orbFrame = requestAnimationFrame(orbTick);
+    }
+
+    // 她在说话时：「按住 说话」变成「轻点停止 · 按住插话」；打字模式下左边的「说」变成「停」
+    function voiceLabels() {
+      const voice = form.classList.contains("voice");
+      if (!press) holdBtn.querySelector(".label").textContent = orbState === "speaking" ? "轻点停止 · 按住插话" : "按住 说话";
+      micBtn.textContent = voice ? "打字" : orbState === "speaking" ? "停" : "说";
     }
 
     // 这一轮全说完才收起白环；句子之间的停顿不收
@@ -1450,7 +1473,7 @@
 
     function setMode(voice) {
       form.classList.toggle("voice", voice);
-      micBtn.textContent = voice ? "打字" : "说";
+      voiceLabels();
       micBtn.setAttribute("aria-label", voice ? "切换到打字" : "切换到说话");
       try { localStorage.setItem(MODE_KEY, voice ? "voice" : "text"); } catch (e) {}
       // 切过来这一下就把麦克风打开：权限框在这时弹，而不是在他按住的时候弹
@@ -1511,7 +1534,8 @@
       const cancel = !!(press && press.cancel);
       holdBtn.classList.toggle("holding", !!press);
       holdBtn.classList.toggle("cancel", cancel);
-      holdBtn.textContent = !press ? "按住 说话" : cancel ? "松开 取消" : "松开 发送";
+      if (press) holdBtn.querySelector(".label").textContent = cancel ? "松开 取消" : "松开 发送";
+      else voiceLabels();
       if (press) {
         clearTimeout(hintTimer);
         voiceHint.textContent = cancel ? "松开手指，取消发送" : "松开发送，上滑取消";
@@ -1525,9 +1549,10 @@
       e.preventDefault();
       if (press) return;
       try { holdBtn.setPointerCapture(e.pointerId); } catch (err) {}
-      stopSpeaking(); // 她正在说：你一开口她就停
+      const interrupting = orbState === "speaking";
+      stopSpeaking(); // 她正在说：你一碰她就停
       hintTimer = 0;
-      press = { id: e.pointerId, y: e.clientY, at: Date.now(), cancel: false };
+      press = { id: e.pointerId, y: e.clientY, at: Date.now(), cancel: false, interrupting };
       showHolding();
       const fresh = !mediaStream;
       if (!(await ensureMic())) {
@@ -1580,7 +1605,7 @@
         recordChunks = [];
         if (cancelled || tooShort || !blob.size) {
           orbSet("");
-          if (!cancelled) flashHint("说话时间太短");
+          if (!cancelled && !(done && done.interrupting)) flashHint("说话时间太短");
           return;
         }
         sendVoice(blob, mime);
@@ -1773,7 +1798,14 @@
       ask(message);
     });
 
-    micBtn.addEventListener("click", () => setMode(!form.classList.contains("voice")));
+    micBtn.addEventListener("click", () => {
+      if (orbState === "speaking" && !form.classList.contains("voice")) {
+        stopSpeaking();
+        settleOrb();
+        return;
+      }
+      setMode(!form.classList.contains("voice"));
+    });
     holdBtn.addEventListener("pointerdown", startHold);
     holdBtn.addEventListener("pointermove", moveHold);
     holdBtn.addEventListener("pointerup", (e) => { if (press && e.pointerId === press.id) endHold(); });
@@ -1799,12 +1831,6 @@
       }
     } catch (e) {}
 
-    orbEl.addEventListener("click", () => {
-      if (orbState === "speaking") {
-        stopSpeaking();
-        settleOrb();
-      }
-    });
 
     input.addEventListener("input", fitInput);
 

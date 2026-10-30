@@ -66,6 +66,8 @@ class NowTests(unittest.TestCase):
         reminders.add("给妈妈打电话", at("15:30"))
         card, _, _ = view(at("09:00"), self.TASKS)
         self.assertEqual(list(card), ["今天", "明天 · 周三"])  # 没有「需要你」「待办」这些分区
+        empty, _, _ = view(at("09:00", "2026-10-16"), [])  # 周五：今天明天都空
+        self.assertEqual(list(empty), [])  # 空的日子不占地方
         today = [(r["time"], r["title"]) for r in card["今天"]["rows"]]
         self.assertEqual(today, [
             ("10:00–11:00", "Comp30291 lecture"),

@@ -146,22 +146,9 @@ def card(gh: dict[str, Any] | None = None) -> tuple[list[dict[str, Any]], dict[s
             }
         )
 
-    deploy = gh.get("deploy")
-    if deploy and deploy["status"] == "running":
-        running.append({"time": "上线中", "title": deploy["message"] or "develop", "where": deploy["sha"][:7],
-                        "now": False, "key": f"deploy:{deploy['sha']}", "actions": []})
-
-    pending_branch = (pending or {}).get("branch")
-    for pr in gh.get("prs") or []:
-        if pr["draft"] or pr["branch"] == pending_branch:
-            continue
-        running.append({"time": f"PR #{pr['number']}", "title": pr["title"], "where": "", "now": False,
-                        "key": f"pr:{pr['number']}", "actions": [{"id": "open", "label": "打开", "url": pr["url"]}]})
-
-    section = None
-    if running:
-        live = live_sha()
-        section = {"label": "在跑的", "meta": f"线上 {live[:7]}" if live else "", "rows": running[:4], "empty": ""}
+    # 正在部署、开着的 PR、线上是哪个提交：这些是工厂里的事，不摆到他每天看的画面上。
+    # 要他拍板的才出现（改好了、测试红了）；上线完成会推一句「上线了」
+    section = {"label": "在跑的", "meta": "", "rows": running[:3], "empty": ""} if running else None
     return decisions, section
 
 

@@ -131,25 +131,21 @@ def _sections(
     now: datetime, timed: list[Timed], all_day: list[tuple[date, str]], tasks: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
     """「现在」下面那条安静的时间线：今天还剩的、明天的；两天都空就给下一件。"""
+    # 空的日子不占地方：没有就不出现；「现在」那句话已经说了空不空
     today = now.date()
     tomorrow = today + timedelta(days=1)
-    finished = sum(1 for s, e, _ in timed if s.date() == today and (e or s) <= now)
-    today_rows = _day_rows(today, now, timed, all_day, tasks)
-    tomorrow_rows = _day_rows(tomorrow, now, timed, all_day, tasks)
-    sections = [
-        {"label": "今天", "meta": f"已结束 {finished} 项" if finished else "", "rows": today_rows,
-         "empty": "都结束了" if finished else "没有安排"},
-        {"label": f"明天 · {weekday_zh(tomorrow)}", "meta": "", "rows": tomorrow_rows, "empty": "没有安排"},
-    ]
-    if not today_rows and not tomorrow_rows:
+    sections = []
+    for label, day in (("今天", today), (f"明天 · {weekday_zh(tomorrow)}", tomorrow)):
+        rows = _day_rows(day, now, timed, all_day, tasks)
+        if rows:
+            sections.append({"label": label, "meta": "", "rows": rows, "empty": ""})
+    if not sections:
         later = next((item for item in timed if item[0].date() > tomorrow), None)
         if later:
             start, end, event = later
             sections.append(
                 {"label": f"下一件 · {day_label(start.date())}", "meta": "", "rows": [_row(event, start, end)], "empty": ""}
             )
-        else:
-            sections.append({"label": "到下周日", "meta": "", "rows": [], "empty": "都没有安排"})
     return sections
 
 

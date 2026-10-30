@@ -57,16 +57,18 @@ class CardTests(unittest.TestCase):
         self.assertEqual(decisions[0]["time"], "测试红了")
         self.assertIn("用 Cursor 修", decisions[0]["actions"][0]["ask"])
 
-    def test_running_things_have_their_own_section(self) -> None:
+    def test_only_what_he_started_shows_no_factory_parts(self) -> None:
+        """Cursor 在改他交代的事：显示一行。正在部署、开着的 PR、线上提交号：不摆到他的画面上。"""
         job = {"status": "running", "what": "去掉细节"}
-        prs = [{"number": 7, "title": "Add X", "url": "u", "draft": False, "branch": "b"},
-               {"number": 8, "title": "WIP", "url": "u", "draft": True, "branch": "c"}]
+        prs = [{"number": 7, "title": "Add X", "url": "u", "draft": False, "branch": "b"}]
         with patch.object(engineering.cursor_fix, "_load_job", return_value=job), patch.object(
             engineering.cursor_fix, "refresh_job", return_value=job
         ), patch.dict(os.environ, {"FRIDAY_GIT_SHA": "1234567890"}):
             _, running = engineering.card(gh(deploy="running", prs=prs))
-        self.assertEqual([r["time"] for r in running["rows"]], ["在改", "上线中", "PR #7"])  # 草稿 PR 不占地方
-        self.assertEqual(running["meta"], "线上 1234567")
+        self.assertEqual([(r["time"], r["title"]) for r in running["rows"]], [("在改", "去掉细节")])
+        self.assertEqual(running["meta"], "")
+        _, nothing = engineering.card(gh(deploy="running", prs=prs))
+        self.assertIsNone(nothing)
 
     def test_leftover_decisions_join_the_running_block_at_the_end(self) -> None:
         sections = [{"label": "今天", "rows": []}]
