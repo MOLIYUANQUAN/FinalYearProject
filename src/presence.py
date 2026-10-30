@@ -8,7 +8,7 @@ from collections.abc import AsyncIterator
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from src import agenda, engineering, reminders, todos
+from src import agenda, reminders, todos
 from src.agenda import Timed, day_label, title, when
 from src.config import effective_now
 from src.context import greeting, his_name, weekday_zh
@@ -155,10 +155,9 @@ def _sections(
     return sections
 
 
-def _focus(
-    now: datetime, timed: list[Timed], tasks: list[dict[str, Any]], decisions: list[dict[str, Any]]
-) -> dict[str, Any] | None:
-    """此刻最该做的那一件，带一个动作。顺序：三小时内要紧的会 → 过了截止的 → 工程上要他拍板的 → 今天截止的。
+def _focus(now: datetime, timed: list[Timed], tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """此刻最该做的那一件，带一个动作。顺序：三小时内要紧的会 → 过了截止的 → 今天截止的。
+    工程上的事（Cursor 改好了、测试红了）不在这里：那是车间，只通过推送找他。
     正在上课 / 开会，或者都没有：返回 None，用日历上那句判断。"""
     today = now.date()
     if any(e and s <= now < e for s, e, _ in timed):
@@ -174,9 +173,6 @@ def _focus(
     if overdue:
         return {"say": _spaced(f"过了截止还没划掉：{overdue[0]['title']}。"), "key": f"task:{overdue[0]['id']}",
                 "actions": [DONE, TOMORROW], "title": overdue[0]["title"]}
-    if decisions:
-        first = decisions[0]
-        return {"say": _spaced(first["say"]), "key": first["key"], "actions": first["actions"], "title": first["title"]}
     due = [task for task, day in pairs if day == today]
     if due:
         rest = f"，还有 {len(due) - 1} 件" if len(due) > 1 else ""
@@ -268,12 +264,11 @@ def today_view(
     now: datetime,
     events: list[dict[str, Any]],
     tasks: list[dict[str, Any]] | None = None,
-    decisions: list[dict[str, Any]] | None = None,
 ) -> tuple[list[dict[str, Any]], str, dict[str, Any] | None]:
-    """同一份日历、待办和工程状态：时间线、此刻那一句、那一句要不要带动作（focus）。"""
+    """同一份日历和待办：时间线、此刻那一句、那一句要不要带动作（focus）。"""
     timed, all_day = agenda.split(events)
     tasks = tasks or []
-    focus = _focus(now, timed, tasks, decisions or [])
+    focus = _focus(now, timed, tasks)
     say = focus["say"] if focus else _say(now, timed, all_day, tasks)
     return _sections(now, timed, all_day, tasks), say, focus
 
@@ -292,33 +287,21 @@ async def presence_input() -> tuple[dict[str, Any], str]:
         "error": "",
     }
 
-    calendar, todo, work = await asyncio.gather(
+    calendar, todo = await asyncio.gather(
         asyncio.to_thread(agenda.read, CARD_FRESH_S),
         asyncio.to_thread(todos.read, CARD_FRESH_S),
-        asyncio.to_thread(engineering.card),
         return_exceptions=True,
     )
     if isinstance(calendar, BaseException):
         card["error"] = _reason(calendar, "日历这次没读到。")
         return card, ""
     tasks = [] if isinstance(todo, BaseException) else todo[0]
-    decisions, running = ([], None) if isinstance(work, BaseException) else work
-    card["sections"], say, focus = today_view(now, calendar[0], tasks, decisions)
+    card["sections"], say, focus = today_view(now, calendar[0], tasks)
     if focus:
         card["focus"] = {"key": focus["key"], "actions": focus["actions"], "title": focus["title"]}
     if isinstance(todo, BaseException):
         card["sections"].append({"label": "待办", "meta": "", "rows": [], "empty": _reason(todo, "这次没读到。")})
-    _add_engineering(card["sections"], [d for d in decisions if not focus or d["key"] != focus["key"]], running)
     return card, say
-
-
-def _add_engineering(sections: list[dict[str, Any]], decisions: list[dict[str, Any]], running: dict[str, Any] | None) -> None:
-    """工程线：没放进「现在」的那些拍板事、和在跑的，排在最后一块「在跑的」；都没有就不出现。"""
-    if not decisions and not running:
-        return
-    block = running or {"label": "在跑的", "meta": "", "rows": [], "empty": ""}
-    block["rows"] = decisions + block["rows"]
-    sections.append(block)
 
 
 async def stream_presence() -> AsyncIterator[dict[str, Any]]:

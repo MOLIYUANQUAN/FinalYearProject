@@ -12,7 +12,6 @@ from fastapi.testclient import TestClient
 
 from tests.helpers import SandboxTestCase
 
-import src.workbench as workbench
 from src import engineering, nudges, presence
 
 PENDING = {
@@ -31,53 +30,23 @@ def gh(tests="passed", deploy="passed", prs=()) -> dict:
     return {"connected": True, "tests": run(tests), "deploy": run(deploy), "prs": list(prs)}
 
 
-class CardTests(unittest.TestCase):
-    def setUp(self) -> None:
-        for p in (
-            patch.object(engineering.ship, "load_pending", return_value=None),
-            patch.object(engineering.cursor_fix, "_load_job", return_value=None),
-        ):
-            p.start()
-            self.addCleanup(p.stop)
+class WorkshopStaysOutOfTheLivingRoom(unittest.TestCase):
+    def test_the_daily_card_never_shows_engineering(self) -> None:
+        """Cursor 改好了、测试红了：只推送，不进开工画面。"""
+        import inspect
 
-    def test_quiet_when_nothing_is_going_on(self) -> None:
-        self.assertEqual(engineering.card(gh()), ([], None))
+        self.assertNotIn("engineering", inspect.getsource(presence.presence_input))
+        self.assertFalse(hasattr(engineering, "card"))
 
-    def test_ready_change_needs_a_decision(self) -> None:
-        with patch.object(engineering.ship, "load_pending", return_value=PENDING):
-            decisions, running = engineering.card(gh())
-        row = decisions[0]
-        self.assertEqual((row["time"], row["title"], row["where"]), ("改好了", "开场卡片不再催明天的事", "Cursor · 2 个文件"))
-        self.assertEqual([a["id"] for a in row["actions"]], ["ship", "preview"])
-        self.assertEqual(row["actions"][0]["confirm"], "确认上线")
-        self.assertIsNone(running)
-
-    def test_red_develop_offers_cursor(self) -> None:
-        decisions, _ = engineering.card(gh(tests="failed"))
-        self.assertEqual(decisions[0]["time"], "测试红了")
-        self.assertIn("用 Cursor 修", decisions[0]["actions"][0]["ask"])
-
-    def test_only_what_he_started_shows_no_factory_parts(self) -> None:
-        """Cursor 在改他交代的事：显示一行。正在部署、开着的 PR、线上提交号：不摆到他的画面上。"""
-        job = {"status": "running", "what": "去掉细节"}
-        prs = [{"number": 7, "title": "Add X", "url": "u", "draft": False, "branch": "b"}]
+    def test_pushes_open_a_question_for_her(self) -> None:
+        job = {"status": "done", "agent_id": "a1", "what": "去掉细节"}
         with patch.object(engineering.cursor_fix, "_load_job", return_value=job), patch.object(
             engineering.cursor_fix, "refresh_job", return_value=job
-        ), patch.dict(os.environ, {"FRIDAY_GIT_SHA": "1234567890"}):
-            _, running = engineering.card(gh(deploy="running", prs=prs))
-        self.assertEqual([(r["time"], r["title"]) for r in running["rows"]], [("在改", "去掉细节")])
-        self.assertEqual(running["meta"], "")
-        _, nothing = engineering.card(gh(deploy="running", prs=prs))
-        self.assertIsNone(nothing)
-
-    def test_leftover_decisions_join_the_running_block_at_the_end(self) -> None:
-        sections = [{"label": "今天", "rows": []}]
-        presence._add_engineering(sections, [{"time": "测试红了"}], {"label": "在跑的", "rows": [{"time": "上线中"}]})
-        self.assertEqual([s["label"] for s in sections], ["今天", "在跑的"])
-        self.assertEqual([r["time"] for r in sections[1]["rows"]], ["测试红了", "上线中"])
-        quiet = [{"label": "今天", "rows": []}]
-        presence._add_engineering(quiet, [], None)
-        self.assertEqual(len(quiet), 1)
+        ), patch.object(engineering.ship, "load_pending", return_value=PENDING):
+            found = engineering.events(NOW, gh(tests="failed"))
+        urls = {e["kind"]: e["url"] for e in found}
+        self.assertIn("do=ask", urls["cursor"])
+        self.assertIn("do=ask", urls["ci"])
 
 
 class EventTests(SandboxTestCase):
@@ -116,42 +85,6 @@ class EventTests(SandboxTestCase):
         self.assertEqual([n["key"] for n in nudges.due_now(night, [], [], work)], ["cursor:a1"])  # 他刚让改的，晚上也说
         ci = [{"kind": "ci", "key": "ci:x", "title": "t", "body": "b", "url": "/"}]
         self.assertEqual(nudges.due_now(night, [], [], ci), [])  # 红了等白天
-
-
-class ShipFromCardTests(SandboxTestCase):
-    def setUp(self) -> None:
-        super().setUp()
-        friday, _ = self.friday([])
-        engineering.SHIPPED_PATH.unlink(missing_ok=True)
-        for p in (
-            patch.object(workbench, "friday", friday),
-            patch.object(workbench.ship, "load_or_recover_pending", return_value=PENDING),
-        ):
-            p.start()
-            self.addCleanup(p.stop)
-        app = FastAPI()
-        app.include_router(workbench.router)
-        self.client = TestClient(app)
-
-    def test_preview_shows_the_change(self) -> None:
-        with patch.object(workbench.ship, "compare", return_value={"ok": False}):
-            data = self.client.post("/api/items/act", json={"key": "ship:pending", "action": "preview"}).json()
-        self.assertIn("Cursor 改完了", data["say"])
-
-    def test_ship_merges_and_remembers_to_announce(self) -> None:
-        result = {"ok": True, "merged": True, "say": "已合进 develop，GitHub 正在自动部署。"}
-        with patch.object(workbench.ship, "ship", return_value=result) as shipped:
-            data = self.client.post("/api/items/act", json={"key": "ship:pending", "action": "ship"}).json()
-        shipped.assert_called_once_with(user_confirmed=True)
-        self.assertEqual(data["say"], result["say"])
-        self.assertTrue(engineering.SHIPPED_PATH.exists())
-
-    def test_failed_tests_block_and_nothing_is_announced(self) -> None:
-        blocked = {"ok": False, "error": "tests_failed", "say": "Cursor 这版没过测试，我没合并、也没部署。"}
-        with patch.object(workbench.ship, "ship", return_value=blocked):
-            data = self.client.post("/api/items/act", json={"key": "ship:pending", "action": "ship"}).json()
-        self.assertIn("没过测试", data["say"])
-        self.assertFalse(engineering.SHIPPED_PATH.exists())
 
 
 class GithubReadTests(unittest.TestCase):

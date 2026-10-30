@@ -1,8 +1,6 @@
-"""工程线：Cursor 在改什么、改好了待上线、develop 测试红了、正在上线、线上是哪一版。
+"""工程线（车间）：Cursor 改好了、上线了、develop 测试红了——只通过推送找他，不摆进每天的开场画面。
 
-- 要他拍板的（改好了要不要上线、测试红了要不要交给 Cursor 修）进「需要你」；
-- 进行中的（Cursor 在改、正在上线、开着的 PR）进「在跑的」，没有就不出现。
-- 改好了、上线了、测试红了，会主动推给他（nudges.tick 里调 events）。
+点开推送就是一段对话：她把改了什么给他看，要上线就照常确认（ship_pending_fix 的确认卡片）。
 
 GitHub 的状态要 GITHUB_TOKEN（scripts/connect_github_fly.py 一次放好）；没有就只看 Cursor 这边。
 """
@@ -17,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import requests
+from urllib.parse import quote
 
 from src import cursor_fix, ship
 from src.config import FEEDBACK_DIR
@@ -97,61 +96,6 @@ def forget() -> None:
         _cache = None
 
 
-# ---- 开工台上的行 ----
-
-
-def card(gh: dict[str, Any] | None = None) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
-    """（进「需要你」的行，「在跑的」那一块）。"""
-    gh = gh if gh is not None else github()
-    decisions: list[dict[str, Any]] = []
-    running: list[dict[str, Any]] = []
-
-    pending = ship.load_pending()
-    job = cursor_fix.refresh_job() if cursor_fix._load_job() else None
-    if pending and pending.get("branch"):
-        what = _first_line(pending.get("summary") or (job or {}).get("what") or pending["branch"])
-        n = len(pending.get("files") or [])
-        decisions.append(
-            {
-                "time": "改好了",
-                "title": what,
-                "say": f"Cursor 改好了：{what}，等你上线。",
-                "where": f"Cursor · {n} 个文件" if n else "Cursor",
-                "now": False,
-                "key": "ship:pending",
-                "actions": [
-                    {"id": "ship", "label": "上线", "confirm": "确认上线"},
-                    {"id": "preview", "label": "看改动"},
-                ],
-            }
-        )
-    elif job and job.get("status") == "running":
-        running.append({"time": "在改", "title": _first_line(job.get("what") or "改代码"), "where": "Cursor",
-                        "now": False, "key": "cursor:job", "actions": []})
-
-    tests = gh.get("tests")
-    if tests and tests["status"] == "failed":
-        decisions.append(
-            {
-                "time": "测试红了",
-                "title": tests["message"] or "develop",
-                "say": f"develop 测试红了：{tests['message'] or tests['sha'][:7]}。",
-                "where": f"develop · {tests['sha'][:7]}",
-                "now": False,
-                "key": f"ci:{tests['sha']}",
-                "actions": [
-                    {"id": "fix", "label": "交给 Cursor 修", "ask": f"用 Cursor 修 develop 上没过的测试（{tests['message']}）"},
-                    {"id": "open", "label": "看日志", "url": tests["url"]},
-                ],
-            }
-        )
-
-    # 正在部署、开着的 PR、线上是哪个提交：这些是工厂里的事，不摆到他每天看的画面上。
-    # 要他拍板的才出现（改好了、测试红了）；上线完成会推一句「上线了」
-    section = {"label": "在跑的", "meta": "", "rows": running[:3], "empty": ""} if running else None
-    return decisions, section
-
-
 # ---- 上线以后告诉他 ----
 
 
@@ -181,7 +125,7 @@ def events(now: datetime, gh: dict[str, Any] | None = None) -> list[dict[str, An
         what = _first_line(job.get("what") or "改代码", 40)
         if job.get("status") == "done" and ship.load_pending():
             out.append({"kind": "cursor", "key": f"cursor:{agent}", "title": "Cursor 改好了",
-                        "body": f"{what}。点开看改动，一键上线。", "url": f"/?n=cursor:{agent}", "urgency": "high"})
+                        "body": f"{what}。点开看改动，一键上线。", "url": f"/?n=cursor:{agent}&do=ask&what={quote('Cursor 改了什么')}", "urgency": "high"})
         elif job.get("status") != "done":
             out.append({"kind": "cursor", "key": f"cursor-failed:{agent}", "title": "Cursor 没改成",
                         "body": f"{what}：没改成。点开看看。", "url": f"/?n=cursor-failed:{agent}"})
@@ -203,5 +147,6 @@ def events(now: datetime, gh: dict[str, Any] | None = None) -> list[dict[str, An
             fresh = False
         if fresh:
             out.append({"kind": "ci", "key": f"ci:{tests['sha']}", "title": "develop 测试红了",
-                        "body": f"{tests['message']}。点开，一键交给 Cursor 修。", "url": f"/?n=ci:{tests['sha'][:12]}"})
+                        "body": f"{tests['message']}。点开，交给 Cursor 修。",
+                        "url": f"/?n=ci:{tests['sha'][:12]}&do=ask&what={quote('develop 测试为什么红了')}"})
     return out

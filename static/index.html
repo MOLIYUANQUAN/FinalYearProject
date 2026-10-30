@@ -1014,7 +1014,10 @@
         }).catch(() => {});
       }
       const what = target.searchParams.get("what");
-      if (target.searchParams.get("do") === "prepare" && what) pendingAsk = "帮我准备 " + what;
+      const action = target.searchParams.get("do");
+      if (action === "prepare" && what) pendingAsk = "帮我准备 " + what;
+      // 车间的推送（Cursor 改好了、测试红了）：点开就直接问她，改了什么由她给你看
+      if (action === "ask" && what) pendingAsk = what;
       if (pendingAsk && ready && !busy) {
         const message = pendingAsk;
         pendingAsk = "";

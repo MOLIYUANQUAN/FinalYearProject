@@ -96,20 +96,13 @@ Turning it on:
 
 Opening a notification is counted in the usage log, so `usage_report.py` shows whether nudges are worth it.
 
-## Engineering line
+## Engineering line (kept out of the daily screen)
 
-With `GITHUB_TOKEN` on Fly, the workbench also shows his engineering work:
+Cursor fixes and CI belong to the workshop, not the living room, so they never appear on the opening card. Friday only pushes:
 
-- **需要你:**
-  - a Cursor change that is ready ("上线" → "确认上线", or "看改动");
-  - a red `develop` ("交给 Cursor 修", "看日志").
-- **在跑的:** Cursor working, a deploy in progress, open non-draft PRs, and which commit is live. The section is hidden when nothing is moving.
-- **Pushes:**
-  - "Cursor 改好了";
-  - "上线了", sent once the new commit is actually serving;
-  - "develop 测试红了".
-
-  The first two answer something he started, so they ignore the daily quota and quiet hours.
+- "Cursor 改好了": tapping it opens Friday asking "Cursor 改了什么". She shows the change, and shipping goes through the usual confirmation card, which lists the changed files.
+- "上线了": sent once the new commit is actually serving.
+- "develop 测试红了": tapping it asks why and offers to hand the fix to Cursor.
 
 Shipping still goes through the test gate: a change whose tests fail is not merged.
 

@@ -23,8 +23,8 @@ def at(hhmm: str, day: str = "2026-10-13") -> datetime:
     return datetime.fromisoformat(f"{day}T{hhmm}")
 
 
-def view(now: datetime, tasks: list[dict], decisions: list[dict] | None = None):
-    found, say, focus = presence.today_view(now, EVENTS, tasks, decisions)
+def view(now: datetime, tasks: list[dict]):
+    found, say, focus = presence.today_view(now, EVENTS, tasks)
     return {s["label"]: s for s in found}, say.replace("\u00a0", " "), focus
 
 
@@ -36,20 +36,15 @@ class NowTests(unittest.TestCase):
         {"id": "t-today", "title": "准备进度汇报", "due": "2026-10-13"},
         {"id": "t-tomorrow", "title": "续借图书馆的书", "due": "2026-10-14"},
     ]
-    SHIP = {"time": "改好了", "title": "开场不再催", "say": "Cursor 改好了：开场不再催，等你上线。", "key": "ship:pending",
-            "actions": [{"id": "ship", "label": "上线"}]}
-
     def test_important_meeting_soon_comes_first(self) -> None:
-        _, say, focus = view(at("12:00"), self.TASKS, [self.SHIP])
+        _, say, focus = view(at("12:00"), self.TASKS)
         # 第一句只说最要紧的（大字），地点和还剩多久在后面（小字）
         self.assertEqual(say, "下午 2 点 FYP meeting with mentor。Kilburn Building · 还有 2 小时。")
         self.assertEqual([a["id"] for a in focus["actions"]], ["prepare"])
 
-    def test_then_overdue_then_engineering_then_due_today(self) -> None:
-        _, say, focus = view(at("09:00"), self.TASKS, [self.SHIP])
+    def test_then_overdue_then_due_today(self) -> None:
+        _, say, focus = view(at("09:00"), self.TASKS)
         self.assertEqual((say, focus["key"]), ("过了截止还没划掉：交 Lab 2。", "task:t-old"))
-        _, say, focus = view(at("09:00"), self.TASKS[1:], [self.SHIP])
-        self.assertEqual(focus["key"], "ship:pending")
         _, say, focus = view(at("09:00"), self.TASKS[1:])
         self.assertEqual(say, "今天截止：准备进度汇报。")
         self.assertEqual([a["id"] for a in focus["actions"]], ["done", "tomorrow"])
