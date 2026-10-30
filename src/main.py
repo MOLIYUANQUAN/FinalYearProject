@@ -23,7 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src import agenda, closed, reminders, todos, usage_log, voice
-from src.agent import friday, run_assistant
+from src.agent import active_model, friday, run_assistant, verify_model
 from src.calendar_providers import get_calendar_provider
 from src.presence import stream_presence
 from src.access import gate, router as access_router
@@ -89,6 +89,7 @@ async def lifespan(_app: FastAPI):
         print("[WARN] FRIDAY_ACCESS_TOKEN unset — set it before exposing Friday on the public internet")
     _warm = asyncio.create_task(asyncio.to_thread(_warm_calendar)) if backend == "google" else None
     nudger = asyncio.create_task(run_scheduler()) if scheduler_enabled() else None
+    asyncio.create_task(asyncio.to_thread(verify_model))
     print(f"[OK] nudges {'on' if nudger else 'off'}")
     yield
     if nudger:
@@ -177,6 +178,7 @@ def health() -> dict:
         "code_version": CODE_VERSION,
         # 云上部署时带进来的提交号：部署工作流靠它确认线上就是刚推的那一版
         "git_sha": (os.getenv("FRIDAY_GIT_SHA") or "").strip(),
+        "model": active_model(),
         "has_openai_api_key": has_key,
         "calendar_backend": backend,
         "mail_backend": mail,

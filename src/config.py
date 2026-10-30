@@ -35,7 +35,10 @@ MOCK_TODAY = "2026-10-12"
 MOCK_TOMORROW = "2026-10-13"
 MOCK_NOW_TIME = "09:00"
 
-DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+# 她的「脑子」：2026-10-30 起默认 GPT-5（gpt-4.1-mini 规则多了就不照做）。可用 OPENAI_MODEL 换别的型号
+DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5")
+# 推理模型想多久：low 在「说对」和「快」之间取中；要更快可设 minimal，要更稳可设 medium
+REASONING_EFFORT = os.getenv("FRIDAY_REASONING", "low")
 
 # calendar backend: mock | google
 GOOGLE_CREDENTIALS_PATH = SECRETS_DIR / "credentials.json"

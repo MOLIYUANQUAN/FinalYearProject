@@ -9,11 +9,13 @@ from typing import Any
 
 from agents import Agent, Model, ModelSettings, RunState, Runner
 from openai.types.responses import ResponseTextDeltaEvent
+from openai.types.shared import Reasoning
 
 from src import todos
 from src.agenda import chat_block
 from src.config import (
     DEFAULT_MODEL,
+    REASONING_EFFORT,
     get_calendar_backend,
     get_mail_backend,
     get_tasks_backend,
@@ -34,7 +36,7 @@ VOICE = """你叫 Friday，是 Zeep 的管家，只为他一个人。不是顾�
 你的价值：减少他必须亲自管理的事。不是陪聊，不是功能演示。
 和 GPT 不同：他去找 GPT，通常脑子里已经有问题；你是发现事情再来找他。一天问他二十五次就失败了——好管家知道什么该自己扛、什么该等、什么必须马上找他。
 他问你是谁 / 做什么：一两句说清上面这个定位就停，不背功能清单，不推销。没问就别自我介绍，也别复述这段说明。
-你有声音：他点「说」或要听你说话时，回复会念出来；别说自己只能打字。
+你有声音：他说「念给我听」之类时，回复会念出来；别说自己只能打字。
 
 你已经认识他——下面有他的档案和你记得的事，直接用。不要再问他告诉过你的事，也不要为此调用 get_personal_context 或 search_memory；只有下面找不到、需要翻更早的记忆时才用 search_memory。
 
@@ -131,9 +133,40 @@ def create_assistant(
         name="Friday",
         instructions=build_instructions(calendar, todo, spoken=spoken),
         tools=ALL_TOOLS + TASK_TOOLS if todos.connected() else ALL_TOOLS,
-        model=model or DEFAULT_MODEL,
-        model_settings=ModelSettings(temperature=0.2),
+        model=model or active_model(),
+        model_settings=model_settings(model if isinstance(model, str) else active_model() if model is None else ""),
     )
+
+
+# 这个账号用不了默认型号（名字写错、没开通）时，退回一个肯定能用的，不让 Friday 整个坏掉
+FALLBACK_MODEL = "gpt-4.1-mini"
+_active_model = DEFAULT_MODEL
+
+
+def active_model() -> str:
+    return _active_model
+
+
+def verify_model() -> str:
+    """服务启动时问一次 OpenAI：默认型号在不在。不在就换成 FALLBACK_MODEL；网络问题不算，照旧用默认的。"""
+    global _active_model
+    import openai
+
+    try:
+        openai.OpenAI(api_key=require_openai_api_key()).models.retrieve(DEFAULT_MODEL)
+    except openai.NotFoundError:
+        print(f"[WARN] model {DEFAULT_MODEL} is not available on this account; using {FALLBACK_MODEL}")
+        _active_model = FALLBACK_MODEL
+    except Exception as exc:  # noqa: BLE001
+        print(f"[WARN] could not check model {DEFAULT_MODEL}: {exc}")
+    return _active_model
+
+
+def model_settings(name: str) -> ModelSettings:
+    """推理模型（GPT-5 及以后、o 系列）不收 temperature：给它思考力度，并让回答短一点；老模型照旧。"""
+    if name.startswith(("gpt-5", "gpt-6", "o1", "o3", "o4")):
+        return ModelSettings(reasoning=Reasoning(effort=REASONING_EFFORT), verbosity="low")
+    return ModelSettings(temperature=0.2)
 
 
 async def _assistant(spoken: bool = False, model: Model | None = None) -> Agent:
