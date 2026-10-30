@@ -27,6 +27,7 @@ from src.presence import stream_presence
 from src.access import gate, router as access_router
 from src.push_api import router as push_router, run_scheduler, scheduler_enabled
 from src.state_sync import router as state_router
+from src.workbench import router as workbench_router
 from src.config import (
     STATIC_DIR,
     effective_now,
@@ -101,6 +102,7 @@ app.middleware("http")(gate)
 app.include_router(access_router)
 app.include_router(state_router)
 app.include_router(push_router)
+app.include_router(workbench_router)
 
 
 class ChatRequest(BaseModel):

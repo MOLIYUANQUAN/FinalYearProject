@@ -195,6 +195,30 @@
       color: var(--muted);
       font-size: 0.78rem;
     }
+    /* 能点的行：点开下面出动作；「需要你」那块用黑字标题，和日程区分开 */
+    .today .row.tappable { cursor: pointer; }
+    .today .more { color: var(--soft); }
+    .today .row.handled { opacity: 0.45; }
+    .today .row.handled .what { text-decoration: line-through; }
+    .today section.attention h3 { color: var(--ink); font-weight: 600; }
+    .today .row-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 2px 0 8px calc(6.6em + 10px);
+    }
+    .today .row-actions button {
+      font: inherit;
+      font-size: 0.8rem;
+      padding: 5px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .today .row-actions button:first-child { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+    .today .row-actions .hint { margin: 0; }
     .today .where {
       display: block;
       overflow: hidden;
@@ -467,7 +491,11 @@
       header h1 { font-size: 1.4rem; }
       #newChat { min-height: 44px; padding: 0 4px; }
       .msg { max-width: 94%; }
-      .today .row { grid-template-columns: 5.2em minmax(0, 1fr); }
+      /* 手机上「18:00–19:00」放不进 5.2em，会和标题挤在一起：时间字小一号，列宽给够 */
+      .today .row { grid-template-columns: 5.6em minmax(0, 1fr); }
+      .today .row time { font-size: 0.84em; padding-top: 0.12em; }
+      .today .row-actions { margin-left: calc(5.6em + 10px); }
+      .today .row-actions button { min-height: 40px; }
       #input { font-size: 16px; min-height: 48px; }
       #mic, #send { min-width: 3.6rem; min-height: 48px; padding: 0 14px; }
       .actions { flex-wrap: wrap; }
@@ -706,7 +734,7 @@
       div.replaceChildren(el("div", "hello", card.hello));
       if (card.error) div.append(el("p", "empty", card.error));
       for (const section of card.sections || []) {
-        const box = el("section");
+        const box = el("section", section.attention ? "attention" : "");
         // 空的日子只占一行、退到后面；版面留给真要去的事
         const head = el("h3");
         head.append(el("span", "", section.label));
@@ -716,16 +744,75 @@
         for (const row of section.rows) {
           const line = el("div", row.now ? "row now" : "row");
           const what = el("div", "what", row.title);
+          if (row.actions && row.actions.length) what.append(el("span", "more", " ›"));
           if (row.now) what.append(el("span", "tag", "进行中"));
           if (row.where) what.append(el("span", "where", row.where));
           line.append(el("time", "", row.time), what);
           box.append(line);
+          if (row.actions && row.actions.length) {
+            line.classList.add("tappable");
+            line.onclick = () => toggleRowActions(line, row);
+          }
         }
         div.append(box);
       }
       const say = el("div", "say");
       div.append(say);
       return say;
+    }
+
+    // 卡片上的一行：点开出动作；「帮我准备」交给她，「做完了 / 明天再说」直接办、给撤销
+    function toggleRowActions(line, row) {
+      const open = line.nextElementSibling;
+      if (open && open.classList.contains("row-actions")) {
+        open.remove();
+        return;
+      }
+      if (line.classList.contains("handled")) return;
+      const bar = el("div", "row-actions");
+      for (const action of row.actions) {
+        const b = el("button", "", action.label);
+        b.type = "button";
+        b.onclick = (e) => {
+          e.stopPropagation();
+          doRow(line, row, action.id, bar);
+        };
+        bar.append(b);
+      }
+      line.after(bar);
+    }
+
+    async function doRow(line, row, action, bar) {
+      if (busy || !ready) return;
+      if (action === "prepare") {
+        bar.remove();
+        await ask("帮我准备 " + row.title);
+        return;
+      }
+      bar.querySelectorAll("button").forEach((b) => (b.disabled = true));
+      try {
+        const res = await fetch("/api/items/act", {
+          method: "POST",
+          credentials: "include",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ key: row.key, action, conversation_id: session && session.id }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 401) {
+          showUnlock(true);
+          throw new Error("需要重新登录。");
+        }
+        if (!res.ok) throw new Error(data.detail || "没办成。");
+        bar.remove();
+        line.classList.add("handled");
+        clearActions();
+        const m = { id: data.message_id, role: "assistant", content: data.say, tools: [], undo: data.undo, at: Date.now() };
+        const div = addMessage("bot", data.say);
+        addUndo(div, m);
+        session.messages.push(m);
+      } catch (e) {
+        bar.replaceChildren(el("span", "hint", (e && e.message) || String(e)));
+      }
     }
 
     function showTyping(div, hint) {

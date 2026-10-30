@@ -65,23 +65,62 @@ def _spaced(text: str) -> str:
     return re.sub(r"([0-9]) ?([\u4e00-\u9fff])", "\\1\u00a0\\2", text)
 
 
+# 卡片上每一行能点的动作：点了直接办（待办），或者交给 Friday 去办（准备）
+PREPARE = {"id": "prepare", "label": "帮我准备"}
+DONE = {"id": "done", "label": "做完了"}
+TOMORROW = {"id": "tomorrow", "label": "明天再说"}
+NEEDS_YOU_MAX = 3
+NEEDS_YOU_AHEAD = timedelta(hours=3)
+
+
 def _row(event: dict[str, Any], start: datetime, end: datetime | None, *, now: bool = False) -> dict[str, Any]:
-    return {"time": when(start, end), "title": title(event), "where": _place(event), "now": now}
+    name = title(event)
+    # 要紧的会（见导师、开会、截止、考试……）还没开始：点一下就把要点备好
+    actions = [PREPARE] if IMPORTANT.search(name) and not now else []
+    return {
+        "time": when(start, end),
+        "title": name,
+        "where": _place(event),
+        "now": now,
+        "key": f"event:{event.get('id') or name}",
+        "actions": actions,
+    }
 
 
 def _all_day_rows(titles: list[str]) -> list[dict[str, Any]]:
     return [{"time": "全天", "title": name, "where": "", "now": False} for name in titles]
 
 
+def _task_row(task: dict[str, Any], word: str, actions: list[dict[str, str]]) -> dict[str, Any]:
+    return {"time": word, "title": task["title"], "where": "", "now": False, "key": f"task:{task['id']}", "actions": actions}
+
+
 def _task_section(tasks: list[dict[str, Any]], today: date) -> dict[str, Any] | None:
-    """待办里过了截止的、今天和明天截止的；别的不占卡片。"""
+    """今天和明天截止的待办（过了截止的在「需要你」里）；别的不占卡片。"""
     rows = []
     for task, due in todos.ordered(tasks):
-        if due is None or due > today + timedelta(days=1):
+        if due is None or due < today or due > today + timedelta(days=1):
             continue
-        word = "今天" if due == today else "明天" if due > today else f"过了 {(today - due).days} 天"
-        rows.append({"time": word, "title": task["title"], "where": "", "now": False})
+        if due == today:
+            rows.append(_task_row(task, "今天", [DONE, TOMORROW]))
+        else:
+            rows.append(_task_row(task, "明天", [DONE]))
     return {"label": "待办", "meta": "", "rows": rows, "empty": ""} if rows else None
+
+
+def _needs_you(now: datetime, timed: list[Timed], tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """只放要他拍板的：过了截止还没划掉的（做完了，还是改日子），和三小时内要开始、要紧的会。
+    明天的事不进来；没有就整块不出现。"""
+    rows = []
+    for start, end, event in timed:
+        if start.date() == now.date() and timedelta(0) < start - now <= NEEDS_YOU_AHEAD and IMPORTANT.search(title(event)):
+            rows.append(_row(event, start, end))
+    for task, due in todos.ordered(tasks):
+        if due is not None and due < now.date():
+            rows.append(_task_row(task, f"过了 {(now.date() - due).days} 天", [DONE, TOMORROW]))
+    if not rows:
+        return None
+    return {"label": "需要你", "meta": "", "rows": rows[:NEEDS_YOU_MAX], "empty": "", "attention": True}
 
 
 def _sections(
@@ -119,7 +158,8 @@ def _sections(
         else:
             sections.append({"label": "到下周日", "meta": "", "rows": [], "empty": "都没有安排"})
     due = _task_section(tasks, today)
-    return sections + [due] if due else sections
+    needs = _needs_you(now, timed, tasks)
+    return ([needs] if needs else []) + sections + ([due] if due else [])
 
 
 def _names(titles: list[str]) -> str:
