@@ -472,6 +472,46 @@
       background: var(--brand);
       color: var(--on-brand);
     }
+    /* 像微信：点左边「说」，整条输入栏变成「按住 说话」；按住录、松手发、上滑取消 */
+    #hold {
+      display: none;
+      flex: 1;
+      height: 48px;
+      font: inherit;
+      font-weight: 600;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--user);
+      color: var(--ink);
+      cursor: pointer;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      transition: background 0.12s ease, color 0.12s ease;
+    }
+    form.voice #hold { display: block; }
+    form.voice #input, form.voice #send { display: none; }
+    #hold.holding { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+    #hold.cancel { background: var(--danger); color: #fff; border-color: var(--danger); }
+    #voiceHint {
+      position: fixed;
+      left: 50%;
+      bottom: calc(196px + env(safe-area-inset-bottom, 0px));
+      transform: translateX(-50%);
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: var(--user);
+      color: var(--soft);
+      font-size: 0.85rem;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease;
+      z-index: 11;
+    }
+    #voiceHint.on { opacity: 1; }
+    #voiceHint.cancel { background: var(--danger); color: #fff; }
     #unlock {
       display: none;
       flex-direction: column;
@@ -544,10 +584,12 @@
     <div id="orb" aria-hidden="true" title="点一下停"><b></b><i></i></div>
 
     <form id="form">
+      <button id="mic" type="button" aria-label="切换到说话">说</button>
       <textarea id="input" rows="1" placeholder="问我，或者告诉我一件事" autocomplete="off" enterkeyhint="send"></textarea>
-      <button id="mic" type="button" aria-label="说话" title="点一下开始说，再说完点一下">说</button>
+      <button id="hold" type="button">按住 说话</button>
       <button id="send" type="submit">发送</button>
     </form>
+    <div id="voiceHint" aria-live="polite"></div>
   </main>
 
   <script>
@@ -1211,7 +1253,6 @@
     function setBusy(on) {
       busy = on;
       sendBtn.disabled = on;
-      if (!mediaRecorder || mediaRecorder.state !== "recording") micBtn.disabled = on;
     }
 
     // ---- 声音：你说话时听麦克风；她一句写完就念一句；白环跟着真实的响度起伏 ----
@@ -1456,22 +1497,56 @@
       return "";
     }
 
-    function setRecording(on) {
-      micBtn.classList.toggle("recording", !!on);
-      micBtn.textContent = on ? "完" : "说";
-      micBtn.title = on ? "说完停一下就发，或者点一下" : "按住说话，松手发送";
-      sendBtn.disabled = !!on || busy;
+    // ---- 说话：像微信——点左边切到「按住 说话」，按住就录、松手就发、上滑取消 ----
+    const holdBtn = document.getElementById("hold");
+    const voiceHint = document.getElementById("voiceHint");
+    const MODE_KEY = "pa.inputMode";
+    const MIN_HOLD_MS = 600;
+    const CANCEL_PX = 60;
+    let press = null; // 正按着：{ id, y, at, cancel }
+    let hintTimer = 0;
+
+    function setMode(voice) {
+      form.classList.toggle("voice", voice);
+      micBtn.textContent = voice ? "打字" : "说";
+      micBtn.setAttribute("aria-label", voice ? "切换到打字" : "切换到说话");
+      try { localStorage.setItem(MODE_KEY, voice ? "voice" : "text"); } catch (e) {}
+      // 切过来这一下就把麦克风打开：权限框在这时弹，而不是在他按住的时候弹
+      if (voice) ensureMic();
+      else {
+        closeMic();
+        input.focus();
+      }
     }
 
-    function releaseMic() {
-      if (recordTimer) {
-        clearTimeout(recordTimer);
-        recordTimer = null;
+    // 麦克风开一次就一直开着，直到 Friday 退到后台：每次按住都立刻开录，iPhone 也不会反复问权限
+    async function ensureMic() {
+      if (mediaStream && mediaStream.getAudioTracks().some((t) => t.readyState === "live")) return true;
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+        flashHint("这里不能录音：用 Safari 或 Chrome 打开");
+        return false;
       }
-      if (mediaRecorder && mediaRecorder.state === "recording") {
-        try { mediaRecorder.stop(); } catch (e) {}
+      try {
+        const ctx = unlockVoice();
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (ctx) {
+          micSource = ctx.createMediaStreamSource(mediaStream);
+          micAnalyser = ctx.createAnalyser();
+          micAnalyser.fftSize = levelBuf.length;
+          micSource.connect(micAnalyser);
+        }
+        return true;
+      } catch (e) {
+        flashHint("没有麦克风权限：到设置里给 Friday 打开");
+        return false;
       }
-      mediaRecorder = null;
+    }
+
+    function closeMic() {
+      if (press) {
+        press.cancel = true;
+        endHold();
+      }
       if (micSource) {
         micSource.disconnect();
         micSource = null;
@@ -1481,114 +1556,130 @@
         mediaStream.getTracks().forEach((t) => t.stop());
         mediaStream = null;
       }
-      recordChunks = [];
-      setRecording(false);
     }
 
-    async function startRecording() {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("这浏览器不能录音。换 Chrome / Edge，或用 HTTPS 打开。");
+    function flashHint(text) {
+      voiceHint.textContent = text;
+      voiceHint.className = "on";
+      clearTimeout(hintTimer);
+      hintTimer = setTimeout(() => { if (!press) voiceHint.className = ""; }, 1600);
+    }
+
+    function showHolding() {
+      const cancel = !!(press && press.cancel);
+      holdBtn.classList.toggle("holding", !!press);
+      holdBtn.classList.toggle("cancel", cancel);
+      holdBtn.textContent = !press ? "按住 说话" : cancel ? "松开 取消" : "松开 发送";
+      if (press) {
+        clearTimeout(hintTimer);
+        voiceHint.textContent = cancel ? "松开手指，取消发送" : "松开发送，上滑取消";
+        voiceHint.className = cancel ? "on cancel" : "on";
+      } else if (!hintTimer || voiceHint.className.includes("cancel")) {
+        voiceHint.className = "";
       }
-      stopSpeaking();
-      const ctx = unlockVoice();
-      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (ctx) {
-        micSource = ctx.createMediaStreamSource(mediaStream);
-        micAnalyser = ctx.createAnalyser();
-        micAnalyser.fftSize = levelBuf.length;
-        micSource.connect(micAnalyser);
+    }
+
+    async function startHold(e) {
+      e.preventDefault();
+      if (press) return;
+      try { holdBtn.setPointerCapture(e.pointerId); } catch (err) {}
+      stopSpeaking(); // 她正在说：你一开口她就停
+      hintTimer = 0;
+      press = { id: e.pointerId, y: e.clientY, at: Date.now(), cancel: false };
+      showHolding();
+      const fresh = !mediaStream;
+      if (!(await ensureMic())) {
+        press = null;
+        showHolding();
+        return;
       }
+      if (!press) {
+        // 第一次弹权限框的时候手指已经松开了：这次不算，告诉他可以说了
+        if (fresh) flashHint("好了，按住说话");
+        return;
+      }
+      recordChunks = [];
       const mime = pickMime();
       mediaRecorder = mime ? new MediaRecorder(mediaStream, { mimeType: mime }) : new MediaRecorder(mediaStream);
-      recordChunks = [];
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data && e.data.size) recordChunks.push(e.data);
+      mediaRecorder.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size) recordChunks.push(ev.data);
       };
       mediaRecorder.start();
-      setRecording(true);
+      press.at = Date.now();
       orbSet("listening");
-      watchSilence();
-      recordTimer = setTimeout(() => {
-        if (mediaRecorder && mediaRecorder.state === "recording") stopRecordingAndSend();
-      }, RECORD_MAX_MS);
+      recordTimer = setTimeout(endHold, RECORD_MAX_MS);
     }
 
-    // 点一下开始的那种：听到他说话以后，安静 1.4 秒就当说完了（按住的那种松手才发）
-    const SILENCE_MS = 1400;
-    let silenceTimer = 0;
-    function watchSilence() {
-      clearInterval(silenceTimer);
-      if (!micAnalyser) return;
-      let heard = false;
-      let quietSince = 0;
-      silenceTimer = setInterval(() => {
-        if (!recordingNow()) return clearInterval(silenceTimer);
-        if (pressAt) return; // 还按着：等他松手
-        const level = micLevel();
-        if (level > 0.2) {
-          heard = true;
-          quietSince = 0;
-        } else if (heard) {
-          quietSince = quietSince || Date.now();
-          if (Date.now() - quietSince > SILENCE_MS) stopRecordingAndSend();
-        }
-      }, 100);
+    function moveHold(e) {
+      if (!press || e.pointerId !== press.id) return;
+      const cancel = press.y - e.clientY > CANCEL_PX;
+      if (cancel !== press.cancel) {
+        press.cancel = cancel;
+        showHolding();
+      }
     }
 
-    function stopRecordingAndSend() {
-      clearInterval(silenceTimer);
-      if (!mediaRecorder || mediaRecorder.state !== "recording") return;
+    function endHold() {
+      clearTimeout(recordTimer);
+      const done = press;
+      press = null;
+      showHolding();
       const recorder = mediaRecorder;
+      mediaRecorder = null;
+      if (!recorder || recorder.state !== "recording") {
+        settleOrb();
+        return;
+      }
       const mime = recorder.mimeType || "audio/webm";
-      orbSet("thinking");
-      recorder.onstop = async () => {
+      const tooShort = !done || Date.now() - done.at < MIN_HOLD_MS;
+      const cancelled = !!(done && done.cancel);
+      recorder.onstop = () => {
         const blob = new Blob(recordChunks, { type: mime });
-        releaseMic();
-        if (!blob.size) {
+        recordChunks = [];
+        if (cancelled || tooShort || !blob.size) {
           orbSet("");
-          addMessage("error", "没录到声音。");
+          if (!cancelled) flashHint("说话时间太短");
           return;
         }
-        setBusy(true);
-        try {
-          const formData = new FormData();
-          const ext = mime.includes("mp4") ? "m4a" : mime.includes("ogg") ? "ogg" : "webm";
-          formData.append("file", blob, "speech." + ext);
-          const res = await fetch("/api/voice/transcribe", {
-            method: "POST",
-            credentials: "include",
-            body: formData,
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(data.detail || "没听清。");
-          const text = (data.text || "").trim();
-          if (!text) throw new Error("没听清，再说一遍？");
-          setBusy(false);
-          await ask(text, { speak: true });
-        } catch (e) {
-          setBusy(false);
-          addMessage("error", (e && e.message) || String(e));
-        }
-        settleOrb();
+        sendVoice(blob, mime);
       };
       try {
         recorder.stop();
-      } catch (e) {
-        releaseMic();
+      } catch (err) {
         orbSet("");
       }
     }
 
-    async function toggleMic() {
-      if (mediaRecorder && mediaRecorder.state === "recording") return stopRecordingAndSend();
-      if (busy) return;
+    // 松手气泡就出来；转写好了换成文字，她忙完上一句就接着回
+    async function sendVoice(blob, mime) {
+      const bubble = addMessage("user");
+      bubble.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>';
+      orbSet("thinking");
+      scrollDown();
       try {
-        await startRecording();
+        const formData = new FormData();
+        const ext = mime.includes("mp4") ? "m4a" : mime.includes("ogg") ? "ogg" : "webm";
+        formData.append("file", blob, "speech." + ext);
+        const res = await fetch("/api/voice/transcribe", { method: "POST", credentials: "include", body: formData });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || "没听清。");
+        const text = (data.text || "").trim();
+        if (!text) throw new Error("没听清，再说一遍？");
+        bubble.textContent = text;
+        await whenIdle();
+        await ask(text, { speak: true, userDiv: bubble });
       } catch (e) {
-        releaseMic();
-        orbSet("");
-        addMessage("error", (e && e.message) || "打不开麦克风。");
+        bubble.remove();
+        settleOrb();
+        addMessage("error", (e && e.message) || String(e));
       }
+    }
+
+    function whenIdle() {
+      return new Promise((resolve) => {
+        const check = () => (busy || !ready ? setTimeout(check, 120) : resolve());
+        check();
+      });
     }
 
     async function presence() {
@@ -1671,7 +1762,8 @@
       if (!speaker) settleOrb();
       setBusy(true);
       clearActions();
-      addMessage("user", message);
+      if (opts && opts.userDiv) opts.userDiv.textContent = message;
+      else addMessage("user", message);
       session.messages.push({ role: "user", content: message, at: Date.now() });
       const div = addMessage("bot");
       showTyping(div);
@@ -1740,33 +1832,34 @@
       ask(message);
     });
 
-    // 说话：按住说、松手就发；或者点一下开始，说完停一会儿自己发（也可以再点一下）
-    const HOLD_MS = 350;
-    let pressAt = 0;
-    const recordingNow = () => !!(mediaRecorder && mediaRecorder.state === "recording");
-    micBtn.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      if (recordingNow()) {
-        stopRecordingAndSend();
-        return;
-      }
-      pressAt = Date.now();
-      toggleMic();
+    micBtn.addEventListener("click", () => setMode(!form.classList.contains("voice")));
+    holdBtn.addEventListener("pointerdown", startHold);
+    holdBtn.addEventListener("pointermove", moveHold);
+    holdBtn.addEventListener("pointerup", (e) => { if (press && e.pointerId === press.id) endHold(); });
+    holdBtn.addEventListener("pointercancel", () => {
+      if (!press) return;
+      press.cancel = true;
+      endHold();
     });
-    const release = () => {
-      const held = pressAt && Date.now() - pressAt > HOLD_MS;
-      pressAt = 0;
-      if (held && recordingNow()) stopRecordingAndSend();
-    };
-    micBtn.addEventListener("pointerup", release);
-    micBtn.addEventListener("pointercancel", release);
-    micBtn.addEventListener("contextmenu", (e) => e.preventDefault());
-    // 键盘（Enter / 空格）没有 pointer 事件，照旧点一下开、再点一下发
-    micBtn.addEventListener("click", (e) => { if (e.detail === 0) toggleMic(); });
+    holdBtn.addEventListener("contextmenu", (e) => e.preventDefault());
+    // 键盘：在「按住 说话」上按住空格说，松开发
+    holdBtn.addEventListener("keydown", (e) => {
+      if (e.key !== " " || e.repeat || press) return;
+      startHold({ preventDefault: () => e.preventDefault(), pointerId: -1, clientY: 0 });
+    });
+    holdBtn.addEventListener("keyup", (e) => { if (e.key === " " && press) endHold(); });
+    // 退到后台就把麦克风关掉；回来按住时再开
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") closeMic(); });
+    try {
+      if (localStorage.getItem(MODE_KEY) === "voice") {
+        form.classList.add("voice");
+        micBtn.textContent = "打字";
+        micBtn.setAttribute("aria-label", "切换到打字");
+      }
+    } catch (e) {}
 
     orbEl.addEventListener("click", () => {
-      if (orbState === "listening") stopRecordingAndSend();
-      else if (orbState === "speaking") {
+      if (orbState === "speaking") {
         stopSpeaking();
         settleOrb();
       }

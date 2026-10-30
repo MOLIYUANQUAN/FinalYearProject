@@ -112,7 +112,13 @@ Shipping still goes through the test gate: a change whose tests fail is not merg
 
 ## Talking to Friday
 
-Hold the mic and release to send, or tap it once and Friday sends after 1.4 s of silence. Long-press never selects text on iPhone.
+Like WeChat: tap "说" and the input bar becomes "按住 说话".
+
+- Hold to record, release to send, slide up to cancel. A press that is too short says so.
+- The mic opens once and stays open while Friday is in front, so every press records instantly. The iPhone does not keep asking for permission; the mic closes when Friday goes to the background.
+- Your bubble appears the moment you let go and turns into text once transcribed.
+- You can talk while she is speaking: she stops and listens.
+- "打字" switches back. The last mode is remembered.
 
 There is deliberately no Siri Shortcut or share-sheet setup. Friday is one tap from the home screen and listens as soon as you hold the mic. A second assistant in front of her, plus a hand-built Shortcut, would only add steps.
 
