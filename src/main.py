@@ -143,6 +143,12 @@ def index() -> FileResponse:
     )
 
 
+@app.get("/privacy")
+def privacy() -> FileResponse:
+    """Google OAuth 正式版要求的隐私政策（公开页面，不含任何数据）。"""
+    return FileResponse(STATIC_DIR / "privacy.html")
+
+
 @app.get("/api/health")
 def health() -> dict:
     has_key = True

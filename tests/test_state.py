@@ -23,6 +23,18 @@ class StateDirTests(unittest.TestCase):
         self.assertEqual(config.PROFILE_PATH.parent.parent, config.ROOT_DIR / "data")
 
 
+class PublicPages(unittest.TestCase):
+    def test_privacy_policy_is_public(self) -> None:
+        """Google 发布 OAuth 应用时会去打开这个页面：不能要求登录。"""
+        import os
+        from unittest.mock import patch
+
+        with patch.dict(os.environ, {"FRIDAY_ACCESS_TOKEN": "pw"}):
+            res = TestClient(app).get("/privacy")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("Google API Services User Data Policy", res.text)
+
+
 class ImportTests(unittest.TestCase):
     def setUp(self) -> None:
         config.MEMORY_FACTS_PATH.unlink(missing_ok=True)

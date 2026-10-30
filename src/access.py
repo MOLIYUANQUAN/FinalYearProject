@@ -24,6 +24,7 @@ PUBLIC_PATHS = {
     "/api/logout",
     "/api/session",
     "/sw.js",  # Service Worker 脚本本身不含数据；推送、订阅接口仍要登录
+    "/privacy",  # Google OAuth 发布为正式版要一个公开的隐私政策页
 }
 
 COOKIE_NAME = "friday_session"
