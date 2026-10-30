@@ -21,7 +21,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from src import agenda, todos, usage_log, voice
+from src import agenda, mistakes, todos, usage_log, voice
 from src.agent import friday, run_assistant
 from src.presence import stream_presence
 from src.access import gate, router as access_router
@@ -284,6 +284,34 @@ def undo(body: UndoRequest) -> dict:
         raise HTTPException(status_code=502, detail=f"没撤销成功：{reason}") from exc
     if body.message_id is not None:
         friday.conversations.update_message(body.message_id, undone=True)
+    return {"ok": True}
+
+
+class WrongRequest(BaseModel):
+    message_id: int
+    note: str = Field("", max_length=500)
+
+
+@app.post("/api/wrong")
+def wrong(body: WrongRequest) -> dict:
+    """他点了「说错了」：把那句话、他问的是什么、用了哪些工具记下来，之后补成测试。不经过模型。"""
+    convs = friday.conversations
+    cid = convs.conversation_of(body.message_id)
+    if cid is None:
+        raise HTTPException(status_code=404, detail="找不到这条消息。")
+    messages = convs.messages(cid)
+    index = next(i for i, m in enumerate(messages) if m["id"] == body.message_id)
+    said = messages[index]
+    asked = next((m["content"] for m in reversed(messages[:index]) if m["role"] == "user"), "")
+    mistakes.record(
+        asked=asked,
+        said=said["content"],
+        tools=said.get("tools") or [],
+        opener=bool(said.get("agenda")),
+        note=body.note,
+    )
+    convs.update_message(body.message_id, wrong=True)
+    usage_log.record("wrong", ok=True, first_token_ms=None, total_ms=0, tools=said.get("tools") or [])
     return {"ok": True}
 
 

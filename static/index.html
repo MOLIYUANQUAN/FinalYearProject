@@ -302,6 +302,23 @@
     }
     .details summary::-webkit-details-marker { display: none; }
     .details summary:hover { opacity: 1; color: var(--ink); }
+    /* 「说错了」：和「细节」一样不抢眼；点一下记进错误清单，不经过模型 */
+    .wrong {
+      display: block;
+      margin-top: 8px;
+      padding: 0;
+      border: 0;
+      background: none;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--muted);
+      opacity: 0.4;
+      cursor: pointer;
+    }
+    .wrong:hover { opacity: 1; color: var(--ink); }
+    .wrong:disabled { cursor: default; opacity: 0.7; }
+    .msg .details + .wrong { display: inline-block; margin-left: 12px; }
+    .msg .details { display: inline-block; }
     form {
       display: flex;
       gap: 8px;
@@ -606,6 +623,7 @@
         tools: m.tools || [],
         undo: m.undo || [],
         undone: !!m.undone,
+        wrong: !!m.wrong,
         agenda: m.agenda || null,
         needsConfirm: !!m.needs_confirm,
         at: m.at || 0,
@@ -713,6 +731,32 @@
       div.appendChild(d);
     }
 
+    // 她说错了：点一下就记进错误清单（附上问题和工具），之后补一条测试；Tuesday test 里数「说错几次」
+    function addWrong(div, m) {
+      if (!m.id) return;
+      const b = el("button", "wrong", m.wrong ? "已记下" : "说错了");
+      b.type = "button";
+      b.disabled = !!m.wrong;
+      b.onclick = async () => {
+        b.disabled = true;
+        try {
+          const res = await fetch("/api/wrong", {
+            method: "POST",
+            credentials: "include",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ message_id: m.id }),
+          });
+          if (!res.ok) throw new Error();
+          m.wrong = true;
+          b.textContent = "已记下";
+        } catch (e) {
+          b.disabled = false;
+          b.textContent = "没记上，再点一次";
+        }
+      };
+      div.appendChild(b);
+    }
+
     function addConfirm(div) {
       const bar = document.createElement("div");
       bar.className = "actions";
@@ -771,6 +815,7 @@
         const div = addMessage(m.role === "user" ? "user" : "bot", m.agenda ? null : shown);
         if (m.agenda) drawToday(div, m.agenda).innerHTML = render(m.content);
         if (m.tools && m.tools.length) addDetails(div, m.tools);
+        if (m.role === "assistant") addWrong(div, m);
         const last = i === session.messages.length - 1;
         if (m.needsConfirm && last) addConfirm(div);
         if (m.undo && m.undo.length && !m.undone && last) addUndo(div, m);
@@ -848,6 +893,7 @@
       div.innerHTML = render(reply);
       const m = { id, role: "assistant", content: reply, tools, needsConfirm, undo, at: Date.now() };
       if (tools.length) addDetails(div, tools);
+      addWrong(div, m);
       if (needsConfirm) addConfirm(div);
       if (undo.length) addUndo(div, m);
       session.messages.push(m);
@@ -1238,7 +1284,9 @@
           return;
         }
         view.el.innerHTML = render(result.reply);
-        session.messages.push({ id: result.id, role: "assistant", content: result.reply, tools: [], agenda: view.card, at: Date.now() });
+        const opener = { id: result.id, role: "assistant", content: result.reply, tools: [], agenda: view.card, at: Date.now() };
+        addWrong(div, opener);
+        session.messages.push(opener);
         scrollDown();
       } catch (e) {
         if (!view.card) {

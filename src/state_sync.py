@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from src import friction, memory_store
+from src import friction, memory_store, mistakes
 from src.config import USAGE_LOG_PATH
 
 router = APIRouter(tags=["state"])
@@ -33,7 +33,7 @@ def import_state(body: StateImport) -> dict:
 @router.get("/api/state/export")
 def export_state() -> dict:
     """整份记忆和摩擦清单，用来备份或搬家。"""
-    return {"facts": memory_store.all_facts(), "friction": friction.all_items()}
+    return {"facts": memory_store.all_facts(), "friction": friction.all_items(), "mistakes": mistakes.all_items()}
 
 
 @router.get("/api/usage/events")

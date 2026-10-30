@@ -23,6 +23,12 @@ def _response(status: int, payload: dict | list | None = None, text: str = "") -
 
 
 class MergeDraftTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # 这几条只测草稿 / 合并；测试闸门在 ShipGateTests
+        patcher = patch.object(ship, "_ci_status", return_value="none")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_existing_draft_is_marked_ready_before_merge(self) -> None:
         draft = {
             "number": 3,
@@ -111,6 +117,49 @@ class MergeDraftTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertIn("GitHub 正在自动部署", result["say"])
         self.assertNotIn("flyctl", result["say"])
+
+
+class ShipGateTests(unittest.TestCase):
+    """Cursor 改的代码没过测试，就不能合进 develop、不能上线。"""
+
+    def _merge(self, ci: str) -> dict:
+        ready = {"number": 5, "draft": False, "node_id": "PR_5", "head": {"sha": "abc"}}
+        with patch.object(ship.requests, "post", return_value=_response(201, ready)), patch.object(
+            ship, "_ci_status", return_value=ci
+        ), patch.object(ship.requests, "put", side_effect=AssertionError("must not merge")) as put:
+            if ci == "passed":
+                put.side_effect = None
+                put.return_value = _response(200, {"merged": True})
+            return ship._merge_github("cursor/x")
+
+    def test_failed_ci_blocks_merge(self) -> None:
+        result = self._merge("failed")
+        self.assertEqual(result["error"], "tests_failed")
+        self.assertIn("没过测试", result["say"])
+
+    def test_running_ci_waits(self) -> None:
+        self.assertEqual(self._merge("running")["error"], "tests_running")
+
+    def test_passed_ci_merges(self) -> None:
+        self.assertTrue(self._merge("passed")["ok"])
+
+    def test_local_test_failure_does_not_fall_back_to_github_merge(self) -> None:
+        pending = {"branch": "cursor/x", "friction_id": ""}
+        with patch.object(ship, "load_or_recover_pending", return_value=pending), patch.object(
+            ship, "_merge_local", return_value=ship._tests_failed("boom")
+        ), patch.object(ship, "_merge_github", side_effect=AssertionError("must not merge")), patch.object(
+            ship, "_deploy", side_effect=AssertionError("must not deploy")
+        ):
+            result = ship.ship(user_confirmed=True)
+        self.assertEqual(result["error"], "tests_failed")
+
+    def test_ci_status_reads_the_test_check(self) -> None:
+        def get(url, **kwargs):
+            self.assertTrue(url.endswith("/commits/abc/check-runs"))
+            return _response(200, {"check_runs": [{"status": "completed", "conclusion": "failure"}]})
+
+        with patch.object(ship.requests, "get", side_effect=get):
+            self.assertEqual(ship._ci_status("o/r", {}, "abc"), "failed")
 
 
 if __name__ == "__main__":

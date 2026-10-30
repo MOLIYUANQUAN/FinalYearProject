@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
+import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -231,12 +234,55 @@ def _run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
     )
 
 
+TEST_COMMAND = [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-t", "."]
+
+
+def _tests_failed(text: str) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "error": "tests_failed",
+        "message": text[-600:],
+        "say": "Cursor 这版没过测试，我没合并、也没部署。可以让 Cursor 再改一次。",
+    }
+
+
+def _run_tests_local(branch: str) -> dict[str, Any] | None:
+    """合并前在一个临时工作区里把这版的测试跑一遍；没过就返回原因，过了返回 None。"""
+    workdir = Path(tempfile.mkdtemp(prefix="friday-ship-"))
+    added = _run(["git", "worktree", "add", "--detach", str(workdir), f"origin/{branch}"])
+    if added.returncode != 0:
+        shutil.rmtree(workdir, ignore_errors=True)
+        return {"ok": False, "error": "tests_not_run", "message": (added.stderr or added.stdout)[:300]}
+    try:
+        proc = subprocess.run(
+            TEST_COMMAND,
+            cwd=workdir,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            capture_output=True,
+            timeout=600,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return _tests_failed("测试跑了十分钟还没完。")
+    finally:
+        _run(["git", "worktree", "remove", "--force", str(workdir)])
+        shutil.rmtree(workdir, ignore_errors=True)
+    if proc.returncode != 0:
+        return _tests_failed((proc.stderr or "") + (proc.stdout or ""))
+    return None
+
+
 def _merge_local(branch: str) -> dict[str, Any]:
     if not (ROOT_DIR / ".git").is_dir():
         return {"ok": False, "error": "no_git", "message": "这台机器上没有 git 仓库。"}
     fetch = _run(["git", "-c", "http.proxy=", "-c", "https.proxy=", "fetch", "origin", branch])
     if fetch.returncode != 0:
         return {"ok": False, "error": "fetch_failed", "message": (fetch.stderr or fetch.stdout)[:300]}
+    failed = _run_tests_local(branch)
+    if failed:
+        return failed
     # 在 develop 上合并
     _run(["git", "checkout", _base()])
     merge = _run(["git", "merge", f"origin/{branch}", "-m", f"Ship Cursor fix from {branch}"])
@@ -317,6 +363,28 @@ def _mark_ready(slug: str, headers: dict[str, str], pr_obj: dict[str, Any]) -> d
     return {"ok": False, "error": "undraft_failed", "message": (body_text or ready.text or "")[:200]}
 
 
+def _ci_status(slug: str, headers: dict[str, str], sha: str) -> str:
+    """GitHub 上这版的测试（.github/workflows/tests.yml 的 test）：passed / failed / running / none。"""
+    if not sha:
+        return "none"
+    try:
+        res = requests.get(
+            f"{GITHUB_API}/repos/{slug}/commits/{sha}/check-runs",
+            headers=headers,
+            params={"check_name": "test"},
+            timeout=30,
+        )
+        runs = (res.json() or {}).get("check_runs") if res.ok else None
+    except (requests.RequestException, ValueError, AttributeError):
+        return "none"
+    if not runs:
+        return "none"
+    latest = runs[0]
+    if latest.get("status") != "completed":
+        return "running"
+    return "passed" if latest.get("conclusion") == "success" else "failed"
+
+
 def _merge_github(branch: str) -> dict[str, Any]:
     load_env()
     token = (os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN") or "").strip()
@@ -336,6 +404,15 @@ def _merge_github(branch: str) -> dict[str, Any]:
     undraft = _mark_ready(slug, headers, pr_obj)
     if undraft:
         return undraft
+    checks = _ci_status(slug, headers, ((pr_obj.get("head") or {}).get("sha")) or "")
+    if checks == "failed":
+        return _tests_failed(f"PR #{number} 的测试没过。")
+    if checks == "running":
+        return {
+            "ok": False,
+            "error": "tests_running",
+            "say": "这版的测试还在跑，一两分钟后再说「部署」。",
+        }
     merged = requests.put(
         f"{GITHUB_API}/repos/{slug}/pulls/{number}/merge",
         headers=headers,
@@ -386,7 +463,7 @@ def ship(*, user_confirmed: bool) -> dict[str, Any]:
         return {"ok": False, "error": "nothing_pending", "message": "没有待部署的 Cursor 改动。"}
     branch = pending["branch"]
     merged = _merge_local(branch)
-    if not merged.get("ok"):
+    if not merged.get("ok") and merged.get("error") != "tests_failed":
         merged = _merge_github(branch)
     if not merged.get("ok"):
         return merged

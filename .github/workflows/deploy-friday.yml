@@ -12,7 +12,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # 没过测试就不上线
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -t .
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
