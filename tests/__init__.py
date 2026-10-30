@@ -12,8 +12,10 @@ os.environ["MAIL_BACKEND"] = "mock"
 os.environ["TASKS_BACKEND"] = "mock"
 os.environ["FRIDAY_ACCESS_TOKEN"] = ""
 os.environ["FRIDAY_URL"] = ""
-# 不受本机 .env 里选的型号影响
+# 不受本机 .env 里选的型号影响：默认就是 GPT-5（Claude 那条路用假客户端单独测）
 os.environ["OPENAI_MODEL"] = "gpt-5"
+os.environ["FRIDAY_MODEL"] = ""
+os.environ["ANTHROPIC_API_KEY"] = ""
 os.environ["FRIDAY_REASONING"] = "low"
 os.environ.setdefault("OPENAI_API_KEY", "sk-test-not-used")
 # 测试不去真的 GitHub（要测的地方自己 mock）

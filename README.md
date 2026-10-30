@@ -25,6 +25,7 @@ Manchester CS Final Year Project (Zeep): **a single personal agent** that knows 
 
 - Python 3.11+
 - [OpenAI Agents SDK](https://openai.github.io/openai-agents-python/) (`openai-agents`), including sessions and tool approvals
+- The brain: Claude (`claude-opus-5-5`, through the official `anthropic` SDK) when `ANTHROPIC_API_KEY` is set, otherwise GPT-5. Voice transcription and read-aloud stay on OpenAI
 - FastAPI + a single static HTML page
 - Fly.io for the always-on cloud Friday, with a mounted volume for her state
 - Demo data: `data/calendar.json`, `data/notes/*.md`, `data/mail/messages.json`, `data/tasks.json`
@@ -36,6 +37,14 @@ Friday lives in the cloud (`friday-jimmy.fly.dev`). The phone and the desktop wi
 - Everything that changes — memory, conversations, friction list, mistakes, usage log, pending Cursor work — lives in `FRIDAY_STATE_DIR`. On Fly that is a volume mounted at `/state`, so deploys and restarts no longer wipe her memory. Locally it defaults to `data/`.
 - Conversations are stored on the server, including tool calls and results. Start on the phone, continue on the desktop. Coming back on the same day within two hours continues the conversation; otherwise she starts a fresh one with the day's card.
 - With `FRIDAY_URL=https://friday-jimmy.fly.dev` in `.env`, Ctrl+Alt+F opens the cloud Friday and no local server is started. Without it, the local server is used (for development).
+
+Switching her to Claude is one command; Fly restarts her with the key and `/api/health` then reports `"model": "claude-opus-5-5"`:
+
+```powershell
+flyctl secrets set ANTHROPIC_API_KEY=sk-ant-... -a friday-jimmy
+```
+
+If the key doesn't work she falls back to GPT-5 on her own and says so in the logs. `FRIDAY_MODEL` names a different model if you ever want one.
 
 Switching to the cloud brain for the first time:
 

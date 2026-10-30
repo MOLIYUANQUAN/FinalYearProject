@@ -7,7 +7,8 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any
 
-from agents import Agent, Model, ModelSettings, RunState, Runner
+from agents import Agent, Model, ModelSettings, RunConfig, RunState, Runner
+from agents.run_config import CallModelData, ModelInputData
 from openai.types.responses import ResponseTextDeltaEvent
 from openai.types.shared import Reasoning
 
@@ -22,6 +23,7 @@ from src.config import (
     require_openai_api_key,
 )
 from src import approval, cursor_fix, friction, reminders
+from src.claude import ClaudeModel, for_openai
 from src.config import STATE_DIR, effective_now
 from src.context import memory_block, now_block, profile_block
 from src.conversation import Conversations, store
@@ -124,22 +126,30 @@ def build_instructions(calendar: str = "", todo: str = "", *, spoken: bool = Fal
     return "\n\n".join(part for part in parts if part)
 
 
+def brain(name: str) -> Model | str:
+    """型号名 → Agents SDK 用的模型：claude-* 走 Anthropic（她的性格那段每句都一样，单独缓存），其余交给 OpenAI。"""
+    if name.startswith("claude"):
+        return ClaudeModel(name, stable_prefix=VOICE)
+    require_openai_api_key()
+    return name
+
+
 def create_assistant(
     *, calendar: str = "", todo: str = "", spoken: bool = False, model: Model | None = None
 ) -> Agent:
-    if model is None:
-        require_openai_api_key()
+    name = model if isinstance(model, str) else active_model() if model is None else ""
     return Agent(
         name="Friday",
         instructions=build_instructions(calendar, todo, spoken=spoken),
         tools=ALL_TOOLS + TASK_TOOLS if todos.connected() else ALL_TOOLS,
-        model=model or active_model(),
-        model_settings=model_settings(model if isinstance(model, str) else active_model() if model is None else ""),
+        model=model or brain(name),
+        model_settings=model_settings(name),
     )
 
 
-# 这个账号用不了默认型号（名字写错、没开通）时，退回一个肯定能用的，不让 Friday 整个坏掉
+# 这个账号用不了默认型号（名字写错、没开通、key 不对）时，退回一个肯定能用的，不让 Friday 整个坏掉
 FALLBACK_MODEL = "gpt-4.1-mini"
+CLAUDE_FALLBACK = "gpt-5"
 _active_model = DEFAULT_MODEL
 
 
@@ -148,8 +158,20 @@ def active_model() -> str:
 
 
 def verify_model() -> str:
-    """服务启动时问一次 OpenAI：默认型号在不在。不在就换成 FALLBACK_MODEL；网络问题不算，照旧用默认的。"""
+    """服务启动时问一次：默认型号这个账号能不能用。不能用就换一个能用的；网络问题不算，照旧用默认的。"""
     global _active_model
+    if DEFAULT_MODEL.startswith("claude"):
+        import anthropic
+
+        try:
+            anthropic.Anthropic().models.retrieve(DEFAULT_MODEL)
+        except (anthropic.NotFoundError, anthropic.AuthenticationError, anthropic.PermissionDeniedError) as exc:
+            print(f"[WARN] {DEFAULT_MODEL} is not usable with this key ({exc}); using {CLAUDE_FALLBACK}")
+            _active_model = CLAUDE_FALLBACK
+        except Exception as exc:  # noqa: BLE001
+            print(f"[WARN] could not check model {DEFAULT_MODEL}: {exc}")
+        print(f"[OK] brain: {_active_model}")
+        return _active_model
     import openai
 
     try:
@@ -159,14 +181,28 @@ def verify_model() -> str:
         _active_model = FALLBACK_MODEL
     except Exception as exc:  # noqa: BLE001
         print(f"[WARN] could not check model {DEFAULT_MODEL}: {exc}")
+    print(f"[OK] brain: {_active_model}")
     return _active_model
 
 
 def model_settings(name: str) -> ModelSettings:
-    """推理模型（GPT-5 及以后、o 系列）不收 temperature：给它思考力度，并让回答短一点；老模型照旧。"""
+    """推理模型（Claude、GPT-5 及以后、o 系列）不收 temperature：给它思考力度；GPT 再让回答短一点；老模型照旧。"""
+    if name.startswith("claude"):
+        return ModelSettings(reasoning=Reasoning(effort=REASONING_EFFORT))
     if name.startswith(("gpt-5", "gpt-6", "o1", "o3", "o4")):
         return ModelSettings(reasoning=Reasoning(effort=REASONING_EFFORT), verbosity="low")
     return ModelSettings(temperature=0.2)
+
+
+def _model_input(data: CallModelData[Any]) -> ModelInputData:
+    """换回 OpenAI 时，把 Claude 留在对话里的东西收拾掉（见 claude.for_openai）。"""
+    if isinstance(data.agent.model, ClaudeModel):
+        return data.model_data
+    cleaned = for_openai(data.model_data.input)
+    return data.model_data if cleaned is None else ModelInputData(input=cleaned, instructions=data.model_data.instructions)
+
+
+RUN_CONFIG = RunConfig(call_model_input_filter=_model_input)
 
 
 async def _assistant(spoken: bool = False, model: Model | None = None) -> Agent:
@@ -389,9 +425,11 @@ class Friday:
         """跑一段：delta / tool 原样给页面；最后的文字用 text 事件交回给 turn()。"""
         session = self.conversations.session(cid)
         if isinstance(run_input, RunState):
-            result = Runner.run_streamed(agent, run_input, max_turns=12, session=session)
+            result = Runner.run_streamed(agent, run_input, max_turns=12, session=session, run_config=RUN_CONFIG)
         else:
-            result = Runner.run_streamed(agent, run_input, max_turns=12, context=Turn(), session=session)
+            result = Runner.run_streamed(
+                agent, run_input, max_turns=12, context=Turn(), session=session, run_config=RUN_CONFIG
+            )
         async for event in result.stream_events():
             if event.type == "raw_response_event":
                 if isinstance(event.data, ResponseTextDeltaEvent) and event.data.delta:

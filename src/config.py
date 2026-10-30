@@ -35,8 +35,20 @@ MOCK_TODAY = "2026-10-12"
 MOCK_TOMORROW = "2026-10-13"
 MOCK_NOW_TIME = "09:00"
 
-# 她的「脑子」：2026-10-30 起默认 GPT-5（gpt-4.1-mini 规则多了就不照做）。可用 OPENAI_MODEL 换别的型号
-DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5")
+CLAUDE_MODEL = "claude-opus-5-5"
+
+
+def default_model() -> str:
+    """她的「脑子」：放了 ANTHROPIC_API_KEY 就是 Claude，否则 GPT-5。FRIDAY_MODEL 可以点名别的型号。"""
+    named = (os.getenv("FRIDAY_MODEL") or "").strip()
+    if named:
+        return named
+    if (os.getenv("ANTHROPIC_API_KEY") or "").strip():
+        return CLAUDE_MODEL
+    return os.getenv("OPENAI_MODEL") or "gpt-5"
+
+
+DEFAULT_MODEL = default_model()
 # 推理模型想多久：low 在「说对」和「快」之间取中；要更快可设 minimal，要更稳可设 medium
 REASONING_EFFORT = os.getenv("FRIDAY_REASONING", "low")
 

@@ -153,8 +153,10 @@ def main() -> None:
         "GOOGLE_CALENDAR_ID": env.get("GOOGLE_CALENDAR_ID") or "selected",
         "HOST": "0.0.0.0",
     }
-    # 有 ElevenLabs / Cursor key 就上云；没有则跳过
+    # 有 Claude / ElevenLabs / Cursor key 就上云；没有则跳过（有 ANTHROPIC_API_KEY 她就用 Claude）
     for name in (
+        "ANTHROPIC_API_KEY",
+        "FRIDAY_MODEL",
         "ELEVENLABS_API_KEY",
         "ELEVENLABS_VOICE_ID",
         "ELEVENLABS_MODEL",

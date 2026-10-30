@@ -93,13 +93,19 @@ def remember(named: dict[str, Any]) -> None:
 
 
 def name_batch(titles: list[str]) -> dict[str, str]:
-    import openai
-
     from src.agent import active_model
-    from src.config import require_openai_api_key
 
-    client = openai.OpenAI(api_key=require_openai_api_key())
-    res = client.responses.create(model=active_model(), input=PROMPT + json.dumps(titles, ensure_ascii=False))
-    text = (res.output_text or "").strip()
+    model, prompt = active_model(), PROMPT + json.dumps(titles, ensure_ascii=False)
+    if model.startswith("claude"):
+        from src import claude
+
+        text = claude.ask(model, prompt).strip()
+    else:
+        import openai
+
+        from src.config import require_openai_api_key
+
+        res = openai.OpenAI(api_key=require_openai_api_key()).responses.create(model=model, input=prompt)
+        text = (res.output_text or "").strip()
     start, end = text.find("{"), text.rfind("}")
     return json.loads(text[start : end + 1]) if start >= 0 else {}
