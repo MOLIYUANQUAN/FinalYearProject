@@ -342,6 +342,7 @@ class ClaudeModel(Model):
         self.stable_prefix = stable_prefix
         self._client = client
         self.fallback = fallback
+        self.served = name  # 这一步实际是谁答的（被拦下换了模型、或者备用的顶上了）：记账用
 
     @property
     def client(self) -> Any:
@@ -396,6 +397,7 @@ class ClaudeModel(Model):
     async def _backup(self, system_instructions, input, tools, output_schema, handoffs, tracing,
                       **kwargs) -> AsyncIterator[Any]:
         model, settings = self.fallback
+        self.served = str(getattr(model, "model", "") or "backup")
         items = input if isinstance(input, str) else (for_openai(input) or input)
         async for event in model.stream_response(system_instructions, items, settings, tools, output_schema,
                                                  handoffs, tracing, **kwargs):
@@ -424,6 +426,7 @@ class ClaudeModel(Model):
                     params["messages"] = without_thinking(params["messages"])
                     continue
                 raise
+        self.served = message.model
         if message.model != self.name:
             print(f"[INFO] claude: {self.name} declined; answered by {message.model}")
         response = Response.model_construct(
@@ -457,6 +460,9 @@ def ask(model: str, prompt: str) -> str:
         model=model, max_tokens=16000, output_config={"effort": "low"},
         messages=[{"role": "user", "content": prompt}], **extra,
     )
+    from src import ledger
+
+    ledger.record_usage(message.model, to_usage(message.usage))
     if message.stop_reason == "refusal":
         return ""
     return "".join(block.text for block in message.content if block.type == "text")

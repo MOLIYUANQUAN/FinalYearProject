@@ -30,6 +30,7 @@ from src.presence import stream_presence
 from src.access import gate, router as access_router
 from src.push_api import router as push_router, run_scheduler, scheduler_enabled
 from src.state_sync import router as state_router
+from src.about import router as about_router
 from src.uploads import MAX_PER_MESSAGE, router as uploads_router
 from src.workbench import router as workbench_router
 from src.config import (
@@ -109,6 +110,7 @@ app.include_router(state_router)
 app.include_router(push_router)
 app.include_router(workbench_router)
 app.include_router(uploads_router)
+app.include_router(about_router)
 
 
 class ChatRequest(BaseModel):

@@ -18,14 +18,13 @@ from datetime import date, datetime, time, timedelta
 from typing import Any, Callable
 from urllib.parse import quote
 
-from src import agenda, closed, conversation, engineering, push, reminders, todos, usage_log
+from src import agenda, closed, conversation, engineering, push, reminders, settings, todos, usage_log
 from src.agenda import Timed
 from src.config import effective_now
 from src.presence import IMPORTANT, _clock, _spaced, _there
 from src.webpush import PUSH_DIR
 
 SENT_PATH = PUSH_DIR / "sent.jsonl"
-QUIET_FROM, QUIET_UNTIL = time(22, 0), time(8, 0)
 BRIEF_UNTIL = time(12, 0)
 DUE_FROM = time(17, 0)
 WRAP_FROM, WRAP_UNTIL = time(21, 0), time(22, 0)
@@ -38,10 +37,8 @@ ENGINEERING_ANYTIME = {"cursor", "live"}
 
 
 def daily_max() -> int:
-    try:
-        return max(0, int(os.getenv("FRIDAY_PUSH_DAILY_MAX") or 3))
-    except ValueError:
-        return 3
+    """他在资料页里设的（没设过就是环境变量或 3）。"""
+    return int(settings.get()["daily_max"])
 
 
 def _morning(day: date) -> time:
@@ -55,8 +52,10 @@ def _morning(day: date) -> time:
 
 
 def quiet(moment: datetime) -> bool:
-    t = moment.time()
-    return t >= QUIET_FROM or t < QUIET_UNTIL
+    """安静时段（资料页里能改，默认 22:00–08:00）：跨午夜的也认。"""
+    current = settings.get()
+    start, end, t = settings.clock(current["quiet_from"]), settings.clock(current["quiet_until"]), moment.time()
+    return (t >= start or t < end) if start > end else (start <= t < end)
 
 
 def _names(titles: list[str], limit: int = 3) -> str:

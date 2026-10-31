@@ -25,6 +25,7 @@ from src.config import (
     require_openai_api_key,
 )
 from src import approval, cursor_fix, friction, nudges, reminders, uploads
+from src.ledger import LEDGER
 from src import claude
 from src.claude import ClaudeModel, for_openai
 from src.config import STATE_DIR, effective_now
@@ -503,10 +504,12 @@ class Friday:
         """跑一段：delta / tool 原样给页面；最后的文字用 text 事件交回给 turn()。"""
         session = self.conversations.session(cid)
         if isinstance(run_input, RunState):
-            result = Runner.run_streamed(agent, run_input, max_turns=12, session=session, run_config=RUN_CONFIG)
+            result = Runner.run_streamed(
+                agent, run_input, max_turns=12, session=session, run_config=RUN_CONFIG, hooks=LEDGER
+            )
         else:
             result = Runner.run_streamed(
-                agent, run_input, max_turns=12, context=Turn(), session=session, run_config=RUN_CONFIG
+                agent, run_input, max_turns=12, context=Turn(), session=session, run_config=RUN_CONFIG, hooks=LEDGER
             )
         async for event in result.stream_events():
             if event.type == "raw_response_event":

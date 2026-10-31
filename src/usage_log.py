@@ -8,6 +8,14 @@ from datetime import datetime
 from src.config import USAGE_LOG_PATH
 
 
+def parse(line: str) -> dict | None:
+    try:
+        row = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+    return row if isinstance(row, dict) else None
+
+
 def record(
     kind: str,
     *,

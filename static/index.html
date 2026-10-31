@@ -93,6 +93,98 @@
       flex-direction: column;
       padding: 4px 2px 10px;
     }
+    /* 顶上一条（像 WhatsApp）：她的头像、名字、此刻在干什么；点开是她的资料页 */
+    #bar { display: flex; align-items: center; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+    #who {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 2px 8px 2px 0;
+      border: none;
+      background: none;
+      color: var(--ink);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    #who img { width: 34px; height: 34px; border-radius: 50%; }
+    #who b { display: block; font-size: 1rem; font-weight: 600; letter-spacing: -0.01em; }
+    #who small { display: block; color: var(--muted); font-size: 0.78rem; }
+    #about { position: fixed; inset: 0; z-index: 20; overflow-y: auto; background: var(--bg); }
+    #about[hidden] { display: none; }
+    #about .sheet {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: max(10px, env(safe-area-inset-top, 0px)) 16px calc(40px + env(safe-area-inset-bottom, 0px));
+    }
+    #about .top { display: flex; align-items: center; height: 44px; }
+    #about .top button {
+      padding: 8px 4px;
+      border: none;
+      background: none;
+      color: var(--ink);
+      font: inherit;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    .profile { margin: 4px 0 22px; text-align: center; }
+    .profile img { width: 76px; height: 76px; border-radius: 50%; }
+    .profile h2 { margin: 10px 0 2px; font-size: 1.4rem; font-weight: 600; letter-spacing: -0.02em; }
+    .profile p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+    .panel { margin-bottom: 14px; padding: 14px 16px; border-radius: 16px; background: var(--hers); }
+    .panel h3 {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 0 6px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+    .money { font-size: 1.7rem; font-weight: 600; letter-spacing: -0.02em; }
+    .money small { color: var(--muted); font-size: 0.95rem; font-weight: 400; }
+    .meter { height: 8px; margin: 8px 0 4px; overflow: hidden; border-radius: 999px; background: var(--line); }
+    .meter i { display: block; height: 100%; border-radius: 999px; background: var(--ink); }
+    .line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 44px;
+      padding: 6px 0;
+      border-top: 1px solid var(--line);
+      font-size: 0.95rem;
+    }
+    .panel .line:first-of-type, .panel h3 + .line { border-top: none; }
+    .line .muted { color: var(--muted); text-align: right; }
+    .line.bad .muted { color: var(--danger); }
+    .line.tap { cursor: pointer; }
+    .line.gone > span:first-child { text-decoration: line-through; opacity: 0.5; }
+    .stepper { display: flex; align-items: center; gap: 12px; font-variant-numeric: tabular-nums; }
+    .stepper button, .pill {
+      min-width: 34px;
+      height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--ink);
+      font: inherit;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .panel input[type="time"] {
+      padding: 4px 8px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: transparent;
+      color: var(--ink);
+      font: inherit;
+    }
+    .panel details summary { padding-top: 8px; color: var(--muted); font-size: 0.85rem; cursor: pointer; }
+    .fineprint { margin: 6px 0 0; color: var(--muted); font-size: 0.8rem; }
+
     /* 一条对话：他在右、她在左，都是气泡；隔得久了中间标一下时间 */
     .stamp {
       align-self: center;
@@ -636,6 +728,12 @@
 </head>
 <body>
   <main>
+    <header id="bar">
+      <button id="who" type="button" aria-label="Friday 的资料">
+        <img src="/static/icon.svg?v=ring1" alt="" />
+        <span><b>Friday</b><small id="status">在线</small></span>
+      </button>
+    </header>
     <div id="unlock" aria-live="polite">
       <p>输入一次密码，之后这台设备会记住你。</p>
       <form id="unlockForm">
@@ -657,6 +755,12 @@
     </form>
     <div id="voiceHint" aria-live="polite"></div>
   </main>
+  <section id="about" hidden aria-label="Friday 的资料">
+    <div class="sheet">
+      <div class="top"><button id="aboutBack" type="button">‹ 返回</button></div>
+      <div id="aboutBody"></div>
+    </div>
+  </section>
 
   <script>
     const ACCESS_KEY = "pa.access"; // 旧版曾把密码存在本机；登录后清掉
@@ -706,6 +810,15 @@
     const attachBtn = document.getElementById("attach");
     const fileInput = document.getElementById("file");
     const attachEl = document.getElementById("attachments");
+    const statusEl = document.getElementById("status");
+    const aboutEl = document.getElementById("about");
+    const aboutBody = document.getElementById("aboutBody");
+    let herIssue = "";
+
+    // 顶上那一行小字：在线 / 正在看你的日历… / 正在输入… / 备用的在答
+    function setStatus(text) {
+      statusEl.textContent = text || (herIssue ? "备用的在答" : "在线");
+    }
     const micBtn = document.getElementById("mic");
     const unlockEl = document.getElementById("unlock");
     const unlockForm = document.getElementById("unlockForm");
@@ -1104,6 +1217,203 @@
       document.body.append(box);
     }
 
+    // ---- 她的资料页（点顶上的名字）：用量、状态、连接、推送设置、她记得的事 ----
+    let lastMe = null;
+
+    async function api(path, init) {
+      const res = await fetch(path, Object.assign({ credentials: "include" }, init || {}, {
+        headers: authHeaders(init && init.body ? { "Content-Type": "application/json" } : {}),
+      }));
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) showUnlock(true);
+      if (!res.ok) throw new Error(data.detail || "没办成，再试一次。");
+      return data;
+    }
+
+    async function openAbout() {
+      if (aboutEl.hidden) history.pushState({ about: true }, "");
+      aboutEl.hidden = false;
+      aboutBody.replaceChildren(el("p", "fineprint", "读取中…"));
+      try {
+        lastMe = await api("/api/me");
+        drawAbout(lastMe);
+      } catch (e) {
+        aboutBody.replaceChildren(el("p", "fineprint", "没读到，过会儿再看。"));
+      }
+    }
+
+    function closeAbout() {
+      aboutEl.hidden = true;
+    }
+
+    function line(label, value, extra) {
+      const row = el("div", "line" + (extra ? " " + extra : ""));
+      row.append(el("span", "", label));
+      if (value instanceof Node) row.append(value);
+      else row.append(el("span", "muted", value == null ? "" : String(value)));
+      return row;
+    }
+
+    function panel(title, side) {
+      const box = el("div", "panel");
+      const h = el("h3");
+      h.append(el("span", "", title));
+      if (side) h.append(el("span", "", side));
+      box.append(h);
+      return box;
+    }
+
+    function drawAbout(me) {
+      const money = (n) => "$" + Number(n || 0).toFixed(2);
+      const u = me.usage;
+      const profile = el("div", "profile");
+      const avatar = el("img");
+      avatar.src = "/static/icon.svg?v=ring1";
+      avatar.alt = "";
+      profile.append(avatar, el("h2", "", "Friday"), el("p", "", (me.issue ? "备用的在答 · " : "在线 · ") + me.model));
+
+      // 用量：钱和比例在最上面；token 收在「细节」里
+      const use = panel("这个月用量", "估计值，准的数在控制台");
+      const big = el("div", "money");
+      big.append(money(u.spent), el("small", "", " / $" + u.budget));
+      const meter = el("div", "meter");
+      const fill = el("i");
+      fill.style.width = Math.min(100, (u.spent / (u.budget || 1)) * 100).toFixed(1) + "%";
+      meter.append(fill);
+      use.append(big, meter);
+      use.append(line("照这个速度，月底大约", money(u.projected)));
+      const t = u.today || {};
+      use.append(line("今天", (t.turns || 0) + " 句" + (t.first_reply_s ? " · 平均 " + t.first_reply_s + " 秒开始回答" : "")));
+      const more = el("details");
+      more.append(el("summary", "", "细节"));
+      for (const m of u.by_model || []) more.append(line(m.model, money(m.usd)));
+      const k = (n) => (n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "K" : String(n || 0));
+      more.append(line("输入 token", k(u.tokens.in) + " · 缓存命中 " + Math.round((u.tokens.cache_hit || 0) * 100) + "%"));
+      more.append(line("输出 token", k(u.tokens.out)));
+      more.append(el("p", "fineprint", u.since ? "从 " + u.since + " 开始记。GPT-5 顶班的部分走 OpenAI 的账。" : "这个月还没记到。"));
+      use.append(more);
+
+      // 连接：都好就一句话；有问题的那一行写怎么修
+      const bad = (me.connections || []).filter((c) => !c.ok);
+      const links = panel("连接", bad.length ? bad.length + " 处要看一下" : "都正常");
+      for (const c of me.connections || []) links.append(line(c.name, c.note, c.ok ? "" : "bad"));
+
+      // 推送：这台设备、每天最多几条、安静时段
+      const pushes = panel("推送");
+      const device = el("span", "muted", "…");
+      pushes.append(line("这台设备的通知", device));
+      pushSubscribed().then((on) => {
+        if (on) {
+          device.textContent = "已打开";
+          return;
+        }
+        if (!pushSupported) {
+          device.textContent = isIOS && !standalone ? "先添加到主屏幕" : "这个浏览器不支持";
+          return;
+        }
+        const b = el("button", "pill", "打开");
+        b.type = "button";
+        b.onclick = () => enablePush(device);
+        device.replaceChildren(b);
+      });
+      const stepper = el("span", "stepper");
+      const minus = el("button", "", "−");
+      const count = el("span", "", String(me.push.daily_max));
+      const plus = el("button", "", "+");
+      [minus, plus].forEach((b) => (b.type = "button"));
+      const setDaily = async (n) => {
+        if (n < 0 || n > 10) return;
+        const before = me.push.daily_max;
+        count.textContent = String(n);
+        try {
+          me.push = Object.assign(me.push, await api("/api/settings", { method: "POST", body: JSON.stringify({ daily_max: n }) }));
+        } catch (e) {
+          count.textContent = String(before);
+        }
+      };
+      minus.onclick = () => setDaily(me.push.daily_max - 1);
+      plus.onclick = () => setDaily(me.push.daily_max + 1);
+      stepper.append(minus, count, plus);
+      pushes.append(line("每天最多", stepper));
+      const quiet = el("span", "stepper");
+      const from = el("input");
+      const until = el("input");
+      from.type = until.type = "time";
+      from.value = me.push.quiet_from;
+      until.value = me.push.quiet_until;
+      [[from, "quiet_from"], [until, "quiet_until"]].forEach(([box, key]) => {
+        box.onchange = async () => {
+          try {
+            me.push = Object.assign(me.push, await api("/api/settings", { method: "POST", body: JSON.stringify({ [key]: box.value }) }));
+          } catch (e) {
+            box.value = me.push[key];
+          }
+        };
+      });
+      quiet.append(from, el("span", "muted", "到"), until);
+      pushes.append(line("安静时段", quiet));
+      pushes.append(el("p", "fineprint", "你亲口交代的提醒到点就发，不受这两样限制。"));
+
+      // 她记得的事
+      const mind = panel("她记得的");
+      const open = line("她记得你的事", me.memory + " 件 ›", "tap");
+      open.onclick = showMemories;
+      mind.append(open);
+
+      aboutBody.replaceChildren(profile, use, links, pushes, mind, el("p", "fineprint", me.version ? "版本 " + me.version : ""));
+    }
+
+    async function showMemories() {
+      const back = el("button", "pill", "‹ 资料");
+      back.type = "button";
+      back.onclick = () => drawAbout(lastMe);
+      const box = panel("她记得你的事", "删了能撤销");
+      aboutBody.replaceChildren(back, el("div", "", ""), box);
+      try {
+        const facts = await api("/api/memory");
+        if (!facts.length) box.append(el("p", "fineprint", "她还没记下什么。"));
+        for (const f of facts) {
+          const row = line(f.content, null);
+          const del = el("button", "pill", "删除");
+          del.type = "button";
+          del.onclick = async () => {
+            del.disabled = true;
+            try {
+              await api("/api/memory/" + encodeURIComponent(f.id), { method: "DELETE" });
+              row.classList.add("gone");
+              lastMe.memory = Math.max(0, lastMe.memory - 1);
+              const undo = el("button", "pill", "撤销");
+              undo.type = "button";
+              undo.onclick = async () => {
+                await api("/api/memory/restore", { method: "POST", body: JSON.stringify({ fact: f.fact }) });
+                row.classList.remove("gone");
+                lastMe.memory += 1;
+                undo.replaceWith(del);
+                del.disabled = false;
+              };
+              del.replaceWith(undo);
+            } catch (e) {
+              del.disabled = false;
+            }
+          };
+          row.lastChild.replaceWith(del);
+          box.append(row);
+        }
+      } catch (e) {
+        box.append(el("p", "fineprint", "没读到，过会儿再看。"));
+      }
+    }
+
+    document.getElementById("who").addEventListener("click", openAbout);
+    document.getElementById("aboutBack").addEventListener("click", () => {
+      if (history.state && history.state.about) history.back();
+      else closeAbout();
+    });
+    window.addEventListener("popstate", closeAbout);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !aboutEl.hidden) document.getElementById("aboutBack").click();
+    });
+
     // 推送里没下文的事：一件一行，「做完了 / 明天再说」点一下就办，办过的划掉
     function drawItems(g, m) {
       const box = el("div", "followups");
@@ -1133,6 +1443,7 @@
         g.append(p);
       }
       p.innerHTML = '<div class="msg bot">' + DOTS + "</div>" + (doing ? '<span class="doing">' + escapeHtml(doing) + "</span>" : "");
+      setStatus(doing || "正在输入…");
       scrollDown();
     }
 
@@ -1149,7 +1460,10 @@
         bubbles,
         show(text) {
           const parts = paragraphs(text);
-          if (parts.length) clearPending(g);
+          if (parts.length) {
+            clearPending(g);
+            setStatus("正在输入…");
+          }
           parts.forEach((p, i) => {
             if (!bubbles[i]) bubbles[i] = bubble(g);
             bubbles[i].innerHTML = render(p);
@@ -1749,7 +2063,10 @@
       sendBtn.textContent = on ? "停" : "发送";
       sendBtn.classList.toggle("stop", on);
       sendBtn.setAttribute("aria-label", on ? "停下" : "发送");
-      if (!on) streaming = null;
+      if (!on) {
+        streaming = null;
+        setStatus("");
+      }
     }
 
     // ---- 声音：你说话时听麦克风；她一句写完就念一句；白环跟着真实的响度起伏 ----
@@ -2337,6 +2654,8 @@
         if (!(await ensureSignedIn())) return false;
         const res = await fetch("/api/health", { credentials: "include", headers: authHeaders() });
         const data = await res.json();
+        herIssue = data.claude_issue || "";
+        setStatus("");
         if (!data.has_openai_api_key) {
           note("缺少 OPENAI_API_KEY：在 .env 里填好后，双击 Friday.cmd 重开。");
           return false;
