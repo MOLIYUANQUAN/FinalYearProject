@@ -276,11 +276,14 @@ def react(body: ReactBody) -> dict:
 def conversation_current() -> dict:
     """页面打开时：那一条对话（手机上聊的，电脑上也看得到）。id 是给模型的那一段；放久了是 None，页面就请她开场。"""
     messages = friday.conversations.thread()
-    # 待确认的那一步如果已经没了（比如很久以前的），按钮就别再显示
+    current = friday.conversations.current()
+    # 待确认的按钮只在那一段还没结束、那一步还等着时显示（隔夜的、已经没了的就别再给他点）
     last = messages[-1] if messages else None
-    if last and last.get("needs_confirm") and not friday.pending_approvals(last["conversation_id"]):
+    if last and last.get("needs_confirm") and (
+        last["conversation_id"] != current or not friday.pending_approvals(last["conversation_id"])
+    ):
         last["needs_confirm"] = False
-    return {"id": friday.conversations.current(), "messages": messages}
+    return {"id": current, "messages": messages}
 
 
 async def _presence_events(cid: str) -> AsyncIterator[dict[str, Any]]:

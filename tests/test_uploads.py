@@ -65,5 +65,18 @@ class UploadTests(SandboxTestCase):
             self.assertEqual(client.post("/api/chat/stream", json={"message": "  "}).status_code, 400)
 
 
+class OnlyRecentPictures(SandboxTestCase):
+    def test_older_pictures_become_a_line_of_text(self) -> None:
+        from src.agent import RECENT_IMAGES, _with_images
+
+        refs = [uploads.save(PNG)["url"] for _ in range(RECENT_IMAGES + 2)]
+        items = [{"role": "user", "content": [{"type": "input_text", "text": f"第{i}张"},
+                                               {"type": "input_image", "image_url": ref, "detail": "auto"}]}
+                 for i, ref in enumerate(refs)]
+        sent = json.dumps(_with_images(items), ensure_ascii=False)
+        self.assertEqual(sent.count("data:image/png;base64,"), RECENT_IMAGES)
+        self.assertEqual(sent.count("之前发过的一张图"), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

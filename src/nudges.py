@@ -261,7 +261,8 @@ def _into_thread(nudge: dict[str, Any]) -> None:
     try:
         convs = conversation.store()
         cid = convs.current() or convs.latest() or convs.create()
-        convs.add_message(cid, "assistant", nudge["body"], nudge=nudge["kind"], items=nudge.get("items") or [], tools=[])
+        convs.add_message(cid, "assistant", nudge["body"], touch=False, nudge=nudge["kind"],
+                          items=nudge.get("items") or [], tools=[])
     except Exception as exc:  # noqa: BLE001 — 写不进对话也不耽误推送
         print(f"[WARN] nudge not written into the conversation: {exc}")
 

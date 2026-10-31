@@ -326,5 +326,53 @@ class ChoosingTheBrainTests(unittest.TestCase):
         self.assertEqual((sent["betas"], sent["fallbacks"]), ([claude.FALLBACK_BETA], "default"))
 
 
+class BreaksOffMidStream(FakeStream):
+    """先说几个字，然后像真的流那样中途抛错（SSE 里的 error 事件到了 SDK 是状态码 200 的 APIStatusError）。"""
+
+    async def _events(self):
+        yield SimpleNamespace(type="text", text="我先看一下")
+        raise anthropic.APIStatusError("Overloaded", response=MagicMock(status_code=200),
+                                       body={"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}})
+
+
+class ReviewFixes(SandboxTestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        claude._resting = None
+        self.addCleanup(setattr, claude, "_resting", None)
+
+    def test_overloaded_halfway_hands_over_to_the_backup_and_drops_the_half_sentence(self) -> None:
+        fake = FakeClaude([])
+        fake.beta.messages.stream = lambda **params: BreaksOffMidStream(reply(say("x")))
+        backup = FakeModel([[text("明天下午 2 点见导师。")]])
+        model = claude.ClaudeModel(MODEL, stable_prefix=VOICE, client=fake, fallback=(backup, agent.model_settings("gpt-5")))
+        friday = Friday(Conversations(self.tmp / "c.db"), model=model)
+        self.addCleanup(friday.conversations.close)
+        events = collect(friday.turn(friday.conversations.create(), "明天有什么"))
+        kinds = [e["type"] for e in events]
+        self.assertLess(kinds.index("tool"), max(i for i, k in enumerate(kinds) if k == "delta"))  # 先收起那半句，再说
+        self.assertEqual(events[-1]["reply"], "明天下午 2 点见导师。")
+
+    def test_text_on_both_sides_of_a_switch_is_kept_as_one_reply(self) -> None:
+        out = claude.to_output(reply(say("第一段。"), FALLBACK, say("第二段：记得带报告。"), model="claude-opus-5"))
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0].content[0].text, "第一段。\n\n第二段：记得带报告。")
+
+    def test_a_picture_the_api_refuses_is_dropped_and_asked_again(self) -> None:
+        from src import uploads
+        from tests.test_uploads import PNG
+
+        picture = uploads.save(PNG)
+        fake = FakeClaude([bad_request("messages.0.content.0.image.source.base64: image exceeds 5 MB maximum"),
+                           reply(say("那张图打不开，换一张？"))])
+        model = claude.ClaudeModel(MODEL, stable_prefix=VOICE, client=fake)
+        friday = Friday(Conversations(self.tmp / "c.db"), model=model)
+        self.addCleanup(friday.conversations.close)
+        done = collect(friday.turn(friday.conversations.create(), "这是什么", images=[picture["id"]]))[-1]
+        self.assertEqual(done["reply"], "那张图打不开，换一张？")
+        self.assertEqual(blocks(fake.requests[0], "image")[0]["type"], "image")
+        self.assertEqual(blocks(fake.requests[1], "image"), [])
+
+
 if __name__ == "__main__":
     unittest.main()

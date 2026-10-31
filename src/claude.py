@@ -75,11 +75,26 @@ def _unavailable(exc: Exception) -> str | None:
         return "这个 Claude 型号用不了"
     if isinstance(exc, anthropic.RateLimitError):
         return "超了 Anthropic 的速率或额度上限"
-    if isinstance(exc, anthropic.APIStatusError) and exc.status_code >= 500:
-        return "Anthropic 那边出故障了"
+    if isinstance(exc, anthropic.APIStatusError):
+        # 流到一半出的错（overloaded / api_error）状态码是 200，看错误正文的类型
+        body = exc.body if isinstance(exc.body, dict) else {}
+        kind = (body.get("error") or {}).get("type") if isinstance(body.get("error"), dict) else body.get("type")
+        if exc.status_code >= 500 or kind in ("overloaded_error", "api_error"):
+            return "Anthropic 那边出故障了"
+        if kind == "rate_limit_error":
+            return "超了 Anthropic 的速率或额度上限"
     if isinstance(exc, anthropic.APIConnectionError):
         return "连不上 Anthropic"
     return None
+
+
+RESTART = "friday.restart"
+
+
+class Restart:
+    """不是 Responses 的事件：Claude 说到一半出了故障，前面那半句作废，备用的重新说。"""
+
+    type = RESTART
 
 
 def _get(item: Any, key: str, default: Any = None) -> Any:
@@ -238,6 +253,19 @@ def _answers(ids: list[str]) -> dict[str, Any]:
     ]}
 
 
+def blocks_of(messages: list[dict[str, Any]], kind: str) -> list[dict[str, Any]]:
+    return [b for m in messages for b in m["content"] if b.get("type") == kind]
+
+
+def without_images(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {"role": m["role"], "content": [
+            {"type": "text", "text": "（这张图打不开）"} if b.get("type") == "image" else b for b in m["content"]
+        ]}
+        for m in messages
+    ]
+
+
 def without_thinking(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return _merge([
         {"role": m["role"], "content": [b for b in m["content"] if b.get("type") not in THINKING]} for m in messages
@@ -301,7 +329,12 @@ def to_output(message: Any) -> list[Any]:
                 encrypted_content=json.dumps({_KEY: block.to_dict()}, ensure_ascii=False),
             ))
         elif block.type == "text" and block.text.strip():
-            out.append(_message(block.text))
+            if out and isinstance(out[-1], ResponseOutputMessage):
+                # 挨着的几段字是同一句话（比如中途被拦下、换了模型接着说）：并成一条，不然只存得下最后一段
+                part = out[-1].content[0]
+                out[-1].content[0] = ResponseOutputText(type="output_text", text=f"{part.text}\n\n{block.text}", annotations=[])
+            else:
+                out.append(_message(block.text))
         elif block.type == "tool_use" and message.stop_reason != "max_tokens":
             # 写到一半被截断的调用不能跑
             out.append(ResponseFunctionToolCall(
@@ -382,8 +415,10 @@ class ClaudeModel(Model):
             async for event in self._backup(*args, **kwargs):
                 yield event
             return
+        started = False
         try:
             async for event in self._claude(system_instructions, input, model_settings, tools):
+                started = started or isinstance(event, ResponseTextDeltaEvent)
                 yield event
         except Exception as exc:  # noqa: BLE001 — 只接「Claude 暂时用不了」，别的照常抛
             reason = _unavailable(exc) if self.fallback else None
@@ -391,6 +426,8 @@ class ClaudeModel(Model):
                 raise
             _resting = (time.monotonic() + REST_S, reason)
             print(f"[WARN] claude unavailable ({reason}): {exc}; answering with the backup for {REST_S // 60} min")
+            if started:
+                yield Restart()
             async for event in self._backup(*args, **kwargs):
                 yield event
 
@@ -407,7 +444,8 @@ class ClaudeModel(Model):
         params = self.request(system_instructions, input, model_settings, tools)
         seq = 0
         message = None
-        for attempt in (1, 2):
+        retried: set[str] = set()
+        for _attempt in range(3):
             try:
                 async with self.client.beta.messages.stream(**params) as stream:
                     async for event in stream:
@@ -421,9 +459,16 @@ class ClaudeModel(Model):
                 break
             except anthropic.BadRequestError as exc:
                 # 思考块对不上这份对话（比如重启后才点确认，系统提示已经重算）：官方的恢复办法是去掉思考块再问一次
-                if attempt == 1 and _bound_elsewhere(exc):
+                if "thinking" not in retried and _bound_elsewhere(exc):
                     print(f"[WARN] claude: thinking blocks no longer match, retrying without them: {exc}")
                     params["messages"] = without_thinking(params["messages"])
+                    retried.add("thinking")
+                    continue
+                # 有张图它收不下（太大、格式不对）：图换成一句话再问一次，不让这张图把后面每一句都卡住
+                if "image" not in retried and "image" in str(exc).lower() and blocks_of(params["messages"], "image"):
+                    print(f"[WARN] claude: a picture was refused, retrying without pictures: {exc}")
+                    params["messages"] = without_images(params["messages"])
+                    retried.add("image")
                     continue
                 raise
         self.served = message.model

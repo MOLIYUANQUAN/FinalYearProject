@@ -225,5 +225,16 @@ class SelfOnlyAndEditTests(SandboxTestCase):
         self.assertEqual(self.sent_mail(), [])
 
 
+class AQuestionThatSomethingElseCameAfter(SandboxTestCase):
+    def test_answering_a_push_with_ok_does_not_send_the_pending_mail(self) -> None:
+        friday, _ = self.friday([[call("send_email", **MAIL)], [text("那封先不发。")], [text("好，下午见。")]])
+        cid = friday.conversations.create()
+        self.assertTrue(collect(friday.turn(cid, "给导师发个进度"))[-1]["needs_confirm"])
+        # 她之后又推了一条「会快到了」：他回「好」回的是这条
+        friday.conversations.add_message(cid, "assistant", "13:40 见导师，点开我把要点备好。", touch=False, nudge="meeting")
+        collect(friday.turn(cid, "好"))
+        self.assertEqual(self.sent_mail(), [])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -130,7 +130,7 @@ def budget() -> float:
 BILLING_URL = "https://api.anthropic.com/v1/organizations/cost_report"
 BILLING_FRESH_S = 5 * 60  # 账单本身约 5 分钟才更新一次
 _billing_lock = threading.Lock()
-_billing: tuple[float, str, float] | None = None  # (读到的时刻, 哪个月, 美元)
+_billing: tuple[float, str, float | None] | None = None  # (读到的时刻, 哪个月, 美元；读不到是 None)
 
 
 def billed(now: datetime | None = None) -> float | None:
@@ -159,6 +159,9 @@ def billed(now: datetime | None = None) -> float | None:
             params["page"] = data["next_page"]
     except (requests.RequestException, ValueError) as exc:
         print(f"[WARN] billing: could not read the cost report: {exc}")
+        # 读不到也记 5 分钟：不让每次打开资料页都再等一轮
+        with _billing_lock:
+            _billing = (time.monotonic(), month_key, None)
         return None
     dollars = round(cents / 100, 2)  # 账单金额是「分」
     with _billing_lock:

@@ -17,7 +17,7 @@ from src.config import STATE_DIR
 
 UPLOADS_DIR = STATE_DIR / "uploads"
 PREFIX = "/api/uploads/"
-MAX_BYTES = 10 * 1024 * 1024
+MAX_BYTES = 5 * 1024 * 1024  # Claude 一张图最多 5MB；页面发之前已经缩过，正常远小于这个
 MAX_PER_MESSAGE = 5
 TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp"}
 _ID = re.compile(r"^[0-9a-f]{32}$")
@@ -42,7 +42,7 @@ def save(data: bytes) -> dict[str, str]:
     if ext is None:
         raise ValueError("只能发图片（PNG、JPG、GIF、WebP）。")
     if len(data) > MAX_BYTES:
-        raise ValueError("图片太大了，最多 10MB。")
+        raise ValueError("图片太大了，最多 5MB。")
     upload_id = uuid.uuid4().hex
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     (UPLOADS_DIR / f"{upload_id}{ext}").write_bytes(data)

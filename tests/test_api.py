@@ -123,5 +123,16 @@ class ApiTests(SandboxTestCase):
         self.assertEqual(again.status_code, 409)
 
 
+class StaleButtons(SandboxTestCase):
+    def test_a_question_from_a_segment_that_ended_has_no_buttons(self) -> None:
+        service, _ = self.friday([[call("send_email", to="a@b.c", subject="hi", body="hello", cc="")]])
+        with patch.object(main, "friday", service):
+            client = TestClient(main.app)
+            sse(client.post("/api/chat/stream", json={"message": "发邮件"}))
+            self.assertTrue(client.get("/api/conversation").json()["messages"][-1]["needs_confirm"])
+            with patch("src.conversation.time.time", return_value=time.time() + 12 * 60 * 60):
+                self.assertFalse(client.get("/api/conversation").json()["messages"][-1]["needs_confirm"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -126,14 +126,16 @@ class Conversations:
 
     # ---- 页面上的消息 ----
 
-    def add_message(self, cid: str, role: str, content: str, **data: Any) -> int:
+    def add_message(self, cid: str, role: str, content: str, *, touch: bool = True, **data: Any) -> int:
+        """touch=False：推送这类她自己发的，不把一段放久了的对话算作「刚聊过」。"""
         now = time.time()
         with self._lock:
             cur = self._conn.execute(
                 "INSERT INTO conversation_messages (conversation_id, role, content, data, at) VALUES (?, ?, ?, ?, ?)",
                 (cid, role, content, json.dumps(data, ensure_ascii=False), now),
             )
-            self._conn.execute("UPDATE conversations SET last_active_at = ? WHERE id = ?", (now, cid))
+            if touch:
+                self._conn.execute("UPDATE conversations SET last_active_at = ? WHERE id = ?", (now, cid))
             self._conn.commit()
             return int(cur.lastrowid)
 
@@ -158,6 +160,14 @@ class Conversations:
             return None
         return {"id": r["id"], "conversation_id": r["conversation_id"], "role": r["role"], "content": r["content"],
                 "at": int(r["at"] * 1000), **json.loads(r["data"] or "{}")}
+
+    def last_hers(self, before: int) -> dict[str, Any] | None:
+        """在这条消息之前，她最后说的那一条（整条对话里，不分段）。"""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT id FROM conversation_messages WHERE role != 'user' AND id < ? ORDER BY id DESC LIMIT 1", (before,)
+            ).fetchone()
+        return self.message(row["id"]) if row else None
 
     def recent_reactions(self, since: float) -> list[tuple[str, str]]:
         """他最近贴在她话上的表情：(那一段话, 表情)。"""

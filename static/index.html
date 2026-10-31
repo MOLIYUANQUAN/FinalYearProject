@@ -270,7 +270,19 @@
       cursor: pointer;
     }
     .msg.bot .react { left: 12px; }
-    .msg.user .react { right: 12px; }
+    .msg.user .react, .shots .react { right: 12px; }
+    .shots { position: relative; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; width: 100%; }
+    .shots.has-react { margin-bottom: 14px; }
+    .shots .react {
+      position: absolute;
+      bottom: -15px;
+      padding: 2px 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--bg);
+      font-size: 0.85rem;
+      line-height: 1.3;
+    }
     /* 长按（电脑上右键或悬停的笑脸）出一排表情，最后是「复制」 */
     .picker {
       position: absolute;
@@ -551,6 +563,7 @@
     #mic { display: none; }
     #form.voice #mic { display: grid; }
     #form.voice #attach, #form.voice #input, #form.voice #send { display: none; }
+    #form.voice #send[data-state="stop"] { display: grid; }
     #attachments { display: flex; flex-wrap: wrap; gap: 8px; }
     #attachments[hidden] { display: none; }
     .att {
@@ -1009,6 +1022,7 @@
 
     // ---- 贴表情（像 WhatsApp）：他在她的气泡上贴；她不说话时也会在他那条上贴一个 ----
     function setPill(b, emoji) {
+      if (!b) return;
       let pill = b.querySelector(":scope > .react");
       if (!emoji) {
         if (pill) pill.remove();
@@ -1130,11 +1144,13 @@
     const MAX_IMAGES = 5;
     let attachments = [];
 
+    const SENDABLE = ["image/png", "image/jpeg", "image/gif", "image/webp"];
     async function shrink(file) {
       const bitmap = await createImageBitmap(file).catch(() => null);
-      if (!bitmap) return file;
+      if (!bitmap) return SENDABLE.includes(file.type) ? file : null; // 浏览器都打不开的格式就不收
       const scale = Math.min(1, 1568 / Math.max(bitmap.width, bitmap.height));
-      if (scale === 1 && file.size < 1.5e6) return file;
+      // HEIC、AVIF 这类服务端不收的格式，就算不大也转成 JPEG
+      if (scale === 1 && file.size < 1.5e6 && SENDABLE.includes(file.type)) return file;
       const canvas = document.createElement("canvas");
       canvas.width = Math.round(bitmap.width * scale);
       canvas.height = Math.round(bitmap.height * scale);
@@ -1146,6 +1162,10 @@
       for (const f of files) {
         if (!f.type.startsWith("image/") || attachments.length >= MAX_IMAGES) continue;
         const blob = await shrink(f);
+        if (!blob) {
+          flashHint("这张图的格式打不开，换成截图或 JPG 再发");
+          continue;
+        }
         attachments.push({ blob, url: URL.createObjectURL(blob) });
       }
       drawAttachments();
@@ -1176,12 +1196,12 @@
       syncSend();
     }
 
-    async function uploadAll(list) {
+    async function uploadAll(list, signal) {
       const ids = [];
       for (const a of list) {
         const fd = new FormData();
         fd.append("file", a.blob, "image");
-        const res = await fetch("/api/uploads", { method: "POST", credentials: "include", headers: authHeaders(), body: fd });
+        const res = await fetch("/api/uploads", { method: "POST", credentials: "include", headers: authHeaders(), body: fd, signal });
         const data = await res.json().catch(() => ({}));
         if (res.status === 401) showUnlock(true);
         if (!res.ok) throw new Error(data.detail || "图没传上去，再发一次。");
@@ -1190,15 +1210,20 @@
       return ids;
     }
 
+    // 他发的图放在一块里：只发图没写字时，她贴的表情就贴在这块上
     function drawShots(g, urls) {
+      if (!urls.length) return null;
+      const box = el("div", "shots");
       for (const url of urls) {
         const img = el("img", "shot");
         img.src = url;
         img.alt = "图片";
         img.loading = "lazy";
         img.onclick = () => showShot(url);
-        g.append(img);
+        box.append(img);
       }
+      g.append(box);
+      return box;
     }
 
     function showShot(url) {
@@ -1388,7 +1413,7 @@
     }
 
     function factRow(f) {
-      const row = el("div", "fact");
+      const row = el("div", f.gone ? "fact gone" : "fact");
       row.append(el("p", "", f.content));
       if (f.at) row.append(el("time", "", factDay(f.at)));
       const acts = el("div", "acts");
@@ -1396,7 +1421,8 @@
       del.type = "button";
       const undo = el("button", "", "撤销");
       undo.type = "button";
-      undo.hidden = true;
+      undo.hidden = !f.gone;
+      del.hidden = !!f.gone;
       acts.append(del, undo);
       row.append(acts);
       row.onclick = (e) => {
@@ -1411,6 +1437,7 @@
           await api("/api/memory/" + encodeURIComponent(f.id), { method: "DELETE" });
           row.classList.remove("open");
           row.classList.add("gone");
+          f.gone = true;
           del.hidden = true;
           undo.hidden = false;
           lastMe.memory = Math.max(0, lastMe.memory - 1);
@@ -1424,6 +1451,7 @@
         try {
           await api("/api/memory/restore", { method: "POST", body: JSON.stringify({ fact: f.fact }) });
           row.classList.remove("gone");
+          f.gone = false;
           undo.hidden = true;
           del.hidden = false;
           lastMe.memory += 1;
@@ -2003,8 +2031,8 @@
       msgs.forEach((m, i) => {
         const g = group(m.role, m.at);
         if (m.role === "user") {
-          drawShots(g, (m.images || []).map((i) => i.url));
-          if (m.content) setPill(bubble(g, m.content), m.reaction);
+          const shots = drawShots(g, (m.images || []).map((i) => i.url));
+          setPill(m.content ? bubble(g, m.content) : shots, m.reaction);
         }
         else if (m.agenda) drawOpener(g, m, i === latestOpener);
         else {
@@ -2622,6 +2650,7 @@
     // 她先开口：问候、此刻最该知道的那句、今天的时间线，接在那条对话的最后
     async function presence() {
       setBusy(true);
+      clearActions(); // 她又开口了：之前那个「发吗？」不再等他回答
       // 上一次开场之后什么都没聊：这次的替掉它，不叠两遍
       const last = session.messages[session.messages.length - 1];
       if (last && last.agenda) {
@@ -2711,15 +2740,31 @@
       setBusy(true);
       clearActions();
       const g = group("user");
-      drawShots(g, pictures.map((a) => a.url));
-      const mine = message ? bubble(g, message) : null;
+      const shots = drawShots(g, pictures.map((a) => a.url));
+      const mine = message ? bubble(g, message) : shots;
       const said = { role: "user", content: message, at: Date.now() };
       session.messages.push(said);
       const reply = herReply(group("assistant"));
       Object.assign(reply, { mine, said });
       reply.busy(pictures.length ? "在看图…" : "");
+      let images = [];
       try {
-        const images = pictures.length ? await uploadAll(pictures) : [];
+        streaming = new AbortController(); // 传图的时候点「停」也算数
+        images = pictures.length ? await uploadAll(pictures, streaming.signal) : [];
+      } catch (e) {
+        // 图没传上去：这一句当没发过，字和图放回输入框
+        g.remove();
+        reply.g.remove();
+        session.messages.splice(session.messages.indexOf(said), 1);
+        if (!input.value.trim()) input.value = message;
+        attachments = pictures.concat(attachments);
+        drawAttachments();
+        fitInput();
+        if (!stopped(e)) note(calm(e));
+        setBusy(false);
+        return;
+      }
+      try {
         said.images = images.map((id) => ({ id, url: "/api/uploads/" + id }));
         const result = await stream(
           "/api/chat/stream",

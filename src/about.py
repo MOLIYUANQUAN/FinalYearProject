@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as Timeout
 from datetime import datetime
 from typing import Any, Callable
@@ -51,14 +52,17 @@ def connections() -> list[dict[str, Any]]:
         pass
     if todos.connected():
         checks.append(("待办", todos.read))
-    with ThreadPoolExecutor(max_workers=max(1, len(checks))) as pool:
-        futures = [(name, pool.submit(_check, name, read)) for name, read in checks]
-        out = []
-        for name, future in futures:
-            try:
-                out.append(future.result(timeout=CHECK_TIMEOUT_S))
-            except Timeout:
-                out.append({"name": name, "ok": False, "note": "这次没读到，过会儿再看"})
+    pool = ThreadPoolExecutor(max_workers=max(1, len(checks)))
+    futures = [(name, pool.submit(_check, name, read)) for name, read in checks]
+    out = []
+    deadline = time.monotonic() + CHECK_TIMEOUT_S
+    for name, future in futures:
+        try:
+            out.append(future.result(timeout=max(0.0, deadline - time.monotonic())))
+        except Timeout:
+            out.append({"name": name, "ok": False, "note": "这次没读到，过会儿再看"})
+    # 卡住的那个不等它：页面先出来（with 块退出时会等所有线程，所以不用 with）
+    pool.shutdown(wait=False, cancel_futures=True)
     issue = claude.issue()
     if active_model().startswith("claude"):
         out.insert(0, {"name": "Claude", "ok": not issue, "note": issue or "正常"})

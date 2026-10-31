@@ -174,5 +174,29 @@ class ClaudeBackupIsBilledToTheRightModel(SandboxTestCase):
         self.assertIsInstance(anthropic.BadRequestError, type)
 
 
+class DoesNotHang(unittest.TestCase):
+    def setUp(self) -> None:
+        fresh_files()
+        self.addCleanup(fresh_files)
+        ledger._billing = None
+        self.addCleanup(setattr, ledger, "_billing", None)
+
+    def test_a_hung_google_check_does_not_hold_up_her_page(self) -> None:
+        import time as clock
+
+        with patch.object(about, "CHECK_TIMEOUT_S", 0.2), patch.object(about.agenda, "read", side_effect=lambda: clock.sleep(2)):
+            started = clock.monotonic()
+            rows = about.connections()
+        self.assertLess(clock.monotonic() - started, 1.5)
+        self.assertIn("这次没读到", next(r for r in rows if r["name"] == "日历")["note"])
+
+    def test_an_unreadable_bill_is_not_fetched_again_right_away(self) -> None:
+        with patch.dict("os.environ", {"ANTHROPIC_ADMIN_KEY": "sk-ant-admin01-test"}), \
+                patch.object(ledger.requests, "get", side_effect=ledger.requests.ConnectionError("offline")) as get:
+            self.assertIsNone(ledger.billed())
+            self.assertIsNone(ledger.billed())
+        self.assertEqual(get.call_count, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -27,7 +27,7 @@ from src.config import (
 from src import approval, cursor_fix, friction, nudges, reminders, uploads
 from src.ledger import LEDGER
 from src import claude
-from src.claude import ClaudeModel, for_openai
+from src.claude import RESTART, ClaudeModel, for_openai
 from src.config import STATE_DIR, effective_now
 from src.context import memory_block, now_block, profile_block
 from src.conversation import Conversations, split_reaction, store
@@ -223,8 +223,16 @@ def model_settings(name: str) -> ModelSettings:
     return ModelSettings(temperature=0.2)
 
 
+RECENT_IMAGES = 4  # 只把最近几张图真的发给模型：更早的换成一句话，一段里发多了也不会越问越贵、越慢
+
+
 def _with_images(items: list[Any]) -> list[Any] | None:
     """对话里的图只记编号；问模型这一刻才换成真正的图（文件不在了就说一句）。没有图就返回 None。"""
+    refs = [
+        part.get("image_url") for item in items if isinstance(item, dict) and isinstance(item.get("content"), list)
+        for part in item["content"] if isinstance(part, dict) and str(part.get("image_url") or "").startswith(uploads.PREFIX)
+    ]
+    recent = set(refs[-RECENT_IMAGES:])
     out, changed = [], False
     for item in items:
         content = item.get("content") if isinstance(item, dict) else None
@@ -235,8 +243,12 @@ def _with_images(items: list[Any]) -> list[Any] | None:
             for part in content:
                 ref = part.get("image_url") if isinstance(part, dict) else None
                 if isinstance(ref, str) and ref.startswith(uploads.PREFIX):
-                    url = uploads.data_url(ref)
-                    parts.append({**part, "image_url": url} if url else {"type": "input_text", "text": "（这张图已经不在了）"})
+                    url = uploads.data_url(ref) if ref in recent else None
+                    if url:
+                        parts.append({**part, "image_url": url})
+                    else:
+                        gone = "（之前发过的一张图）" if ref not in recent else "（这张图已经不在了）"
+                        parts.append({"type": "input_text", "text": gone})
                 else:
                     parts.append(part)
             item, changed = {**item, "content": parts}, True
@@ -418,6 +430,10 @@ class Friday:
             if pending is not None:
                 agent, state, waiting = pending
                 choice = "revise" if revision else approval.decide(message)
+                # 她问完「发吗？」之后又说过别的（推送、开场、点按钮办的事）：他这句回的是那些，不是那个问题
+                last = convs.last_hers(said_id)
+                if choice != "revise" and not (last and last.get("needs_confirm")):
+                    choice = "other"
                 self._drop_pending(cid)
                 if choice == "approve":
                     tools.extend(a["name"] for a in waiting if a.get("name") and a["name"] not in tools)
@@ -515,6 +531,9 @@ class Friday:
             if event.type == "raw_response_event":
                 if isinstance(event.data, ResponseTextDeltaEvent) and event.data.delta:
                     yield {"type": "delta", "text": event.data.delta}
+                elif getattr(event.data, "type", None) == RESTART:
+                    # Claude 说到一半出故障、换备用的重说：页面把那半句收起来（和她去查东西时一样）
+                    yield {"type": "tool", "name": ""}
             elif event.type == "run_item_stream_event" and event.name == "tool_called":
                 raw = getattr(event.item, "raw_item", None)
                 name = _get(raw, "name")

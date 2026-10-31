@@ -182,5 +182,20 @@ class Api(unittest.TestCase):
         self.assertIn("showNotification", res.text)
 
 
+class PushesDontReviveOldTalk(unittest.TestCase):
+    def test_carry_over_ignores_a_segment_only_a_push_touched(self) -> None:
+        import time as clock
+
+        convs = Conversations(Path(tempfile.mkdtemp()) / "thread.db")
+        self.addCleanup(convs.close)
+        with patch("src.conversation.time.time", return_value=clock.time() - 5 * 24 * 60 * 60):
+            old = convs.create()
+            convs.add_message(old, "user", "五天前的话")
+        with patch.object(nudges.conversation, "store", return_value=convs):
+            nudges._into_thread({"kind": "brief", "body": "早。今天就一件事。", "items": []})
+        self.assertEqual(convs.carry_over(convs.create()), [])
+        self.assertEqual(convs.thread()[-1]["content"], "早。今天就一件事。")
+
+
 if __name__ == "__main__":
     unittest.main()
