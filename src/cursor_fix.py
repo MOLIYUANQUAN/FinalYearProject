@@ -475,11 +475,6 @@ def check_status() -> dict[str, Any]:
     }
 
 
-def run_fix(friction_id: str) -> dict[str, Any]:
-    """兼容旧调用：改为异步启动。"""
-    return start_fix(friction_id)
-
-
 def acknowledge_delivered() -> None:
     """结果已经告诉用户后，清掉 done 状态，避免每轮重复念。pending_ship 仍保留。"""
     with _lock:
