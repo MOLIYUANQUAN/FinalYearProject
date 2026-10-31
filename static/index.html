@@ -241,7 +241,7 @@
     }
     .msg { position: relative; }
     .msg.user { background: var(--mine); color: var(--on-mine); }
-    /* 按住时边说边出的那句：还没发，淡一点；上滑到取消就更淡 */
+    /* 按住时边说边出的预览：还没定，淡一点（整段转写回来才变实）；上滑到取消就更淡 */
     .msg.user.live { opacity: .75; }
     .msg.user.cancel { opacity: .3; }
     .msg.bot { background: var(--hers); color: var(--ink); }
@@ -2439,10 +2439,8 @@
       return "";
     }
 
-    // ---- 边说边出字：按住时把麦克风的声音转成 24kHz、16 位的小块，经服务器送去实时转写，字回来就填进他的气泡 ----
-    // 录音照录：这边有任何问题（连不上、松手后没等到整句），松手就退回老办法，把录音传上去再转
-    const LIVE_WAIT_MS = 4500;
-    const LIVE_TRUST_MS = 30 * 1000; // 说得很长的那段，以录音转写为准
+    // ---- 边说边出字（预览）：按住时把麦克风的声音转成 24kHz、16 位的小块，经服务器送去实时转写，字回来就填进他的气泡 ----
+    // 发出去的那句不用这些字：松手后整段录音交给最准的整段转写，回来的那句换掉预览
     const PCM_WORKLET = `
       class Pcm24k extends AudioWorkletProcessor {
         constructor() {
@@ -2451,13 +2449,6 @@
           this.t = 0;
           this.prev = 0;
           this.buf = new Int16Array(2400);
-          this.n = 0;
-          this.port.onmessage = () => { this.send(); this.port.postMessage("flushed"); };
-        }
-        send() {
-          if (!this.n) return;
-          const out = this.buf.slice(0, this.n);
-          this.port.postMessage(out.buffer, [out.buffer]);
           this.n = 0;
         }
         process(inputs) {
@@ -2469,7 +2460,12 @@
             const b = i < 0 ? x[0] : x[i + 1];
             const s = Math.max(-1, Math.min(1, a + (b - a) * (this.t - i)));
             this.buf[this.n++] = s < 0 ? s * 0x8000 : s * 0x7fff;
-            if (this.n === this.buf.length) this.send();
+            if (this.n === this.buf.length) {
+              const out = this.buf;
+              this.port.postMessage(out.buffer, [out.buffer]);
+              this.buf = new Int16Array(2400);
+              this.n = 0;
+            }
             this.t += this.step;
           }
           this.t -= x.length;
@@ -2495,79 +2491,55 @@
       const ready = micSource && loadLive();
       if (!ready) return null;
       const ctx = audioContext();
-      const live = { text: "", queue: [], node: null, over: false, ending: false };
-      live.final = new Promise((resolve) => (live.settle = resolve));
+      const live = { text: "", queue: [], nodes: [], over: false };
       const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/api/voice/live");
       ws.binaryType = "arraybuffer";
       live.ws = ws;
       ws.onopen = () => {
         live.queue.forEach((chunk) => ws.send(chunk));
         live.queue = [];
-        if (live.ending) ws.send(JSON.stringify({ type: "end" }));
       };
       ws.onmessage = (ev) => {
         let m = {};
         try { m = JSON.parse(ev.data); } catch (e) {}
-        if (m.type === "delta" && m.text) {
+        if (m.type === "delta" && m.text && !live.over) {
           live.text += m.text;
-          if (!live.over) onText(live.text);
-        } else if (m.type === "done") live.settle(m.text || null);
-        else if (m.type === "error") live.settle(null);
+          onText(live.text);
+        }
       };
-      ws.onerror = ws.onclose = () => live.settle(null);
       ready.then(() => {
         if (live.over) return;
+        // 降到 24kHz 之前先滤掉 10kHz 以上：不然高频折回来变成杂音，听写更不准
+        const filters = [0, 1].map(() => {
+          const f = ctx.createBiquadFilter();
+          f.type = "lowpass";
+          f.frequency.value = 10000;
+          return f;
+        });
         const node = new AudioWorkletNode(ctx, "pcm24k");
         node.port.onmessage = (ev) => {
-          if (ev.data === "flushed") return live.flushed && live.flushed();
           if (ws.readyState === WebSocket.OPEN) ws.send(ev.data);
           else if (ws.readyState === WebSocket.CONNECTING) live.queue.push(ev.data);
         };
-        micSource.connect(node);
+        micSource.connect(filters[0]);
+        filters[0].connect(filters[1]);
+        filters[1].connect(node);
         node.connect(ctx.destination); // 不出声，只是让它跑起来
-        live.node = node;
-      }).catch(() => live.settle(null));
+        live.nodes = [...filters, node];
+      }).catch(() => {});
       return live;
     }
 
-    function stopLiveNode(live) {
-      if (!live.node) return;
-      try { micSource && micSource.disconnect(live.node); } catch (e) {}
-      try { live.node.disconnect(); } catch (e) {}
-      live.node = null;
-    }
-
-    // 松手：剩下那一点声音也发出去，请它收尾；拿到整句就是这句，没拿到就是 null
-    function finishLive(live) {
-      if (!live) return Promise.resolve(null);
-      const sendEnd = () => {
-        if (live.ending) return;
-        live.ending = true;
-        stopLiveNode(live);
-        if (live.ws.readyState === WebSocket.OPEN) live.ws.send(JSON.stringify({ type: "end" }));
-      };
-      if (live.node) {
-        live.flushed = sendEnd;
-        live.node.port.postMessage("flush");
-        setTimeout(sendEnd, 300);
-      } else sendEnd();
-      const late = new Promise((resolve) => setTimeout(() => resolve(null), LIVE_WAIT_MS));
-      return Promise.race([live.final, late]).then((text) => {
-        live.over = true;
-        try { live.ws.close(); } catch (e) {}
-        return text;
-      });
-    }
-
-    function cancelLive(live) {
+    // 松手、取消、太短：都一样，断开就好（预览不用收尾）
+    function stopLive(live) {
       if (!live) return;
       live.over = true;
-      stopLiveNode(live);
-      try {
-        if (live.ws.readyState === WebSocket.OPEN) live.ws.send(JSON.stringify({ type: "cancel" }));
-        live.ws.close();
-      } catch (e) {}
-      live.settle(null);
+      if (live.nodes.length) {
+        try { micSource && micSource.disconnect(live.nodes[0]); } catch (e) {}
+        live.nodes.forEach((n) => { try { n.disconnect(); } catch (e) {} });
+        live.nodes = [];
+      }
+      try { live.ws.close(); } catch (e) {}
     }
 
     // ---- 说话：像微信——点左边切到「按住 说话」，按住就录、松手就发、上滑取消 ----
@@ -2723,20 +2695,16 @@
       showHolding();
       const recorder = mediaRecorder;
       mediaRecorder = null;
-      const live = done && done.live;
+      stopLive(done && done.live);
       if (!recorder || recorder.state !== "recording") {
-        cancelLive(live);
         dropLiveBubble(done);
         settleOrb();
         return;
       }
       const mime = recorder.mimeType || "audio/webm";
-      const held = done ? Date.now() - done.at : 0;
-      const tooShort = !done || held < MIN_HOLD_MS;
+      const tooShort = !done || Date.now() - done.at < MIN_HOLD_MS;
       const cancelled = !!(done && done.cancel);
-      if (cancelled || tooShort) cancelLive(live);
-      const line = cancelled || tooShort ? Promise.resolve(null) : finishLive(live);
-      recorder.onstop = async () => {
+      recorder.onstop = () => {
         const blob = new Blob(recordChunks, { type: mime });
         recordChunks = [];
         if (cancelled || tooShort || !blob.size) {
@@ -2745,9 +2713,7 @@
           if (!cancelled && !(done && done.interrupting)) flashHint("说话时间太短");
           return;
         }
-        if (done.heard) done.heard.classList.remove("live");
-        const text = await line;
-        sendVoice(blob, mime, { mine: done.mine, heard: done.heard, text: held <= LIVE_TRUST_MS ? text : null });
+        sendVoice(blob, mime, { mine: done.mine, heard: done.heard });
       };
       try {
         recorder.stop();
@@ -2756,8 +2722,7 @@
       }
     }
 
-    // 松手气泡就出来；录音一趟传上去：转写好了先填进气泡（heard），她紧接着就回，不再多跑一趟
-    // 边说边出字已经拿到整句（said.text）：只发这句，不传录音
+    // 松手气泡就出来（按住时已经有预览的，就是那个气泡）；录音一趟传上去：转写好了换进气泡（heard），她紧接着就回
     async function sendVoice(blob, mime, said = {}) {
       const mine = said.mine || group("user");
       const heard = said.heard || bubble(mine, null);
@@ -2772,6 +2737,7 @@
       let speaker = null;
       view.onHeard = (ev) => {
         heard.textContent = ev.text;
+        heard.classList.remove("live");
         const said = { role: "user", content: ev.text, at: Date.now() };
         session.messages.push(said);
         Object.assign(reply, { mine: heard, said });
@@ -2787,8 +2753,7 @@
       try {
         const formData = new FormData();
         const ext = mime.includes("mp4") ? "m4a" : mime.includes("ogg") ? "ogg" : "webm";
-        if (said.text) formData.append("text", said.text);
-        else formData.append("file", blob, "speech." + ext);
+        formData.append("file", blob, "speech." + ext);
         if (session && session.id) formData.append("conversation_id", session.id);
         const result = await stream("/api/voice/ask", formData, view);
         finish(reply, result);

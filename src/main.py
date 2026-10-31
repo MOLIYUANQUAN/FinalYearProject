@@ -423,26 +423,15 @@ async def voice_live(page: WebSocket) -> None:
 
 
 @app.post("/api/voice/ask")
-async def voice_ask(
-    file: UploadFile | None = File(None),
-    conversation_id: str | None = Form(None),
-    text: str | None = Form(None, max_length=4000),
-) -> StreamingResponse:
-    """按住说话松手：一趟里转写完就接着回答。先回 {"type": "heard"} 让气泡立刻填上他说的话。
-
-    边说边出字已经拿到整句（text）就不再转写录音。
-    """
+async def voice_ask(file: UploadFile = File(...), conversation_id: str | None = Form(None)) -> StreamingResponse:
+    """按住说话松手：整段录音转写完就接着回答。先回 {"type": "heard"} 让气泡填上他说的话（换掉边说边出的预览）。"""
     _require_key()
-    text = (text or "").strip()
-    if not text:
-        if file is None:
-            raise HTTPException(status_code=400, detail="没听清，再说一遍？")
-        data = await file.read()
-        try:
-            text = await asyncio.to_thread(voice.transcribe, data, file.filename or "audio.webm")
-        except Exception as exc:  # noqa: BLE001
-            reason = str(exc).splitlines()[0]
-            raise HTTPException(status_code=502, detail=f"没听清：{reason}") from exc
+    data = await file.read()
+    try:
+        text = await asyncio.to_thread(voice.transcribe, data, file.filename or "audio.webm")
+    except Exception as exc:  # noqa: BLE001
+        reason = str(exc).splitlines()[0]
+        raise HTTPException(status_code=502, detail=f"没听清：{reason}") from exc
     if not text:
         raise HTTPException(status_code=400, detail="没听清，再说一遍？")
     cid = friday.resolve_conversation(conversation_id)

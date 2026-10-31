@@ -1,4 +1,4 @@
-"""按住说话：一趟上传，转写完立刻接着回答；默认文字回，他说「念给我听」才出声；转写换更快的模型，用不了就退回 whisper。"""
+"""按住说话：一趟上传，转写完立刻接着回答；默认文字回，他说「念给我听」才出声；整段转写用最准的模型，用不了依次退回。"""
 
 from __future__ import annotations
 
@@ -46,16 +46,28 @@ class VoiceAskTests(SandboxTestCase):
 
 
 class TranscribeTests(unittest.TestCase):
-    def test_faster_model_with_his_vocabulary_then_whisper_as_fallback(self) -> None:
+    def test_the_most_accurate_model_with_his_words_then_older_ones_as_fallback(self) -> None:
         client = MagicMock()
         missing = openai.NotFoundError("no model", response=MagicMock(status_code=404), body=None)
-        client.audio.transcriptions.create.side_effect = [missing, MagicMock(text=" 在吗 ")]
+        refused = openai.BadRequestError("bad", response=MagicMock(status_code=400), body=None)
+        client.audio.transcriptions.create.side_effect = [missing, refused, MagicMock(text=" 在吗 ")]
         with patch.object(voice, "_client", return_value=client):
             self.assertEqual(voice.transcribe(b"audio", "speech.webm"), "在吗")
-        first, second = client.audio.transcriptions.create.call_args_list
-        self.assertEqual(first.kwargs["model"], "gpt-4o-mini-transcribe")
-        self.assertIn("Friday", first.kwargs["prompt"])
-        self.assertEqual(second.kwargs["model"], "whisper-1")
+        first, second, third = client.audio.transcriptions.create.call_args_list
+        self.assertEqual(first.kwargs["model"], "gpt-transcribe")
+        self.assertIn("Friday", first.kwargs["extra_body"]["keywords"])
+        self.assertEqual(first.kwargs["extra_body"]["languages"], ["zh", "en"])
+        self.assertNotIn("prompt", first.kwargs)
+        self.assertEqual(second.kwargs["model"], "gpt-4o-transcribe")
+        self.assertIn("Friday", second.kwargs["prompt"])
+        self.assertEqual(third.kwargs["model"], "whisper-1")
+
+    def test_when_every_model_refuses_the_error_reaches_him(self) -> None:
+        client = MagicMock()
+        missing = openai.NotFoundError("no model", response=MagicMock(status_code=404), body=None)
+        client.audio.transcriptions.create.side_effect = [missing, missing, missing]
+        with patch.object(voice, "_client", return_value=client), self.assertRaises(openai.NotFoundError):
+            voice.transcribe(b"audio", "speech.webm")
 
 
 if __name__ == "__main__":

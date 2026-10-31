@@ -13,7 +13,9 @@ from src.config import load_env, require_openai_api_key
 
 # Whisper 单文件上限 25MB；网页侧再卡短一点
 MAX_AUDIO_BYTES = 12 * 1024 * 1024
-TRANSCRIBE_MODEL = os.getenv("FRIDAY_TRANSCRIBE_MODEL", "gpt-4o-mini-transcribe")
+# 整段录音转写：用 OpenAI 最准的那个；用不了依次退回
+TRANSCRIBE_MODEL = os.getenv("FRIDAY_TRANSCRIBE_MODEL", "gpt-transcribe")
+TRANSCRIBE_FALLBACKS = ("gpt-4o-transcribe", "whisper-1")
 # 播报别念太长：长回复仍显示全文，只念前面
 MAX_SPEAK_CHARS = 800
 
@@ -57,16 +59,21 @@ def transcribe(audio: bytes, filename: str = "audio.webm") -> str:
         name = name.replace("\\", "/").rsplit("/", 1)[-1]
     import openai
 
-    # 比 whisper-1 快、也更准；把他常说的专有名词告诉它，「Kilburn」「COMP34111」就不会听成别的
-    for model in (TRANSCRIBE_MODEL, "whisper-1"):
+    # 把他常说的专有名词告诉它，「Kilburn」「COMP34111」就不会听成别的；中英夹着说也认
+    models = [TRANSCRIBE_MODEL, *(m for m in TRANSCRIBE_FALLBACKS if m != TRANSCRIBE_MODEL)]
+    for i, model in enumerate(models):
         bio = io.BytesIO(audio)
         bio.name = name
+        if model == "gpt-transcribe":
+            hints: dict = {"extra_body": {"keywords": vocabulary(), "languages": ["zh", "en"]}}
+        else:
+            hints = {"prompt": _vocabulary()}
         try:
-            result = _client().audio.transcriptions.create(model=model, file=bio, prompt=_vocabulary())
+            result = _client().audio.transcriptions.create(model=model, file=bio, **hints)
         except (openai.NotFoundError, openai.BadRequestError) as exc:
-            if model == "whisper-1":
+            if i == len(models) - 1:
                 raise
-            print(f"[WARN] {model} unavailable ({exc}); falling back to whisper-1")
+            print(f"[WARN] {model} unavailable ({exc}); falling back to {models[i + 1]}")
             continue
         return (result.text or "").strip()
     return ""
