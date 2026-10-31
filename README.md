@@ -120,7 +120,7 @@ Shipping still goes through the test gate: a change whose tests fail is not merg
 One mic button, at the right of the input bar when it is empty.
 
 - **Tap it (like Claude's dictation):** the bar becomes ✕ · a live waveform and timer · ✓. Speak as long as you like (up to five minutes). Tap ✓ and the whole recording is transcribed by OpenAI `gpt-transcribe` (with your usual names as keywords, Chinese and English) and put into the input box, after anything already typed. Look, fix a word if needed, tap ↑. ✕ throws it away.
-- **Hold it (like WeChat):** speak, let go and it is sent straight away; slide up to cancel. A press that is too short says so.
+- **Hold it (like WeChat):** the page dims and a bubble moves with your voice. Let go where you are and it is sent straight away; slide to ✕ on the left to cancel; slide to 文 on the right and it is turned into words in the input box instead, to read and send like a dictation. A press that is too short says so.
 - Recording starts the moment the finger touches the button, so the first word is not lost. The mic opens once and stays open while Friday is in front, so the iPhone does not keep asking for permission; it closes when Friday goes to the background.
 - She answers in text, as if you had typed. She reads aloud only when you ask ("念给我听", "听听你的声音"). Touching the mic while she is speaking stops her.
 - Her page shows which model did the last transcription under 语音.
