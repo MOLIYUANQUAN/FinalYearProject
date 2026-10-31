@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1255" viewBox="0 0 1200 1255">
+<title>Personal AI Assistant — Request flow for Demo 3 (Baseline v1)</title>
+<defs>
+  <marker id="solid" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#3f3b35"/>
+  </marker>
+  <marker id="open" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10" fill="none" stroke="#6b665c" stroke-width="1.6"/>
+  </marker>
+  <style>
+    .sans { font-family: Inter, "Segoe UI", Helvetica, Arial, "PingFang SC", "Microsoft YaHei", "WenQuanYi Zen Hei", sans-serif; }
+    .mono { font-family: "JetBrains Mono", Consolas, Menlo, monospace; }
+    .title { font-size: 28px; font-weight: 700; fill: #1c1a16; }
+    .subtitle { font-size: 16px; fill: #5c574e; }
+    .hd { font-size: 17px; font-weight: 700; fill: #1c1a16; }
+    .hsub { font-size: 13px; fill: #6b665c; }
+    .lbl { font-size: 13.5px; fill: #2e2b26; paint-order: stroke; stroke: #ffffff; stroke-width: 5px; stroke-linejoin: round; }
+    .lblret { font-size: 13.5px; fill: #5c574e; paint-order: stroke; stroke: #ffffff; stroke-width: 5px; stroke-linejoin: round; }
+    .sec { font-size: 13px; font-weight: 700; fill: #5a3e8e; letter-spacing: 0.04em; }
+    .note { font-size: 14px; fill: #3a362f; }
+    .foot { font-size: 13px; fill: #6b665c; }
+    .tab { font-size: 14px; font-weight: 700; fill: #5a3e8e; }
+    .guard { font-size: 14px; fill: #5a3e8e; }
+  </style>
+</defs>
+<rect x="0" y="0" width="1200" height="1255" fill="#ffffff"/>
+<text class="sans title" x="50" y="58">Request Flow — Demo 3: “Prepare tomorrow’s FYP meeting”</text>
+<text class="sans subtitle" x="50" y="86">User types “帮我准备明天的 FYP meeting。” · typical run (the model chooses the tools) · today is fixed at 2026-10-12</text>
+<line x1="115" y1="168" x2="115" y2="1199" stroke="#b9b5ab" stroke-width="1.4" stroke-dasharray="5 5"/>
+<line x1="305" y1="168" x2="305" y2="1199" stroke="#b9b5ab" stroke-width="1.4" stroke-dasharray="5 5"/>
+<line x1="495" y1="168" x2="495" y2="1199" stroke="#b9b5ab" stroke-width="1.4" stroke-dasharray="5 5"/>
+<line x1="695" y1="168" x2="695" y2="1199" stroke="#b9b5ab" stroke-width="1.4" stroke-dasharray="5 5"/>
+<line x1="895" y1="168" x2="895" y2="1199" stroke="#b9b5ab" stroke-width="1.4" stroke-dasharray="5 5"/>
+<line x1="1085" y1="168" x2="1085" y2="1199" stroke="#b9b5ab" stroke-width="1.4" stroke-dasharray="5 5"/>
+<rect x="35" y="112" width="160" height="56" rx="9" fill="#eef4fb" stroke="#a9c3e3" stroke-width="1.4"/>
+<text class="sans hd" x="115" y="136" text-anchor="middle">Web chat UI</text>
+<text class="mono hsub" x="115" y="156" text-anchor="middle">static/index.html</text>
+<rect x="225" y="112" width="160" height="56" rx="9" fill="#ecf5f1" stroke="#9fcbbb" stroke-width="1.4"/>
+<text class="sans hd" x="305" y="136" text-anchor="middle">FastAPI</text>
+<text class="mono hsub" x="305" y="156" text-anchor="middle">POST /api/chat</text>
+<rect x="415" y="112" width="160" height="56" rx="9" fill="#f3f0fa" stroke="#b7a6dc" stroke-width="1.4"/>
+<text class="sans hd" x="495" y="136" text-anchor="middle">Agent + Runner</text>
+<text class="mono hsub" x="495" y="156" text-anchor="middle">src/agent.py</text>
+<rect x="615" y="112" width="160" height="56" rx="9" fill="#ffffff" stroke="#8f8f8f" stroke-width="1.4" stroke-dasharray="6 4"/>
+<text class="sans hd" x="695" y="136" text-anchor="middle">OpenAI API</text>
+<text class="mono hsub" x="695" y="156" text-anchor="middle">gpt-4.1-mini</text>
+<rect x="815" y="112" width="160" height="56" rx="9" fill="#fdf5e8" stroke="#e3c48f" stroke-width="1.4"/>
+<text class="sans hd" x="895" y="136" text-anchor="middle">Tools</text>
+<text class="mono hsub" x="895" y="156" text-anchor="middle">src/tools/</text>
+<rect x="1005" y="112" width="160" height="56" rx="9" fill="#f3f3f1" stroke="#c9c9c2" stroke-width="1.4"/>
+<text class="sans hd" x="1085" y="136" text-anchor="middle">Local data</text>
+<text class="mono hsub" x="1085" y="156" text-anchor="middle">data/</text>
+<rect x="405" y="305" width="765" height="724" rx="6" fill="#faf8fe" fill-opacity="0.55" stroke="#9d88cc" stroke-width="1.4"/>
+<path d="M405,331 L463,331 L475,319 L475,305 " fill="none" stroke="#9d88cc" stroke-width="1.4"/>
+<text class="sans tab" x="417" y="324">loop</text>
+<text class="sans guard" x="489" y="324">[ until the model gives a final answer · max 8 turns ]</text>
+<line x1="115" y1="210" x2="303" y2="210" stroke="#3f3b35" stroke-width="1.7" marker-end="url(#solid)"/>
+<text class="mono lbl" x="210.0" y="203" text-anchor="middle">POST /api/chat</text>
+<line x1="305" y1="244" x2="493" y2="244" stroke="#3f3b35" stroke-width="1.7" marker-end="url(#solid)"/>
+<text class="mono lbl" x="400.0" y="237" text-anchor="middle">run_assistant(message)</text>
+<path d="M315.0,264 h348 l12,12 v19 h-360 z" fill="#fffbe6" stroke="#d9c98a"/>
+<path d="M663.0,264 v12 h12" fill="none" stroke="#d9c98a"/>
+<text class="sans note" x="327.0" y="285">builds the agent, then Runner.run(max_turns=8)</text>
+<text class="sans sec" x="417" y="348">TURN 1 · CHECK THE CALENDAR</text>
+<line x1="495" y1="379" x2="693" y2="379" stroke="#3f3b35" stroke-width="1.7" marker-end="url(#solid)"/>
+<text class="sans lbl" x="595.0" y="372" text-anchor="middle">instructions + message + tool schemas</text>
+<line x1="695" y1="413" x2="497" y2="413" stroke="#6b665c" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#open)"/>
+<text class="mono lblret" x="595.0" y="406" text-anchor="middle">call get_calendar_events</text>
+<line x1="495" y1="447" x2="893" y2="447" stroke="#3f3b35" stroke-width="1.7" marker-end="url(#solid)"/>
+<text class="mono lbl" x="695.0" y="440" text-anchor="middle">get_calendar_events(date="2026-10-13")</text>
+<line x1="895" y1="481" x2="1083" y2="481" stroke="#3f3b35" stroke-width="1.7" marker-end="url(#solid)"/>
+<text class="sans lbl" x="990.0" y="474" text-anchor="middle">read calendar.json</text>
+<line x1="895" y1="515" x2="497" y2="515" stroke="#6b665c" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#open)"/>
+<text class="sans lblret" x="695.0" y="508" text-anchor="middle">FYP meeting · 13 Oct 14:00–15:00 · Kilburn Building</text>
+<line x1="405" y1="531" x2="1170" y2="531" stroke="#d5cbea" stroke-dasharray="4 4"/>
+<text class="sans sec" x="417" y="548">TURN 2 · FIND THE PROPOSAL</text>
+<line x1="495" y1="579" x2="693" y2="579" stroke="#3f3b35" stroke-width="1.7" marker-end="url(#solid)"/>
+<text class="sans lbl" x="595.0" y="572" text-anchor="middle">tool result</text>
+<line x1="695" y1="613" x2="497" y2="613" stroke="#6b665c" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#open)"/>
+<text class="mono lblret" x="595.0" y="606" text-anchor="middle">call search_files</text>
+<line x1="495" y1="647" x2="893" y2="647" stroke="#3f3b35" stroke-width="1.7" marker-end="url(#solid)"/>
+<text class="mono lbl" x="695.0" y="640" text-anchor="middle">search_files("FYP proposal")</text>
+<line x1="895" y1="681" x2="1083" y2="681" stroke="#3f3b35" stroke-width="1.7" marker-end="url(#solid)"/>
+<text class="sans lbl" x="990.0" y="674" text-anchor="middle">scan data/notes/</text>
+<line x1="895" y1="715" x2="497" y2="715" stroke="#6b665c" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#open)"/>
+<text class="sans lblret" x="695.0" y="708" text-anchor="middle">match: data/notes/fyp-proposal.md</text>
+<line x1="405" y1="731" x2="1170" y2="731" stroke="#d5cbea" stroke-dasharray="4 4"/>
+<text class="sans sec" x="417" y="748">TURN 3 · READ THE PROPOSAL</text>
+<line x1="495" y1="779" x2="693" y2="779" stroke="#3f3b35" stroke-width="1.7" marker-end="url(#solid)"/>
+<text class="sans lbl" x="595.0" y="772" text-anchor="middle">tool result</text>
+<line x1="695" y1="813" x2="497" y2="813" stroke="#6b665c" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#open)"/>
+<text class="mono lblret" x="595.0" y="806" text-anchor="middle">call read_file</text>
+<line x1="495" y1="847" x2="893" y2="847" stroke="#3f3b35" stroke-width="1.7" marker-end="url(#solid)"/>
+<text class="mono lbl" x="695.0" y="840" text-anchor="middle">read_file("data/notes/fyp-proposal.md")</text>
+<line x1="895" y1="881" x2="1083" y2="881" stroke="#3f3b35" stroke-width="1.7" marker-end="url(#solid)"/>
+<text class="sans lbl" x="990.0" y="874" text-anchor="middle">read fyp-proposal.md</text>
+<line x1="895" y1="915" x2="497" y2="915" stroke="#6b665c" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#open)"/>
+<text class="sans lblret" x="695.0" y="908" text-anchor="middle">full proposal text</text>
+<line x1="405" y1="931" x2="1170" y2="931" stroke="#d5cbea" stroke-dasharray="4 4"/>
+<text class="sans sec" x="417" y="948">TURN 4 · WRITE THE ANSWER</text>
+<line x1="495" y1="979" x2="693" y2="979" stroke="#3f3b35" stroke-width="1.7" marker-end="url(#solid)"/>
+<text class="sans lbl" x="595.0" y="972" text-anchor="middle">tool result</text>
+<line x1="695" y1="1013" x2="497" y2="1013" stroke="#6b665c" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#open)"/>
+<text class="sans lblret" x="595.0" y="1006" text-anchor="middle">final answer: meeting brief</text>
+<line x1="495" y1="1069" x2="307" y2="1069" stroke="#6b665c" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#open)"/>
+<text class="mono lblret" x="400.0" y="1062" text-anchor="middle">{reply, tools_called}</text>
+<line x1="305" y1="1103" x2="117" y2="1103" stroke="#6b665c" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#open)"/>
+<text class="sans lblret" x="210.0" y="1096" text-anchor="middle">200 OK · JSON</text>
+<path d="M50.0,1123 h408 l12,12 v38 h-420 z" fill="#fffbe6" stroke="#d9c98a"/>
+<path d="M458.0,1123 v12 h12" fill="none" stroke="#d9c98a"/>
+<text class="sans note" x="62.0" y="1144">shows the brief + tool trace:</text>
+<text class="mono note" x="62.0" y="1163">get_calendar_events → search_files → read_file</text>
+<line x1="50" y1="1228" x2="92" y2="1228" stroke="#3f3b35" stroke-width="1.7" marker-end="url(#solid)"/>
+<text class="sans foot" x="100" y="1233">call</text>
+<line x1="150" y1="1228" x2="192" y2="1228" stroke="#6b665c" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#open)"/>
+<text class="sans foot" x="200" y="1233">return</text>
+<text class="sans foot" x="270" y="1233">· Each turn = one model call. Expected path from the README demo script; real runs may differ slightly.</text>
+</svg>

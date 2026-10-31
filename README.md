@@ -102,12 +102,21 @@ python scripts/demo_cli.py
 
 页面回复下方会显示本轮「工具调用」序列，便于对照验收。
 
+## 架构图
+
+- [`docs/architecture/architecture.png`](docs/architecture/architecture.png)：系统整体架构（Baseline v1）
+- [`docs/architecture/request-flow.png`](docs/architecture/request-flow.png)：Demo 3 的请求时序（日历 → 文件搜索 → 读文件 → meeting brief）
+
+图注、组件说明和放进 Google Doc 的方法见 [`docs/architecture/README.md`](docs/architecture/README.md)。
+
 ## 仓库结构
 
 ```
 ├── README.md
 ├── requirements.txt
 ├── .env.example
+├── docs/
+│   └── architecture/    # 架构图（PNG + SVG 源文件）
 ├── src/
 │   ├── main.py          # FastAPI 入口
 │   ├── agent.py         # Personal Assistant + 工具绑定
