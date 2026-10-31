@@ -82,6 +82,45 @@ def transcribe(audio: bytes, filename: str = "audio.webm") -> str:
     return ""
 
 
+TIDY_MODEL = os.getenv("FRIDAY_TIDY_MODEL", "claude-haiku-5-5")
+TIDY_FALLBACK = "gpt-4.1-mini"
+TIDY_TIMEOUT_S = 4.0
+TIDY_PROMPT = """下面是他对着手机说的一句话的语音转写，可能有同音字、人名、课程名、地点听错，可能夹着「嗯」「啊」「那个」「就是」这类没意义的口头填充。
+
+按上下文只改明显听错的字词、补上标点、去掉口头填充。不要改写，不要润色，不要增删意思，不要回答这句话。看不出错就原样输出。
+只输出改好的这一句，不要引号，不要解释。
+
+最近的对话：
+{context}
+
+他常说的词：{words}
+
+转写：{text}"""
+
+
+def tidy(text: str, context: str = "") -> str:
+    """转写出来的那句按上下文改错字（「大会」→「它会」）、去口头禅。小模型做，不到一秒；出任何问题就原样返回。"""
+    if not text or os.getenv("FRIDAY_TIDY_SPEECH", "1").strip().lower() in ("0", "false", "no", "off"):
+        return text
+    prompt = TIDY_PROMPT.format(context=context or "（没有）", words="、".join(vocabulary()), text=text)
+    try:
+        if (os.getenv("ANTHROPIC_API_KEY") or "").strip():
+            from src import claude
+
+            said = claude.ask(TIDY_MODEL, prompt, timeout=TIDY_TIMEOUT_S)
+        else:
+            said = OpenAI(api_key=require_openai_api_key(), timeout=TIDY_TIMEOUT_S, max_retries=0).responses.create(
+                model=TIDY_FALLBACK, input=prompt).output_text
+    except Exception as exc:  # noqa: BLE001
+        print(f"[WARN] tidy speech: {exc}")
+        return text
+    said = (said or "").strip().strip("「」“”\"'").strip()
+    # 它要是答起话来、或者删得太多，就不用它的
+    if not said or "\n" in said or len(said) > len(text) * 1.5 + 12 or len(said) < len(text) * 0.5:
+        return text
+    return said
+
+
 def vocabulary() -> list[str]:
     """他常说的专有名词：Friday、他的名字、课程代码、常去的楼——从档案里取，没有就给几个固定的。"""
     from src.context import his_name, module_names

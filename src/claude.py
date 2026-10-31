@@ -498,10 +498,11 @@ class ClaudeModel(Model):
         )
 
 
-def ask(model: str, prompt: str) -> str:
-    """一问一答的小事（给日历标题起短名）：只要文字，被拦下就当没答。"""
+def ask(model: str, prompt: str, timeout: float | None = None) -> str:
+    """一问一答的小事（给日历标题起短名、改转写的错字）：只要文字，被拦下就当没答。"""
     extra: dict[str, Any] = {"betas": [FALLBACK_BETA], "fallbacks": "default"} if model in WITH_FALLBACKS else {}
-    message = anthropic.Anthropic().beta.messages.create(
+    client = anthropic.Anthropic(timeout=timeout, max_retries=0) if timeout else anthropic.Anthropic()
+    message = client.beta.messages.create(
         model=model, max_tokens=16000, output_config={"effort": "low"},
         messages=[{"role": "user", "content": prompt}], **extra,
     )

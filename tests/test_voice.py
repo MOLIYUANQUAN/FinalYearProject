@@ -45,23 +45,43 @@ class VoiceAskTests(SandboxTestCase):
         self.assertEqual(self.ask("").status_code, 400)
 
 
-class DictationTests(SandboxTestCase):
-    """点一下麦克风听写、说完点 ✓：只转成字给页面放进输入框，不问她、不进对话。"""
+class TidyTests(SandboxTestCase):
+    """转写完按上下文改错字：用最近几句和他常说的词；小模型乱来（答话、删光）就用原样。"""
 
-    def test_the_words_come_back_and_nothing_is_said_to_her(self) -> None:
-        friday, model = self.friday([])
-        with patch.object(main, "friday", friday), patch.object(voice, "transcribe", return_value="明天下午三点见导师"):
-            res = TestClient(main.app).post("/api/voice/transcribe", files={"file": ("speech.m4a", b"audio", "audio/mp4")})
-        self.assertEqual(res.json(), {"text": "明天下午三点见导师"})
-        self.assertEqual(model.inputs, [])
-        self.assertEqual(friday.conversations.thread(), [])
+    def tidy(self, said: str, text: str = "在这里看到大会直接出字吗", context: str = "") -> tuple[str, str]:
+        with patch.dict("os.environ", {"FRIDAY_TIDY_SPEECH": "1", "ANTHROPIC_API_KEY": "sk-ant-test"}), \
+                patch("src.claude.ask", return_value=said) as asked:
+            out = voice.tidy(text, context)
+        return out, asked.call_args.args[1] if asked.call_args else ""
 
-    def test_a_failed_transcription_says_so(self) -> None:
-        with patch.object(voice, "transcribe", side_effect=RuntimeError("这段太长了，短一点再说。")):
-            res = TestClient(main.app).post("/api/voice/transcribe", files={"file": ("speech.m4a", b"audio", "audio/mp4")})
-        self.assertEqual(res.status_code, 502)
-        self.assertIn("这段太长了", res.json()["detail"])
+    def test_a_homophone_is_fixed_with_the_conversation_as_context(self) -> None:
+        out, prompt = self.tidy("在这里看到它会直接出字吗？", context="他：会直接出字了吗\n她：会，按住就出")
+        self.assertEqual(out, "在这里看到它会直接出字吗？")
+        self.assertIn("会直接出字了吗", prompt)
+        self.assertIn("Friday", prompt)
+        self.assertIn("在这里看到大会直接出字吗", prompt)
 
+    def test_an_answer_instead_of_a_fix_is_ignored(self) -> None:
+        out, _ = self.tidy("会的！按住麦克风说话，松手之后字就会出来，而且我会马上回答你提出的问题。")
+        self.assertEqual(out, "在这里看到大会直接出字吗")
+        self.assertEqual(self.tidy("好")[0], "在这里看到大会直接出字吗")
+
+    def test_when_the_model_fails_the_words_stay_as_heard(self) -> None:
+        with patch.dict("os.environ", {"FRIDAY_TIDY_SPEECH": "1", "ANTHROPIC_API_KEY": "sk-ant-test"}), \
+                patch("src.claude.ask", side_effect=TimeoutError("slow")):
+            self.assertEqual(voice.tidy("明天三点"), "明天三点")
+
+    def test_the_heard_line_is_the_fixed_one(self) -> None:
+        friday, _ = self.friday([[text("会。")]])
+        with patch.object(main, "friday", friday), patch.object(voice, "transcribe", return_value="大会直接出字吗"), \
+                patch.object(voice, "tidy", return_value="它会直接出字吗？") as tidied:
+            events = sse(TestClient(main.app).post("/api/voice/ask", files={"file": ("speech.m4a", b"audio", "audio/mp4")}))
+        self.assertEqual(events[0]["text"], "它会直接出字吗？")
+        self.assertEqual(tidied.call_args.args[0], "大会直接出字吗")
+        self.assertEqual(friday.conversations.thread()[0]["content"], "它会直接出字吗？")
+
+
+class HerPageTests(SandboxTestCase):
     def test_her_page_says_which_model_transcribed(self) -> None:
         client = MagicMock()
         client.audio.transcriptions.create.return_value = MagicMock(text="在吗")

@@ -32,6 +32,7 @@ from src.context import memory_block, now_block, profile_block
 from src.conversation import FULL, ROLL_AT, Conversations, split_reaction, store
 from src.tools import ALL_TOOLS, TASK_TOOLS
 from src.turn import Turn
+from src.undo import undo_items
 
 VOICE = """你叫 Friday，是 Zeep 的管家，只为他一个人。不是顾问，不是客服，不是通用聊天机器人。
 
@@ -316,6 +317,17 @@ def _turn_from_json(data: Any) -> Turn:
     return Turn(undo=list((data or {}).get("undo") or []))
 
 
+def _is_his(item: Any) -> bool:
+    return _get(item, "role") == "user" and (_get(item, "type") or "message") == "message"
+
+
+def _text_of(item: Any) -> str:
+    content = _get(item, "content")
+    if isinstance(content, str):
+        return content
+    return "".join(str(_get(part, "text") or "") for part in content or [])
+
+
 def _too_long(exc: Exception) -> bool:
     """模型说这段对话装不下了（Claude：prompt is too long；OpenAI：context_length_exceeded）。"""
     text = str(exc).lower()
@@ -405,15 +417,18 @@ class Friday:
 
     async def turn(
         self, cid: str, message: str, *, spoken: bool = False, revision: dict[str, Any] | None = None,
-        images: list[str] | None = None,
+        images: list[str] | None = None, replace: bool = False,
     ) -> AsyncIterator[dict[str, Any]]:
         """他说了一句：存进对话，跑 Friday，事件流给页面，最后把她的回复也存进对话。
 
         revision = {"call_id", "changes"}：他在确认卡片里改了内容再点「发送」。改过的那份就是他确认的版本。
+        replace：他改了自己最后那句（多半是没听准）——那一轮当没说过，按这句重来。
         """
         lock = self._locks.setdefault(cid, asyncio.Lock())
         async with lock:
             convs = self.conversations
+            if replace:
+                await self._take_back(cid)
             await self._carry_over(cid)
             images = [i for i in images or [] if uploads.find(i)][: uploads.MAX_PER_MESSAGE]
             shown = {"images": [{"id": i, "url": uploads.PREFIX + i} for i in images]} if images else {}
@@ -514,6 +529,29 @@ class Friday:
                 "message_id": message_id,
                 "conversation_id": cid,
             }
+
+    async def _take_back(self, cid: str) -> None:
+        """他最后那句和她的回答当没发生：她办掉的事撤回，等他确认的那步作废，页面和给模型的那份都删掉。"""
+        convs = self.conversations
+        last = convs.last_user()
+        if not last or last["conversation_id"] != cid:
+            return
+        for later in (m for m in convs.messages(cid) if m["id"] > last["id"]):
+            if later.get("undo") and not later.get("undone"):
+                try:
+                    undo_items(later["undo"])
+                except Exception as exc:  # noqa: BLE001
+                    print(f"[WARN] take back: could not undo {later['undo']}: {exc}")
+        self._drop_pending(cid)
+        session = convs.session(cid)
+        items = await session.get_items()
+        said = (last.get("content") or "").strip()[:20]
+        his = next((i for i in range(len(items) - 1, -1, -1) if _is_his(items[i])), None)
+        # 只在模型那份的最后一句确实是这句时才删（那一轮要是根本没进去，就别删到更早的话）
+        if his is not None and said in _text_of(items[his]):
+            for _ in range(len(items) - his):
+                await session.pop_item()
+        convs.delete_from(cid, last["id"])
 
     async def _run(
         self,

@@ -22,16 +22,16 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from src import agenda, claude, closed, reminders, todos, usage_log, voice
+from src import agenda, claude, usage_log, voice
 from src.agent import answering_model, friday, run_assistant, verify_model
 from src.conversation import REACTIONS
-from src.calendar_providers import get_calendar_provider
 from src.presence import stream_presence
 from src.access import gate, router as access_router
 from src.push_api import router as push_router, run_scheduler, scheduler_enabled
 from src.state_sync import router as state_router
 from src.about import router as about_router
 from src.uploads import MAX_PER_MESSAGE, router as uploads_router
+from src.undo import undo_items
 from src.workbench import router as workbench_router
 from src.config import (
     STATIC_DIR,
@@ -122,6 +122,7 @@ class ChatRequest(BaseModel):
         description="页面上这段对话的 id；没有或过期了就接上当前对话 / 开新的。历史在服务端，不用传。",
     )
     spoken: bool = Field(False, description="他是开口说的：回答会被念出来")
+    replace_last: bool = Field(False, description="他改了自己最后那句：那一轮当没说过（办的事撤掉），按这句重来")
 
 
 class PresenceRequest(BaseModel):
@@ -339,22 +340,8 @@ class UndoRequest(BaseModel):
 def undo(body: UndoRequest) -> dict:
     """他点了「撤销」：直接撤回刚才那一步，不经过模型。"""
     items = [item.model_dump() for item in body.items]
-    tasks = [item for item in items if item["kind"].startswith("task_")]
-    for item in items:
-        if item["kind"] == "task_completed":
-            closed.remove(f"task:{item['id']}")
-    events = [item for item in items if item["kind"] == "event_created"]
     try:
-        if tasks:
-            todos.undo(tasks)
-        for item in reversed(events):
-            get_calendar_provider().delete_event(item["id"])
-            agenda.forget()
-        for item in reversed(items):
-            if item["kind"] == "reminder_added":
-                reminders.cancel(item["id"])
-            elif item["kind"] == "reminder_cancelled":
-                reminders.restore(item["id"])
+        undo_items(items)
     except Exception as exc:  # noqa: BLE001
         reason = str(exc).splitlines()[0] if isinstance(exc, RuntimeError) else "这次没连上"
         raise HTTPException(status_code=502, detail=f"没撤销成功：{reason}") from exc
@@ -392,8 +379,9 @@ async def chat_revise(body: ReviseRequest) -> StreamingResponse:
 async def chat_stream(body: ChatRequest) -> StreamingResponse:
     _require_key()
     message = _parse_chat(body)
-    cid = friday.resolve_conversation(body.conversation_id)
-    return _sse("chat", friday.turn(cid, message, spoken=body.spoken, images=body.images))
+    last = friday.conversations.last_user() if body.replace_last else None
+    cid = last["conversation_id"] if last else friday.resolve_conversation(body.conversation_id)
+    return _sse("chat", friday.turn(cid, message, spoken=body.spoken, images=body.images, replace=bool(last)))
 
 
 @app.post("/api/chat", response_model=ChatResponse)
@@ -421,22 +409,11 @@ class SpeakBody(BaseModel):
     text: str = Field(..., min_length=1)
 
 
-@app.post("/api/voice/transcribe")
-async def voice_transcribe(file: UploadFile = File(...)) -> dict[str, str]:
-    """点一下麦克风听写、说完点 ✓：整段录音转成字，放进他的输入框（他看一眼再发）。"""
-    _require_key()
-    data = await file.read()
-    try:
-        text = await asyncio.to_thread(voice.transcribe, data, file.filename or "audio.webm")
-    except Exception as exc:  # noqa: BLE001
-        reason = str(exc).splitlines()[0]
-        raise HTTPException(status_code=502, detail=f"没听清：{reason}") from exc
-    return {"text": text}
-
-
 @app.post("/api/voice/ask")
-async def voice_ask(file: UploadFile = File(...), conversation_id: str | None = Form(None)) -> StreamingResponse:
-    """按住说话松手：整段录音转写完就接着回答。先回 {"type": "heard"} 让气泡立刻填上他说的话。"""
+async def voice_ask(
+    file: UploadFile = File(...), conversation_id: str | None = Form(None), replace_last: bool = Form(False)
+) -> StreamingResponse:
+    """点麦克风说完（停一下就算说完）：整段录音转写、按上下文改好错字，接着回答。先回 {"type": "heard"} 让气泡填上他说的话。"""
     _require_key()
     data = await file.read()
     try:
@@ -446,12 +423,18 @@ async def voice_ask(file: UploadFile = File(...), conversation_id: str | None = 
         raise HTTPException(status_code=502, detail=f"没听清：{reason}") from exc
     if not text:
         raise HTTPException(status_code=400, detail="没听清，再说一遍？")
-    cid = friday.resolve_conversation(conversation_id)
+    # 用刚才聊的、他常说的词把同音字、名字改对，去掉「嗯」「那个」；只改错字不改意思，出问题就用原样
+    recent = [f"{'他' if m['role'] == 'user' else '她'}：{m['content'][:200]}" for m in friday.conversations.thread()[-6:]
+              if m.get("content")]
+    text = await asyncio.to_thread(voice.tidy, text, "\n".join(recent))
+    # 他点了自己最后那条、清空了重新说：替掉那一轮
+    last = friday.conversations.last_user() if replace_last else None
+    cid = last["conversation_id"] if last else friday.resolve_conversation(conversation_id)
     spoken = voice.wants_voice(text)
 
     async def events() -> AsyncIterator[dict[str, Any]]:
         yield {"type": "heard", "text": text, "spoken": spoken}
-        async for event in friday.turn(cid, text, spoken=spoken):
+        async for event in friday.turn(cid, text, spoken=spoken, replace=bool(last)):
             yield event
 
     return _sse("chat", events())

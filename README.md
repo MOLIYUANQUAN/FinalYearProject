@@ -117,12 +117,13 @@ Shipping still goes through the test gate: a change whose tests fail is not merg
 
 ## Talking to Friday
 
-One mic button, at the right of the input bar when it is empty.
+Like talking to a person: tap the mic (the right button when the input bar is empty), speak, stop.
 
-- **Tap it (like Claude's dictation):** the bar becomes ✕ · a live waveform and timer · ✓. Speak as long as you like (up to five minutes). Tap ✓ and the whole recording is transcribed by OpenAI `gpt-transcribe` (with your usual names as keywords, Chinese and English) and put into the input box, after anything already typed. Look, fix a word if needed, tap ↑. ✕ throws it away.
-- **Hold it (like WeChat):** the page dims and a bubble moves with your voice. Let go where you are and it is sent straight away; slide to ✕ on the left to cancel; slide to 文 on the right and it is turned into words in the input box instead, to read and send like a dictation. A press that is too short says so.
-- Recording starts the moment the finger touches the button, so the first word is not lost. The mic opens once and stays open while Friday is in front, so the iPhone does not keep asking for permission; it closes when Friday goes to the background.
-- She answers in text, as if you had typed. She reads aloud only when you ask ("念给我听", "听听你的声音"). Touching the mic while she is speaking stops her.
+- While you speak the bar shows ✕ · a live waveform and timer · ↑. Once you have said something and go quiet for 1.6 seconds, a ring round ↑ fills and the message is sent; tap ↑ or the waveform to send sooner, ✕ to throw it away. Up to five minutes.
+- The whole recording is transcribed by OpenAI `gpt-transcribe` (your usual names as keywords, Chinese and English), then a small model (Claude Haiku 5.5, or GPT-4.1 mini without an Anthropic key) fixes misheard words from the conversation so far ("大会" → "它会") and drops fillers, without changing the meaning; if it misbehaves, the words stay as heard. Your bubble shows the result and she answers.
+- Misheard? Tap your last message: its words come back into the box with 改上一句 above. Send the fixed text (or clear it and say it again) and that whole turn is replaced: what she did for it is undone (to-dos, events, reminders), a pending yes/no is dropped, and it is removed from what the model sees.
+- Recording starts at the tap. The mic opens once and stays open while Friday is in front, so the iPhone does not keep asking for permission; it closes when Friday goes to the background.
+- She answers in text, as if you had typed. She reads aloud only when you ask ("念给我听", "听听你的声音"). Tap ■ while she is speaking to stop her.
 - Her page shows which model did the last transcription under 语音.
 
 There is deliberately no Siri Shortcut or share-sheet setup. Friday is one tap from the home screen and listens as soon as you hold the mic. A second assistant in front of her, plus a hand-built Shortcut, would only add steps.
