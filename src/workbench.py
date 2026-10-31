@@ -23,6 +23,7 @@ class ActBody(BaseModel):
     key: str = Field(..., max_length=200, description="卡片那一行的 key，例如 task:abc")
     action: str = Field(..., pattern="^(done|drop|tomorrow)$")
     conversation_id: str | None = Field(None, max_length=64)
+    message_id: int | None = Field(None, description="点的是推送消息下面那一行时：记下这一行办过了")
 
 
 def _task(task_id: str) -> tuple[Any, dict[str, Any]]:
@@ -72,4 +73,9 @@ async def act(body: ActBody) -> dict:
     finally:
         todos.forget()
 
+    if body.message_id:
+        pushed = friday.conversations.message(body.message_id)
+        if pushed and pushed.get("items"):
+            items = [{**item, "handled": body.action} if item.get("key") == body.key else item for item in pushed["items"]]
+            friday.conversations.update_message(body.message_id, items=items)
     return await _record(body.conversation_id, say, [undo])

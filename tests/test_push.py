@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import unittest
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from cryptography.hazmat.primitives import hashes
@@ -13,6 +15,7 @@ from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 from fastapi.testclient import TestClient
 
 from src import nudges, push, webpush
+from src.conversation import Conversations
 from src.calendar_providers.mock import _load_raw_events
 from src.main import app
 from src.tasks_providers.mock import MockTasksProvider
@@ -138,6 +141,19 @@ class Delivery(unittest.TestCase):
         self.assertEqual(self.tick(at("21:10")), [])  # 今天三条用完了：收工这条让给了更要紧的
         self.assertEqual(len(self.sent), 3)
         self.assertIn("do=prepare", self.sent[1]["url"])
+
+    def test_what_she_pushes_is_also_her_message_with_one_tap_answers(self) -> None:
+        push.subscribe(SUB, "iPhone")
+        convs = Conversations(Path(tempfile.mkdtemp()) / "thread.db")
+        self.addCleanup(convs.close)
+        with patch.object(nudges.conversation, "store", return_value=convs):
+            self.tick(at("17:30"))
+        said = convs.thread()[-1]
+        self.assertEqual((said["role"], said["nudge"], said["content"]), ("assistant", "due", self.sent[-1]["body"]))
+        self.assertEqual([i["title"] for i in said["items"]], ["准备 FYP meeting 的进度汇报"])
+        self.assertTrue(said["items"][0]["key"].startswith("task:"))
+        # 他回这条时，她知道自己刚才主动说了什么
+        self.assertIn(self.sent[-1]["body"], nudges.chat_block(at("17:40")))
 
     def test_dead_device_is_removed(self) -> None:
         push.subscribe(SUB, "iPhone")

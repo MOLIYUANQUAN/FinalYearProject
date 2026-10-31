@@ -18,7 +18,7 @@ from datetime import date, datetime, time, timedelta
 from typing import Any, Callable
 from urllib.parse import quote
 
-from src import agenda, closed, engineering, push, reminders, todos, usage_log
+from src import agenda, closed, conversation, engineering, push, reminders, todos, usage_log
 from src.agenda import Timed
 from src.config import effective_now
 from src.presence import IMPORTANT, _clock, _spaced, _there
@@ -72,6 +72,16 @@ def _due_today(now: datetime, tasks: list[dict[str, Any]]) -> tuple[list[str], l
     )
 
 
+def _open_items(now: datetime, tasks: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """今天截止、刚过截止（没放太久）的待办：推送下面一件一行，「做完了 / 明天再说」点一下就办。"""
+    today = now.date()
+    return [
+        {"key": f"task:{task['id']}", "title": task["title"]}
+        for task, day in todos.ordered(tasks)
+        if task.get("id") and day is not None and day <= today and not todos.is_stale(day, today)
+    ][:5]
+
+
 def _brief(now: datetime, timed: list[Timed], tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
     today = now.date()
     if not (_morning(today) <= now.time() < BRIEF_UNTIL):
@@ -92,7 +102,8 @@ def _brief(now: datetime, timed: list[Timed], tasks: list[dict[str, Any]]) -> di
     if overdue:
         parts.append(f"已经过了截止：{_names(overdue)}。")
     key = f"brief:{today.isoformat()}"
-    return {"kind": "brief", "key": key, "title": "Friday · 今天", "body": _spaced("".join(parts)), "url": f"/?n={quote(key)}"}
+    return {"kind": "brief", "key": key, "title": "Friday · 今天", "body": _spaced("".join(parts)), "url": f"/?n={quote(key)}",
+            "items": _open_items(now, tasks)}
 
 
 def _meetings(now: datetime, timed: list[Timed]) -> list[dict[str, Any]]:
@@ -128,7 +139,8 @@ def _due(now: datetime, tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
     if overdue:
         text += f"已经过了截止：{_names(overdue)}。"
     key = f"due:{now.date().isoformat()}"
-    return {"kind": "due", "key": key, "title": "Friday · 截止", "body": _spaced(text), "url": f"/?n={quote(key)}"}
+    return {"kind": "due", "key": key, "title": "Friday · 截止", "body": _spaced(text), "url": f"/?n={quote(key)}",
+            "items": _open_items(now, tasks)}
 
 
 def _wrap(now: datetime, timed: list[Timed], tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -157,7 +169,8 @@ def _wrap(now: datetime, timed: list[Timed], tasks: list[dict[str, Any]]) -> dic
         if week:
             parts.append(f"这周替你关掉了 {len(week)} 件。")
     key = f"wrap:{today.isoformat()}"
-    return {"kind": "wrap", "key": key, "title": "Friday · 收工", "body": _spaced("".join(parts)), "url": f"/?n={quote(key)}"}
+    return {"kind": "wrap", "key": key, "title": "Friday · 收工", "body": _spaced("".join(parts)), "url": f"/?n={quote(key)}",
+            "items": _open_items(now, tasks)}
 
 
 def candidates(now: datetime, events: list[dict[str, Any]], tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -238,9 +251,30 @@ def tick(now: datetime | None = None, *, deliver: Callable[..., int] = push.deli
         delivered = deliver(message, urgency=nudge.get("urgency", "normal"))
         if delivered:
             _mark_sent(nudge, now, delivered)
+            _into_thread(nudge)
             usage_log.record("nudge", ok=True, first_token_ms=None, total_ms=0, tools=[nudge["kind"]])
             sent.append(nudge)
     return sent
+
+
+def _into_thread(nudge: dict[str, Any]) -> None:
+    """推送就是她发来的一条消息：也写进那条对话，点开 Friday 就在最后。她自己从 chat_block 知道说过什么。"""
+    try:
+        convs = conversation.store()
+        cid = convs.current() or convs.latest() or convs.create()
+        convs.add_message(cid, "assistant", nudge["body"], nudge=nudge["kind"], items=nudge.get("items") or [], tools=[])
+    except Exception as exc:  # noqa: BLE001 — 写不进对话也不耽误推送
+        print(f"[WARN] nudge not written into the conversation: {exc}")
+
+
+def chat_block(now: datetime) -> str:
+    """她今天主动发给他的（推送）：他可能正在回这几句。"""
+    today = now.date().isoformat()
+    rows = [row for row in _sent() if row.get("day") == today and row.get("body")][-6:]
+    if not rows:
+        return ""
+    lines = "\n".join(f"- {row.get('at', '')[11:16]} {row['body']}" for row in rows)
+    return f"你今天主动发给他的消息（他可能在回这些）：\n{lines}"
 
 
 def _send_reminders(now: datetime, deliver: Callable[..., int]) -> list[dict[str, Any]]:
@@ -251,6 +285,7 @@ def _send_reminders(now: datetime, deliver: Callable[..., int]) -> list[dict[str
         if deliver(message, urgency="high"):
             reminders.mark_sent(item["id"], now)
             _mark_sent(nudge, now, 1)
+            _into_thread(nudge)
             usage_log.record("nudge", ok=True, first_token_ms=None, total_ms=0, tools=["reminder"])
             sent.append(nudge)
     return sent

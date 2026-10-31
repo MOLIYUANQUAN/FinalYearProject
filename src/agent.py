@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import time
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -23,12 +24,12 @@ from src.config import (
     get_tasks_backend,
     require_openai_api_key,
 )
-from src import approval, cursor_fix, friction, reminders
+from src import approval, cursor_fix, friction, nudges, reminders
 from src import claude
 from src.claude import ClaudeModel, for_openai
 from src.config import STATE_DIR, effective_now
 from src.context import memory_block, now_block, profile_block
-from src.conversation import Conversations, store
+from src.conversation import Conversations, reaction_of, store
 from src.tools import ALL_TOOLS, TASK_TOOLS
 from src.turn import Turn
 
@@ -52,7 +53,7 @@ VOICE = """你叫 Friday，是 Zeep 的管家，只为他一个人。不是顾�
 - 做成事（记下了、部署了、会准备好了）：一句到位的肯定或收束就停，别庆祝表演。
 - 纯文本：不用 Markdown 标题、加粗或表格；需要列举时每项一行。
 - 不用客套收尾：不问「有什么需要帮忙的吗」「有什么可以帮你」，不说「希望对你有帮助」「需要的话告诉我」。结尾也不提议、不反问：不说「需要我…吗」「要不要我…」——能读的直接读完再回答。真需要他拍板时，只问一个问题。
-- 他只是打招呼或随口回应（hi、在吗、好的、嗯、谢谢）→ 一句话接住就停，比如「在。」「好。」「不客气。」不问他要做什么，不找话题。
+- 他只是打招呼：问「在吗」就一句「在。」。他只是随口回应（好的、嗯、收到、谢谢、哈哈、或者只发了个表情）：不用说话，整条回复只写一个表情（👍 ❤️ 😂 😮 😢 🙏 选一个），它会贴在他那条消息上，像 WhatsApp 那样。不问他要做什么，不找话题。
 - 有主见：直接给你认为最好的做法，不摆 A/B/C 菜单。下一步只在真有用时提一句。
 - 不提工具、接口、模型、后端或 Demo。
 
@@ -85,6 +86,7 @@ VOICE = """你叫 Friday，是 Zeep 的管家，只为他一个人。不是顾�
 - 读操作直接做，不预告。
 - 给他自己建日程（create_calendar_event）：时间齐了就直接建，不用问；页面会给他「撤销」。建完一句话说建好了什么（哪天几点）。
 - 对外或删东西的写操作（发邮件、归档或删除邮件、删除记忆、让 Cursor 改代码、部署）：信息齐了就直接调用对应工具，不要先用文字问「要不要」——系统会在执行前把具体内容（收件人、主题、正文）给他看，等他点确认；他也可能在卡片里改了内容，系统会让你照改过的重新调用，那时参数一字不改。
+- 他说自己晚点 / 明天要做某件事、但没给钟点（「我晚点回导师」「明天把报告交了」）：直接 add_task 记下（标题就是那件事，due 写他说的那天，没说就写「今天」），一句话说记下了。到时候还没划掉，推送里会带着「做完了 / 明天再说」去问他，你不用另外约时间。
 - 关键信息缺了（不知道几点、发给谁）才先问一句。他拒绝了就一句话说没做，不重试。成功之前绝不说已完成；工具返回后一句话告诉他结果。
 - 帮他准备一场会面或重要对话：先搜相关的邮件和笔记，再写：时间地点（日历里没有就直说）+ 现状一句话 + 三个讨论点。讨论点只能来自真材料（档案、记忆、邮件、笔记）；材料不够就少写几点并直说，不用空话凑数。"""
 
@@ -111,7 +113,7 @@ def _connections_line() -> str:
     return f"已接入：{connected}。没接入的账户就直说没接入。"
 
 
-def build_instructions(calendar: str = "", todo: str = "", *, spoken: bool = False) -> str:
+def build_instructions(calendar: str = "", todo: str = "", *, spoken: bool = False, extra: str = "") -> str:
     parts = [
         VOICE,
         SPOKEN if spoken else "",
@@ -124,6 +126,7 @@ def build_instructions(calendar: str = "", todo: str = "", *, spoken: bool = Fal
         memory_block(),
         friction.chat_block(),
         cursor_fix.chat_block(),
+        extra,
     ]
     return "\n\n".join(part for part in parts if part)
 
@@ -146,12 +149,12 @@ def brain(name: str) -> Model | str:
 
 
 def create_assistant(
-    *, calendar: str = "", todo: str = "", spoken: bool = False, model: Model | None = None
+    *, calendar: str = "", todo: str = "", spoken: bool = False, model: Model | None = None, extra: str = ""
 ) -> Agent:
     name = model if isinstance(model, str) else active_model() if model is None else ""
     return Agent(
         name="Friday",
-        instructions=build_instructions(calendar, todo, spoken=spoken),
+        instructions=build_instructions(calendar, todo, spoken=spoken, extra=extra),
         tools=ALL_TOOLS + TASK_TOOLS if todos.connected() else ALL_TOOLS,
         model=model or brain(name),
         model_settings=model_settings(name),
@@ -221,10 +224,10 @@ def _model_input(data: CallModelData[Any]) -> ModelInputData:
 RUN_CONFIG = RunConfig(call_model_input_filter=_model_input)
 
 
-async def _assistant(spoken: bool = False, model: Model | None = None) -> Agent:
+async def _assistant(spoken: bool = False, model: Model | None = None, extra: str = "") -> Agent:
     """这一轮的 Friday：日历和待办同时读，谁也不等谁。"""
     calendar, todo = await asyncio.gather(asyncio.to_thread(chat_block), asyncio.to_thread(todos.chat_block))
-    return create_assistant(calendar=calendar, todo=todo, spoken=spoken, model=model)
+    return create_assistant(calendar=calendar, todo=todo, spoken=spoken, model=model, extra=extra)
 
 
 # ---------------------------------------------------------------------------
@@ -351,7 +354,7 @@ class Friday:
         async with lock:
             convs = self.conversations
             await self._carry_over(cid)
-            convs.add_message(cid, "user", message)
+            said_id = convs.add_message(cid, "user", message)
             yield {"type": "conversation", "id": cid}
 
             pending = await self._load_pending(cid, spoken)
@@ -399,15 +402,22 @@ class Friday:
                 if choice == "other" and not approvals:
                     # 他换了话题：上一步已作罢，接着回答他这句
                     yield {"type": "tool", "name": ""}
-                    agent = await _assistant(spoken, self._model)
+                    agent = await _assistant(spoken, self._model, self._context())
                     async for event in run(agent, message):
                         yield event
             else:
-                agent = await _assistant(spoken, self._model)
+                agent = await _assistant(spoken, self._model, self._context())
                 async for event in run(agent, message):
                     yield event
 
             reply = "\n\n".join(t for t in texts if t.strip())
+            emoji = None if approvals or undo else reaction_of(reply)
+            if emoji:
+                # 她没说话，只在他那条上贴了个表情（像 WhatsApp）
+                convs.update_message(said_id, reaction=emoji)
+                yield {"type": "done", "reply": "", "reaction": emoji, "ask": "", "tools_called": tools, "undo": [],
+                       "needs_confirm": False, "approvals": [], "message_id": None, "conversation_id": cid}
+                return
             ask = approval.prompt(approvals) if approvals else ""
             if ask:
                 reply = f"{reply}\n\n{ask}" if reply else ask
@@ -493,6 +503,15 @@ class Friday:
         yield {"type": "text", "text": final if isinstance(final, str) else str(final or "")}
 
     # ---- 开场 ----
+
+    def _context(self) -> str:
+        """她今天主动发过的消息、他刚贴在她话上的表情：写进这一句的说明里，不动对话历史。"""
+        parts = [nudges.chat_block(effective_now())]
+        seen = self.conversations.recent_reactions(time.time() - 2 * 60 * 60)
+        if seen:
+            lines = "\n".join(f"- 「{text[:60]}」{emoji}" for text, emoji in seen[-5:])
+            parts.append(f"他刚才在你说的话上贴了表情：\n{lines}")
+        return "\n\n".join(part for part in parts if part)
 
     async def _carry_over(self, cid: str) -> None:
         """页面上是一条连着的对话；给模型的那段过两小时会重开。新开的一段先带上前一段最后几句，他接着刚才的话说她也接得上。"""

@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 
 from src import agenda, claude, closed, reminders, todos, usage_log, voice
 from src.agent import answering_model, friday, run_assistant, verify_model
+from src.conversation import REACTIONS
 from src.calendar_providers import get_calendar_provider
 from src.presence import stream_presence
 from src.access import gate, router as access_router
@@ -241,6 +242,29 @@ def _sse(kind: str, events: AsyncIterator[dict[str, Any]]) -> StreamingResponse:
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+class ReactBody(BaseModel):
+    message_id: int
+    part: int = Field(0, ge=0, le=50, description="她那条消息的第几段（一段一个气泡）")
+    emoji: str = Field("", max_length=8, description="空的就是拿掉")
+
+
+@app.post("/api/react")
+def react(body: ReactBody) -> dict:
+    """他在她的某个气泡上贴表情（再点同一个就拿掉）。不经过模型；他下次说话时她看得到。"""
+    if body.emoji and body.emoji not in REACTIONS:
+        raise HTTPException(status_code=400, detail="只能贴这几个表情。")
+    message = friday.conversations.message(body.message_id)
+    if message is None or message["role"] == "user":
+        raise HTTPException(status_code=404, detail="这条消息不在了。")
+    reactions = dict(message.get("reactions") or {})
+    if body.emoji:
+        reactions[str(body.part)] = body.emoji
+    else:
+        reactions.pop(str(body.part), None)
+    friday.conversations.update_message(body.message_id, reactions=reactions, reacted_at=time.time())
+    return {"ok": True, "reactions": reactions}
 
 
 @app.get("/api/conversation")

@@ -123,6 +123,14 @@ class ActTests(SandboxTestCase):
         last = self.friday_service.conversations.messages(data["conversation_id"])[-1]
         self.assertEqual(last["content"], "划掉了：交 Lab 2。")
 
+    def test_tapping_done_under_a_push_marks_that_line_handled(self) -> None:
+        convs = self.friday_service.conversations
+        pushed = convs.add_message(convs.create(), "assistant", "今天截止还没划掉：交 Lab 2。", nudge="due",
+                                   items=[{"key": "task:t1", "title": "交 Lab 2"}])
+        with patch.object(self.provider, "complete", return_value=self.tasks[0]):
+            self.client.post("/api/items/act", json={"key": "task:t1", "action": "done", "message_id": pushed})
+        self.assertEqual(convs.message(pushed)["items"][0]["handled"], "done")
+
     def test_tomorrow_moves_the_due_date_and_undo_restores_it(self) -> None:
         with patch.object(self.provider, "set_due", return_value=self.tasks[0]) as set_due:
             data = self.client.post("/api/items/act", json={"key": "task:t1", "action": "tomorrow"}).json()

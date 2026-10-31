@@ -82,6 +82,25 @@ class ApiTests(SandboxTestCase):
         self.assertEqual(error["type"], "error")
         self.assertEqual(error["message"], "这句没接上，再说一次。")
 
+    def test_a_one_emoji_reply_is_a_reaction_on_his_message(self) -> None:
+        self.use([[text("👍")]])
+        done = self.chat("好的，下午搞定")[-1]
+        self.assertEqual((done["reaction"], done["reply"]), ("👍", ""))
+        thread = self.client.get("/api/conversation").json()["messages"]
+        self.assertEqual([(m["role"], m.get("reaction")) for m in thread], [("user", "👍")])  # 没有多出一个她的气泡
+
+    def test_he_reacts_on_her_bubble_and_she_sees_it_next_time(self) -> None:
+        self.use([[text("明天下午 2 点见导师。\n\n在 Kilburn 1.10。")]])
+        mid = self.chat("明天有什么")[-1]["message_id"]
+        ok = self.client.post("/api/react", json={"message_id": mid, "part": 1, "emoji": "❤️"}).json()
+        self.assertEqual(ok["reactions"], {"1": "❤️"})
+        self.assertIn("「在 Kilburn 1.10。」❤️", self.service._context())
+        self.assertEqual(self.client.post("/api/react", json={"message_id": mid, "part": 1, "emoji": "🤡"}).status_code, 400)
+        removed = self.client.post("/api/react", json={"message_id": mid, "part": 1, "emoji": ""}).json()
+        self.assertEqual(removed["reactions"], {})
+        his = self.client.get("/api/conversation").json()["messages"][0]["id"]
+        self.assertEqual(self.client.post("/api/react", json={"message_id": his, "emoji": "👍"}).status_code, 404)
+
     def test_revise_only_while_waiting_and_only_subject_or_body(self) -> None:
         self.use([[call("send_email", to="a@b.c", subject="hi", body="hello", cc="")], [call("send_email", to="a@b.c", subject="hi", body="hello!!", cc="")], [text("发了。")]])
         cid = self.chat("发邮件")[0]["id"]

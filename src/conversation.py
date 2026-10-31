@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import threading
 import time
@@ -28,6 +29,19 @@ THREAD_DAYS = 14
 THREAD_MAX = 200
 CARRY_LINES = 6
 CARRY_WITHIN_S = 24 * 60 * 60
+# 能贴在气泡上的表情（和 WhatsApp 默认的一样）
+REACTIONS = ("👍", "❤️", "😂", "😮", "😢", "🙏")
+
+
+def reaction_of(text: str) -> str | None:
+    """她整条回复只有一个表情：那就是贴在他那条消息上的，不是一句话。"""
+    said = (text or "").strip().replace("\ufe0f", "")
+    return next((r for r in REACTIONS if said == r.replace("\ufe0f", "")), None)
+
+
+def paragraphs(text: str) -> list[str]:
+    """和页面一样分段：一段一个气泡。"""
+    return [p.strip() for p in re.split(r"\n\s*\n", text or "") if p.strip()]
 
 
 class Conversations:
@@ -92,6 +106,12 @@ class Conversations:
             return None
         return row["id"]
 
+    def latest(self) -> str | None:
+        """最近说过话的那一段（不管是不是已经放久了）。"""
+        with self._lock:
+            row = self._conn.execute("SELECT id FROM conversations ORDER BY last_active_at DESC LIMIT 1").fetchone()
+        return row["id"] if row else None
+
     def touch(self, cid: str) -> None:
         with self._lock:
             self._conn.execute("UPDATE conversations SET last_active_at = ? WHERE id = ?", (time.time(), cid))
@@ -121,6 +141,29 @@ class Conversations:
                 (row["content"] if content is None else content, json.dumps(merged, ensure_ascii=False), message_id),
             )
             self._conn.commit()
+
+    def message(self, message_id: int) -> dict[str, Any] | None:
+        with self._lock:
+            r = self._conn.execute(
+                "SELECT id, conversation_id, role, content, data, at FROM conversation_messages WHERE id = ?", (message_id,)
+            ).fetchone()
+        if r is None:
+            return None
+        return {"id": r["id"], "conversation_id": r["conversation_id"], "role": r["role"], "content": r["content"],
+                "at": int(r["at"] * 1000), **json.loads(r["data"] or "{}")}
+
+    def recent_reactions(self, since: float) -> list[tuple[str, str]]:
+        """他最近贴在她话上的表情：(那一段话, 表情)。"""
+        out = []
+        for m in self.thread()[-60:]:
+            if m["role"] == "user" or (m.get("reacted_at") or 0) < since:
+                continue
+            parts = paragraphs(m["content"])
+            for part, emoji in (m.get("reactions") or {}).items():
+                index = int(part) if str(part).isdigit() else 0
+                if index < len(parts):
+                    out.append((parts[index], emoji))
+        return out
 
     def messages(self, cid: str) -> list[dict[str, Any]]:
         with self._lock:

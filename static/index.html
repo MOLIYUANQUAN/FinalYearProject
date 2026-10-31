@@ -115,6 +115,7 @@
       font-size: 1.02rem;
       letter-spacing: -0.01em;
     }
+    .msg { position: relative; }
     .msg.user { background: var(--mine); color: var(--on-mine); }
     .msg.bot { background: var(--hers); color: var(--ink); }
     .msg a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
@@ -129,6 +130,83 @@
     .pending { display: flex; align-items: center; gap: 10px; max-width: 100%; }
     .pending .msg { padding: 12px 14px; }
     .pending .doing { color: var(--muted); font-size: 0.85rem; }
+    /* 贴在气泡上的表情（像 WhatsApp）：压在气泡下沿 */
+    .msg.has-react { margin-bottom: 14px; }
+    .msg .react {
+      position: absolute;
+      bottom: -15px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--bg);
+      font-size: 0.85rem;
+      line-height: 1.3;
+      white-space: nowrap;
+      user-select: none;
+      cursor: pointer;
+    }
+    .msg.bot .react { left: 12px; }
+    .msg.user .react { right: 12px; }
+    /* 长按（电脑上右键或悬停的笑脸）出一排表情，最后是「复制」 */
+    .picker {
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 0;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 4px 6px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+      white-space: nowrap;
+    }
+    .picker.below { bottom: auto; top: calc(100% + 6px); }
+    .picker button {
+      font: inherit;
+      font-size: 1.35rem;
+      line-height: 1;
+      padding: 5px 6px;
+      border: none;
+      border-radius: 999px;
+      background: none;
+      color: var(--ink);
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .picker button.on { background: var(--hers); }
+    .picker button.copy { font-size: 0.85rem; color: var(--soft); padding: 6px 8px; }
+    .react-btn {
+      position: absolute;
+      top: 50%;
+      right: -34px;
+      transform: translateY(-50%);
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border: none;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--muted);
+      font-size: 1rem;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+    @media (hover: hover) {
+      .msg:hover > .react-btn, .react-btn:focus-visible { opacity: 0.8; }
+    }
+    @media (hover: none) {
+      .react-btn { display: none; }
+      /* 手机上长按是贴表情，不弹系统的选字菜单（复制在表情条里） */
+      .group.hers .msg[data-mid] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+    }
+    /* 推送里没下文的事：一件一行，点一下就办 */
+    .followups { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 2px 4px; }
+    .followup { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; font-size: 0.92rem; }
+    .followup.handled .what { text-decoration: line-through; opacity: 0.5; }
     /* 今天的时间线：开场里的一张卡片 */
     .msg.today {
       width: min(100%, 460px);
@@ -512,6 +590,8 @@
     const ACCESS_KEY = "pa.access"; // 旧版曾把密码存在本机；登录后清掉
     const CARD_FRESH_MS = 15 * 60 * 1000;
     const GAP_MS = 60 * 60 * 1000; // 隔了一小时以上，中间标一下时间
+    const QUIET_AFTER_HER_MS = 2 * 60 * 60 * 1000;
+    const REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
     // 她在干什么：一行小字，不出现工具名
     const DOING = {
       get_calendar_events: "在看你的日历…",
@@ -641,9 +721,13 @@
     // 页面上只有一条对话，存在服务端：手机上聊的，电脑上打开也在。
     // session.id 是给模型的那一段（服务端按「同一天、两小时内」分段）；放久了是 null，就请她开场
     function needsOpener(s) {
-      if (!s.id) return true;
       const last = s.messages[s.messages.length - 1];
-      return !last || (!!last.agenda && Date.now() - (last.at || 0) > CARD_FRESH_MS);
+      if (!last) return true;
+      const age = Date.now() - (last.at || 0);
+      if (last.agenda) return age > CARD_FRESH_MS;
+      // 她刚刚才说过话（比如推送）：那就是她的开场，不再说一遍
+      if (last.role !== "user" && age < QUIET_AFTER_HER_MS) return false;
+      return !s.id;
     }
 
     function fromServer(m) {
@@ -656,6 +740,9 @@
         undone: !!m.undone,
         agenda: m.agenda || null,
         ask: m.ask || "",
+        items: m.items || [],
+        reaction: m.reaction || "",
+        reactions: m.reactions || {},
         needsConfirm: !!m.needs_confirm,
         approvals: m.approvals || [],
         at: m.at || 0,
@@ -738,6 +825,146 @@
       return bubble(group("assistant"), text, "note");
     }
 
+    // ---- 贴表情（像 WhatsApp）：他在她的气泡上贴；她不说话时也会在他那条上贴一个 ----
+    function setPill(b, emoji) {
+      let pill = b.querySelector(":scope > .react");
+      if (!emoji) {
+        if (pill) pill.remove();
+        b.classList.remove("has-react");
+        return;
+      }
+      if (!pill) {
+        pill = el("span", "react");
+        b.append(pill);
+      }
+      pill.textContent = emoji;
+      b.classList.add("has-react");
+    }
+
+    // 她的一个气泡能贴表情：记下是哪条消息的第几段，电脑上悬停出一个笑脸
+    function reactable(b, m, part) {
+      if (!m || !m.id) return;
+      b.dataset.mid = m.id;
+      b.dataset.part = part;
+      const btn = el("button", "react-btn", "☺");
+      btn.type = "button";
+      btn.setAttribute("aria-label", "贴表情");
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        openPicker(b);
+      };
+      b.append(btn);
+      setPill(b, (m.reactions || {})[part]);
+    }
+
+    let picker = null;
+    function closePicker() {
+      if (picker) picker.remove();
+      picker = null;
+    }
+
+    function openPicker(b) {
+      closePicker();
+      const now = (b.querySelector(":scope > .react") || {}).textContent || "";
+      picker = el("div", "picker");
+      for (const emoji of REACTIONS) {
+        const x = el("button", emoji === now ? "on" : "", emoji);
+        x.type = "button";
+        x.onclick = (e) => {
+          e.stopPropagation();
+          closePicker();
+          react(b, emoji === now ? "" : emoji);
+        };
+        picker.append(x);
+      }
+      const copy = el("button", "copy", "复制");
+      copy.type = "button";
+      copy.onclick = (e) => {
+        e.stopPropagation();
+        const clone = b.cloneNode(true);
+        clone.querySelectorAll(".react, .react-btn, .picker").forEach((n) => n.remove());
+        navigator.clipboard && navigator.clipboard.writeText(clone.textContent.trim()).catch(() => {});
+        closePicker();
+      };
+      picker.append(copy);
+      b.append(picker);
+      if (b.getBoundingClientRect().top - logEl.getBoundingClientRect().top < 60) picker.classList.add("below");
+    }
+
+    async function react(b, emoji) {
+      const before = (b.querySelector(":scope > .react") || {}).textContent || "";
+      setPill(b, emoji);
+      try {
+        const res = await fetch("/api/react", {
+          method: "POST",
+          credentials: "include",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ message_id: Number(b.dataset.mid), part: Number(b.dataset.part), emoji }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        const { reactions } = await res.json();
+        const m = session.messages.find((x) => String(x.id) === b.dataset.mid);
+        if (m) m.reactions = reactions;
+      } catch (e) {
+        setPill(b, before);
+      }
+    }
+
+    // 手机：在她的气泡上按住半秒；电脑：右键或悬停的笑脸
+    let pressTimer = null;
+    let pressAt = null;
+    logEl.addEventListener("pointerdown", (e) => {
+      const b = e.target.closest(".group.hers .msg[data-mid]");
+      if (!b || e.pointerType === "mouse" || e.target.closest(".picker, button")) return;
+      pressAt = { x: e.clientX, y: e.clientY };
+      clearTimeout(pressTimer);
+      pressTimer = setTimeout(() => {
+        pressTimer = null;
+        if (navigator.vibrate) navigator.vibrate(8);
+        openPicker(b);
+      }, 450);
+    });
+    logEl.addEventListener("pointermove", (e) => {
+      if (pressTimer && pressAt && Math.hypot(e.clientX - pressAt.x, e.clientY - pressAt.y) > 8) {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+      }
+    });
+    ["pointerup", "pointercancel"].forEach((t) => logEl.addEventListener(t, () => {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    }));
+    logEl.addEventListener("contextmenu", (e) => {
+      const b = e.target.closest(".group.hers .msg[data-mid]");
+      if (!b) return;
+      e.preventDefault();
+      openPicker(b);
+    });
+    document.addEventListener("pointerdown", (e) => {
+      if (picker && !e.target.closest(".picker")) closePicker();
+    });
+
+    // 推送里没下文的事：一件一行，「做完了 / 明天再说」点一下就办，办过的划掉
+    function drawItems(g, m) {
+      const box = el("div", "followups");
+      for (const item of m.items || []) {
+        const line = el("div", item.handled ? "followup handled" : "followup");
+        line.append(el("span", "what", item.title));
+        if (!item.handled) {
+          const bar = el("span", "row-actions");
+          for (const action of [{ id: "done", label: "做完了" }, { id: "tomorrow", label: "明天再说" }]) {
+            const b = el("button", "", action.label);
+            b.type = "button";
+            b.onclick = () => doRow(line, { key: item.key, title: item.title, message_id: m.id }, action, bar);
+            bar.append(b);
+          }
+          line.append(bar);
+        }
+        box.append(line);
+      }
+      g.append(box);
+    }
+
     // 她还在想、在查：打字的气泡，旁边一行小字说在干什么
     function pending(g, doing) {
       let p = g.querySelector(":scope > .pending");
@@ -759,6 +986,7 @@
       const bubbles = [];
       return {
         g,
+        bubbles,
         show(text) {
           const parts = paragraphs(text);
           if (parts.length) clearPending(g);
@@ -820,7 +1048,11 @@
       g.classList.add("opener");
       const card = m.agenda || {};
       if (full && card.hello) bubble(g, card.hello);
-      if (m.content) fillSay(bubble(g, null, "say"), m.content);
+      if (m.content) {
+        const say = bubble(g, null, "say");
+        fillSay(say, m.content);
+        reactable(say, m, 0);
+      }
       if (full) {
         g.classList.add("full");
         attachToday(g, card);
@@ -952,7 +1184,7 @@
           method: "POST",
           credentials: "include",
           headers: authHeaders({ "Content-Type": "application/json" }),
-          body: JSON.stringify({ key: row.key, action: action.id, conversation_id: session && session.id }),
+          body: JSON.stringify({ key: row.key, action: action.id, conversation_id: session && session.id, message_id: row.message_id || null }),
         });
         const data = await res.json().catch(() => ({}));
         if (res.status === 401) {
@@ -1138,10 +1370,11 @@
       stopSpeaking();
       setBusy(true);
       box.remove();
-      const said = "（改了一下）按这个发。";
-      bubble(group("user"), said);
-      session.messages.push({ role: "user", content: said, at: Date.now() });
+      const said = { role: "user", content: "（改了一下）按这个发。", at: Date.now() };
+      const mine = bubble(group("user"), said.content);
+      session.messages.push(said);
       const reply = herReply(group("assistant"));
+      Object.assign(reply, { mine, said });
       reply.busy(DOING.send_email);
       try {
         const result = await stream(
@@ -1203,10 +1436,11 @@
       });
       msgs.forEach((m, i) => {
         const g = group(m.role, m.at);
-        if (m.role === "user") bubble(g, m.content);
+        if (m.role === "user") setPill(bubble(g, m.content), m.reaction);
         else if (m.agenda) drawOpener(g, m, i === latestOpener);
         else {
           showHers(g, m);
+          if (m.items && m.items.length) drawItems(g, m);
           const last = i === msgs.length - 1;
           if (m.needsConfirm && last) addConfirm(g, m);
           if (m.undo && m.undo.length && !m.undone && last) addUndo(g, m);
@@ -1220,7 +1454,7 @@
     function showHers(g, m) {
       const parts = paragraphs(saidPart(m));
       if (m.undone && parts.length) parts[parts.length - 1] += "（已撤销）";
-      parts.forEach((p) => bubble(g, p));
+      parts.forEach((p, i) => reactable(bubble(g, p), m, i));
       if (m.ask) drawAsk(g, m.ask);
     }
 
@@ -1275,8 +1509,9 @@
             if (view.onTool) view.onTool(ev.name);
           } else if (ev.type === "done") {
             result = {
-              reply: ev.reply || text,
+              reply: ev.reaction ? "" : ev.reply || text,
               ask: ev.ask || "",
+              reaction: ev.reaction || "",
               tools: ev.tools_called || [],
               undo: ev.undo || [],
               needsConfirm: !!ev.needs_confirm,
@@ -1295,10 +1530,18 @@
 
     // 这一轮说完：按最终的话重排气泡（写的时候已经分好的原样留着），要拍板的那段单独一个框
     function finish(reply, result) {
-      const { reply: content, ask = "", tools = [], undo = [], needsConfirm = false, approvals = [], id } = result;
+      const { reply: content, ask = "", tools = [], undo = [], needsConfirm = false, approvals = [], id, reaction } = result;
+      if (reaction) {
+        // 她没说话，只在他那条上贴了个表情
+        reply.g.remove();
+        if (reply.mine) setPill(reply.mine, reaction);
+        if (reply.said) reply.said.reaction = reaction;
+        return;
+      }
       const m = { id, role: "assistant", content, ask, tools, needsConfirm, approvals, undo, at: Date.now() };
       clearPending(reply.g);
       reply.show(saidPart(m));
+      reply.bubbles.forEach((b, i) => reactable(b, m, i));
       if (ask) drawAsk(reply.g, ask);
       if (needsConfirm) addConfirm(reply.g, m);
       if (undo.length) addUndo(reply.g, m);
@@ -1737,7 +1980,9 @@
       let speaker = null;
       view.onHeard = (ev) => {
         heard.textContent = ev.text;
-        session.messages.push({ role: "user", content: ev.text, at: Date.now() });
+        const said = { role: "user", content: ev.text, at: Date.now() };
+        session.messages.push(said);
+        Object.assign(reply, { mine: heard, said });
         g.hidden = false;
         reply.busy();
         // 只有他明说要听（「念给我听」）才出声
@@ -1867,9 +2112,11 @@
       if (!speaker) settleOrb();
       setBusy(true);
       clearActions();
-      bubble(group("user"), message);
-      session.messages.push({ role: "user", content: message, at: Date.now() });
+      const mine = bubble(group("user"), message);
+      const said = { role: "user", content: message, at: Date.now() };
+      session.messages.push(said);
       const reply = herReply(group("assistant"));
+      Object.assign(reply, { mine, said });
       reply.busy();
       try {
         const result = await stream(
