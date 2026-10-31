@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 import time
 import unittest
 from unittest.mock import patch
@@ -48,6 +49,19 @@ class ConversationTests(SandboxTestCase):
         cid = convs.create()
         self.assertEqual(convs.current(), cid)
         self.assertIsNone(convs.current(now=time.time() + 2 * 3600 + 5))
+
+    def test_a_database_from_before_segment_sizes_still_opens(self) -> None:
+        db = self.tmp / "old.db"
+        old = sqlite3.connect(db)  # 云上已有的库：conversations 表还没有 context_tokens
+        old.execute("CREATE TABLE conversations (id TEXT PRIMARY KEY, started_at REAL NOT NULL, last_active_at REAL NOT NULL)")
+        old.execute("INSERT INTO conversations VALUES ('before', 1.0, 1.0)")
+        old.commit()
+        old.close()
+        convs = Conversations(db)
+        self.addCleanup(convs.close)
+        self.assertEqual(convs.size("before"), 0)
+        convs.set_size("before", 1234)
+        self.assertEqual(convs.size("before"), 1234)
 
 
 class ApprovalTests(SandboxTestCase):

@@ -23,7 +23,7 @@ from tests.helpers import SandboxTestCase
 import src.agent as agent
 from src import claude, uploads
 from src.agent import VOICE, Friday
-from src.conversation import Conversations
+from src.conversation import ROLL_AT, Conversations
 
 MAIL = {"to": "mentor.example@manchester.ac.uk", "subject": "FYP update", "body": "Hi, here is my update.", "cc": ""}
 PNG = base64.b64decode(
@@ -71,6 +71,11 @@ def sse(msg: dict) -> bytes:
                 "usage": {"output_tokens": msg["usage"]["output_tokens"]}},
                {"type": "message_stop"}]
     return "".join(f"event: {e['type']}\ndata: {json.dumps(e, ensure_ascii=False)}\n\n" for e in events).encode()
+
+
+def long(msg: dict, tokens: int = ROLL_AT + 10_000) -> dict:
+    """这一问时整段对话已经这么长（大部分是缓存读）。"""
+    return {**msg, "usage": {**msg["usage"], "cache_read_input_tokens": tokens}}
 
 
 def refused(text_: str) -> tuple[int, dict]:
@@ -124,7 +129,7 @@ async def talk(friday: Friday, cid: str, words: str, **kwargs: Any) -> dict:
     return events[-1]
 
 
-class RealSdkTests(SandboxTestCase):
+class SdkCase(SandboxTestCase):
     def setUp(self) -> None:
         super().setUp()
         claude._resting = None
@@ -146,6 +151,8 @@ class RealSdkTests(SandboxTestCase):
         self.addCleanup(conversations.close)
         return Friday(conversations, model=model)
 
+
+class RealSdkTests(SdkCase):
     def test_a_tool_round_then_a_follow_up_over_real_http(self) -> None:
         server = self.stand_in([
             message(think("sigA"), use("search_emails", "toolu_1", query="FYP", top=5), stop="tool_use"),
@@ -245,3 +252,66 @@ class RealSdkTests(SandboxTestCase):
         self.assertEqual(json.loads(said), {"FYP meeting with mentor": "见导师"})
         self.assertNotIn("stream", server.seen[0]["body"])
         self.assertEqual(server.seen[0]["body"]["fallbacks"], "default")
+
+
+class LongTalkTests(SdkCase):
+    """一天里一直聊，给模型的那一段越来越长：到了线就悄悄换一段，他看到的还是同一条。"""
+
+    def test_a_long_segment_continues_in_a_fresh_one_with_the_last_lines(self) -> None:
+        server = self.stand_in([long(message(say("周三交 Lab 3。"))), message(say("对，就是那个。"))])
+        friday = self.friday(server)
+
+        async def scenario() -> tuple[str, str]:
+            first = friday.resolve_conversation(None)
+            await talk(friday, first, "Lab 3 什么时候交？")
+            second = friday.resolve_conversation(first)  # 页面带着原来那段的 id 来
+            await talk(friday, second, "是那个报告吗")
+            return first, second
+
+        first, second = asyncio.run(scenario())
+        self.assertNotEqual(first, second)
+        self.assertGreaterEqual(friday.conversations.size(first), ROLL_AT)
+        # 新的一段只带前一段最后几句，不是整段历史
+        sent = [(m["role"], [b.get("text") for b in m["content"]]) for m in server.seen[1]["body"]["messages"]]
+        self.assertEqual(sent, [("user", ["Lab 3 什么时候交？"]), ("assistant", ["周三交 Lab 3。"]),
+                                ("user", ["是那个报告吗"])])
+        self.assertLess(friday.conversations.size(second), ROLL_AT)
+        # 页面上还是一条：四句都在，按顺序
+        said = [m["content"] for m in friday.conversations.thread()]
+        self.assertEqual(said, ["Lab 3 什么时候交？", "周三交 Lab 3。", "是那个报告吗", "对，就是那个。"])
+
+    def test_a_waiting_confirm_stays_in_its_segment_however_long(self) -> None:
+        server = self.stand_in([
+            long(message(think("sigL"), use("send_email", "toolu_l", **MAIL), stop="tool_use")),
+            long(message(say("发了。"))),
+        ])
+        friday = self.friday(server)
+
+        async def scenario() -> tuple[str, str, str]:
+            first = friday.resolve_conversation(None)
+            asked = await talk(friday, first, "给导师发个进度")
+            self.assertTrue(asked["needs_confirm"])
+            same = friday.resolve_conversation(first)
+            await talk(friday, same, "发")
+            return first, same, friday.resolve_conversation(same)
+
+        first, same, after = asyncio.run(scenario())
+        self.assertEqual(same, first)
+        self.assertEqual(len(self.sent_mail()), 1)
+        self.assertNotEqual(after, first)  # 确认完了，下一句才换段
+
+    def test_when_the_model_says_too_long_the_next_message_is_answered(self) -> None:
+        server = self.stand_in([refused("prompt is too long: 1000321 tokens > 1000000 maximum"),
+                                message(say("在，接着说。"))])
+        friday = self.friday(server)
+
+        async def scenario() -> tuple[str, str, dict]:
+            first = friday.resolve_conversation(None)
+            with self.assertRaises(anthropic.BadRequestError):
+                await talk(friday, first, "刚才那个呢")
+            second = friday.resolve_conversation(first)
+            return first, second, await talk(friday, second, "刚才那个呢")
+
+        first, second, done = asyncio.run(scenario())
+        self.assertNotEqual(first, second)
+        self.assertEqual(done["reply"], "在，接着说。")

@@ -5,7 +5,8 @@
 - 给页面看的：每条消息的文字、开场卡片、工具、撤销、待确认。
 
 页面上只有一条对话（thread：最近两周、按时间连着）。给模型的会话仍按「同一天、两小时内」分段，
-免得上下文无限长；新的一段会先带上前一段最后几句（carry_over）。
+免得上下文无限长；新的一段会先带上前一段最后几句（carry_over）。一天里一直聊、一段长到 ROLL_AT，
+也悄悄换一段（他看到的还是同一条）。
 """
 
 from __future__ import annotations
@@ -29,6 +30,10 @@ THREAD_DAYS = 14
 THREAD_MAX = 200
 CARRY_LINES = 6
 CARRY_WITHIN_S = 24 * 60 * 60
+# 给模型的一段最长多少 token（上一次问模型时的输入加输出）。Claude 能看 1M，备用的 GPT-5 只能 272K；
+# 这里远在两者之下换段，也免得每句话都把很长的历史再付一遍钱
+ROLL_AT = 150_000
+FULL = 10**9  # 模型说「太长了」：记成满的，下一句就换段
 # 能贴在气泡上的表情（和 WhatsApp 默认的一样）
 REACTIONS = ("👍", "❤️", "😂", "😮", "😢", "🙏")
 
@@ -65,7 +70,8 @@ class Conversations:
                 CREATE TABLE IF NOT EXISTS conversations (
                     id TEXT PRIMARY KEY,
                     started_at REAL NOT NULL,
-                    last_active_at REAL NOT NULL
+                    last_active_at REAL NOT NULL,
+                    context_tokens INTEGER NOT NULL DEFAULT 0
                 );
                 CREATE TABLE IF NOT EXISTS conversation_messages (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -79,6 +85,9 @@ class Conversations:
                     ON conversation_messages (conversation_id, id);
                 """
             )
+            columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(conversations)")}
+            if "context_tokens" not in columns:  # 之前建的库
+                self._conn.execute("ALTER TABLE conversations ADD COLUMN context_tokens INTEGER NOT NULL DEFAULT 0")
             self._conn.commit()
         self._sessions: dict[str, SQLiteSession] = {}
 
@@ -118,6 +127,17 @@ class Conversations:
         with self._lock:
             row = self._conn.execute("SELECT id FROM conversations ORDER BY last_active_at DESC LIMIT 1").fetchone()
         return row["id"] if row else None
+
+    def size(self, cid: str) -> int:
+        """这一段给模型的有多长（token）。"""
+        with self._lock:
+            row = self._conn.execute("SELECT context_tokens FROM conversations WHERE id = ?", (cid,)).fetchone()
+        return int(row["context_tokens"]) if row else 0
+
+    def set_size(self, cid: str, tokens: int) -> None:
+        with self._lock:
+            self._conn.execute("UPDATE conversations SET context_tokens = ? WHERE id = ?", (int(tokens), cid))
+            self._conn.commit()
 
     def touch(self, cid: str) -> None:
         with self._lock:

@@ -30,7 +30,7 @@ from src import claude
 from src.claude import RESTART, ClaudeModel, for_openai
 from src.config import STATE_DIR, effective_now
 from src.context import memory_block, now_block, profile_block
-from src.conversation import Conversations, split_reaction, store
+from src.conversation import FULL, ROLL_AT, Conversations, split_reaction, store
 from src.tools import ALL_TOOLS, TASK_TOOLS
 from src.turn import Turn
 
@@ -320,6 +320,13 @@ def _turn_from_json(data: Any) -> Turn:
     return Turn(undo=list((data or {}).get("undo") or []))
 
 
+def _too_long(exc: Exception) -> bool:
+    """模型说这段对话装不下了（Claude：prompt is too long；OpenAI：context_length_exceeded）。"""
+    text = str(exc).lower()
+    return any(words in text for words in ("prompt is too long", "context_length_exceeded", "maximum context length",
+                                           "exceed context limit"))
+
+
 class Friday:
     """对话存在服务端（见 conversation.py）；写操作停下时，那一步原样存着，他确认才继续。
 
@@ -390,11 +397,15 @@ class Friday:
     # ---- 一轮 ----
 
     def resolve_conversation(self, cid: str | None) -> str:
-        """页面带来的对话 id 还在就用它；否则接上当前的；都没有就开一个新的。"""
+        """页面带来的对话 id 还在就用它；否则接上当前的；都没有就开一个新的。
+
+        这一段给模型的已经太长：悄悄换一段新的，带上最后几句（页面上还是同一条）。等他确认的那一步除外。
+        """
         convs = self.conversations
-        if cid and convs.exists(cid):
+        cid = cid if cid and convs.exists(cid) else convs.current()
+        if cid and (convs.size(cid) < ROLL_AT or self.pending_approvals(cid)):
             return cid
-        return convs.current() or convs.create()
+        return convs.create()
 
     async def turn(
         self, cid: str, message: str, *, spoken: bool = False, revision: dict[str, Any] | None = None,
@@ -527,20 +538,30 @@ class Friday:
             result = Runner.run_streamed(
                 agent, run_input, max_turns=12, context=Turn(), session=session, run_config=RUN_CONFIG, hooks=LEDGER
             )
-        async for event in result.stream_events():
-            if event.type == "raw_response_event":
-                if isinstance(event.data, ResponseTextDeltaEvent) and event.data.delta:
-                    yield {"type": "delta", "text": event.data.delta}
-                elif getattr(event.data, "type", None) == RESTART:
-                    # Claude 说到一半出故障、换备用的重说：页面把那半句收起来（和她去查东西时一样）
-                    yield {"type": "tool", "name": ""}
-            elif event.type == "run_item_stream_event" and event.name == "tool_called":
-                raw = getattr(event.item, "raw_item", None)
-                name = _get(raw, "name")
-                if name:
-                    if name not in tools:
-                        tools.append(str(name))
-                    yield {"type": "tool", "name": str(name)}
+        try:
+            async for event in result.stream_events():
+                if event.type == "raw_response_event":
+                    if isinstance(event.data, ResponseTextDeltaEvent) and event.data.delta:
+                        yield {"type": "delta", "text": event.data.delta}
+                    elif getattr(event.data, "type", None) == RESTART:
+                        # Claude 说到一半出故障、换备用的重说：页面把那半句收起来（和她去查东西时一样）
+                        yield {"type": "tool", "name": ""}
+                elif event.type == "run_item_stream_event" and event.name == "tool_called":
+                    raw = getattr(event.item, "raw_item", None)
+                    name = _get(raw, "name")
+                    if name:
+                        if name not in tools:
+                            tools.append(str(name))
+                        yield {"type": "tool", "name": str(name)}
+        except Exception as exc:
+            if _too_long(exc):
+                # 模型说装不下了：这句只能请他再说一次，但下一句就换一段新的，不会一直卡着
+                self.conversations.set_size(cid, FULL)
+            raise
+        # 最后一次问模型时整段有多长：下一句开头据此决定要不要换段
+        usage = result.raw_responses[-1].usage if result.raw_responses else None
+        if usage is not None and (usage.input_tokens or usage.output_tokens):
+            self.conversations.set_size(cid, usage.input_tokens + usage.output_tokens)
         turn = getattr(result.context_wrapper, "context", None)
         undo.extend(getattr(turn, "undo", None) or [])
         interruptions = list(getattr(result, "interruptions", None) or [])
