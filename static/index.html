@@ -1446,7 +1446,7 @@
       mind.append(open);
 
       setAboutView("profile");
-      aboutBody.replaceChildren(profile, use, links, pushes, mind, el("p", "fineprint", me.version ? "版本 " + me.version : ""));
+      aboutBody.replaceChildren(profile, use, links, pushes, mind, el("p", "fineprint", me.version ? "版本 " + me.version + (me.build ? " · " + me.build : "") : ""));
     }
 
     // 她记得你的事：大标题和件数，事情多了能搜；按「这周 / 这个月 / 更早」分组，每条下面写哪天记的；

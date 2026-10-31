@@ -46,7 +46,7 @@ from src.config import (
     require_openai_api_key,
 )
 from src.context import weekday_zh
-from src.version import code_version
+from src.version import VERSION, code_version
 
 CODE_VERSION = code_version()
 
@@ -101,7 +101,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="Friday",
-    version="0.5.0",
+    version=VERSION,
     lifespan=lifespan,
 )
 app.middleware("http")(gate)
@@ -181,6 +181,7 @@ def health() -> dict:
         pass
     return {
         "ok": True,
+        "version": VERSION,
         "code_version": CODE_VERSION,
         # 云上部署时带进来的提交号：部署工作流靠它确认线上就是刚推的那一版
         "git_sha": (os.getenv("FRIDAY_GIT_SHA") or "").strip(),

@@ -18,6 +18,7 @@ from src import agenda, claude, ledger, memory_store, push, settings, todos, usa
 from src.agent import active_model, answering_model
 from src.config import USAGE_LOG_PATH, effective_now, get_calendar_backend
 from src.mail_providers import label_of, mailboxes
+from src.version import VERSION
 
 router = APIRouter(tags=["about"])
 CHECK_TIMEOUT_S = 6
@@ -101,7 +102,9 @@ def me() -> dict[str, Any]:
         "connections": connections(),
         "push": {"devices": len(push.devices()), **settings.get()},
         "memory": len(memory_store.all_facts()),
-        "version": (os.getenv("FRIDAY_GIT_SHA") or "")[:7],
+        "version": VERSION,
+        # 云上部署时带进来的提交号：同一个版本号下具体是哪一次提交
+        "build": (os.getenv("FRIDAY_GIT_SHA") or "")[:7],
     }
 
 

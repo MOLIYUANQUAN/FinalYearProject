@@ -256,6 +256,17 @@ Then follow Environment → API key → Open above. Details in [docs/baseline-v1
 | `main` | Major milestones |
 | tag `baseline-v1` | Reproducing the Baseline for the report |
 
+## Versions
+
+Friday is at **0.9.0**. The number lives in one place, `VERSION` in [`src/version.py`](src/version.py); her page (tap her name, bottom line) and `/api/health` show it, and [CHANGELOG.md](CHANGELOG.md) says what each version brought.
+
+- Something new he can hand over → MINOR (0.9.0 → 0.10.0)
+- A fix or polish he would notice → PATCH (0.9.0 → 0.9.1)
+- Docs or tests only → no change
+- 1.0.0 = the Tuesday test passes: merged into `main` and tagged `v1.0.0`. Until then there are no version tags.
+
+A test fails if `VERSION` and the top of the changelog disagree.
+
 ## Demo script (acceptance)
 
 1. **Tomorrow afternoon**  
@@ -275,6 +286,7 @@ Then follow Environment → API key → Open above. Details in [docs/baseline-v1
 
 ```
 ├── README.md
+├── CHANGELOG.md                   # what each version brought (version in src/version.py)
 ├── requirements.txt
 ├── .env.example
 ├── fly.toml / Dockerfile          # cloud Friday (volume at /state, TZ=Europe/London)
