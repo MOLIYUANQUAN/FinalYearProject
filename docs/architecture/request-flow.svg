@@ -1,0 +1,229 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="2252" viewBox="0 0 1400 2252">
+  <title>Friday — Request flow: replying to an email</title>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3f3b35"/>
+    </marker>
+    <style>
+      .sans { font-family: Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", "WenQuanYi Zen Hei", Helvetica, Arial, sans-serif; }
+      .mono { font-family: "JetBrains Mono", Consolas, Menlo, "WenQuanYi Zen Hei Mono", monospace; }
+    </style>
+  </defs>
+  <rect x="0" y="0" width="1400" height="2252" fill="#ffffff"/>
+  <text class="sans" x="40.0" y="58.0" style="font-size:30px;font-weight:700;fill:#1c1a16">Friday — Request flow: replying to an email</text>
+  <text class="sans" x="40.0" y="88.0" style="font-size:16px;font-weight:400;fill:#5c574e">Two turns. The model drafts the email; the server stops the run before anything is sent, and only his plain yes lets that exact action run.</text>
+  <rect x="22.0" y="116.0" width="176.0" height="62.0" rx="10" fill="#eef4fb" stroke="#a9c3e3" stroke-width="1.2"/>
+  <text class="sans" x="110.0" y="143.0" style="font-size:16.5px;font-weight:700;fill:#1c1a16" text-anchor="middle">Zeep</text>
+  <text class="sans" x="110.0" y="164.0" style="font-size:12.5px;font-weight:500;fill:#6b665c" text-anchor="middle">Friday page</text>
+  <rect x="207.0" y="116.0" width="176.0" height="62.0" rx="10" fill="#ecf5f1" stroke="#9fcbbb" stroke-width="1.2"/>
+  <text class="sans" x="295.0" y="143.0" style="font-size:16.5px;font-weight:700;fill:#1c1a16" text-anchor="middle">Web server</text>
+  <text class="mono" x="295.0" y="164.0" style="font-size:12.5px;font-weight:500;fill:#6b665c" text-anchor="middle">src/main.py</text>
+  <rect x="402.0" y="116.0" width="176.0" height="62.0" rx="10" fill="#f3f0fa" stroke="#c9bce6" stroke-width="1.2"/>
+  <text class="sans" x="490.0" y="143.0" style="font-size:16.5px;font-weight:700;fill:#1c1a16" text-anchor="middle">Friday agent</text>
+  <text class="mono" x="490.0" y="164.0" style="font-size:12.5px;font-weight:500;fill:#6b665c" text-anchor="middle">src/agent.py</text>
+  <rect x="602.0" y="116.0" width="176.0" height="62.0" rx="10" fill="#f3f0fa" stroke="#c9bce6" stroke-width="1.2"/>
+  <text class="sans" x="690.0" y="143.0" style="font-size:16.5px;font-weight:700;fill:#1c1a16" text-anchor="middle">Model</text>
+  <text class="sans" x="690.0" y="164.0" style="font-size:12.5px;font-weight:500;fill:#6b665c" text-anchor="middle">Claude Opus 5.5 / GPT-5</text>
+  <rect x="797.0" y="116.0" width="176.0" height="62.0" rx="10" fill="#fbf6e4" stroke="#e0cd8a" stroke-width="1.2"/>
+  <text class="sans" x="885.0" y="143.0" style="font-size:16.5px;font-weight:700;fill:#1c1a16" text-anchor="middle">Tools</text>
+  <text class="mono" x="885.0" y="164.0" style="font-size:12.5px;font-weight:500;fill:#6b665c" text-anchor="middle">src/tools/</text>
+  <rect x="987.0" y="116.0" width="176.0" height="62.0" rx="10" fill="#edf6f8" stroke="#a8d0da" stroke-width="1.2"/>
+  <text class="sans" x="1075.0" y="143.0" style="font-size:16.5px;font-weight:700;fill:#1c1a16" text-anchor="middle">His mailboxes</text>
+  <text class="sans" x="1075.0" y="164.0" style="font-size:12.5px;font-weight:500;fill:#6b665c" text-anchor="middle">Gmail · 163</text>
+  <rect x="1182.0" y="116.0" width="176.0" height="62.0" rx="10" fill="#f4f3f1" stroke="#cfcac2" stroke-width="1.2"/>
+  <text class="sans" x="1270.0" y="143.0" style="font-size:16.5px;font-weight:700;fill:#1c1a16" text-anchor="middle">State</text>
+  <text class="mono" x="1270.0" y="164.0" style="font-size:12.5px;font-weight:500;fill:#6b665c" text-anchor="middle">/state</text>
+  <line x1="110" y1="178" x2="110" y2="2020" stroke="#bdb7ab" stroke-width="1.3" stroke-dasharray="5 5"/>
+  <line x1="295" y1="178" x2="295" y2="2020" stroke="#bdb7ab" stroke-width="1.3" stroke-dasharray="5 5"/>
+  <line x1="490" y1="178" x2="490" y2="2020" stroke="#bdb7ab" stroke-width="1.3" stroke-dasharray="5 5"/>
+  <line x1="690" y1="178" x2="690" y2="2020" stroke="#bdb7ab" stroke-width="1.3" stroke-dasharray="5 5"/>
+  <line x1="885" y1="178" x2="885" y2="2020" stroke="#bdb7ab" stroke-width="1.3" stroke-dasharray="5 5"/>
+  <line x1="1075" y1="178" x2="1075" y2="2020" stroke="#bdb7ab" stroke-width="1.3" stroke-dasharray="5 5"/>
+  <line x1="1270" y1="178" x2="1270" y2="2020" stroke="#bdb7ab" stroke-width="1.3" stroke-dasharray="5 5"/>
+  <rect x="22.0" y="2020.0" width="176.0" height="34.0" rx="8" fill="#ffffff" stroke="#cfcac2" stroke-width="1"/>
+  <rect x="207.0" y="2020.0" width="176.0" height="34.0" rx="8" fill="#ffffff" stroke="#cfcac2" stroke-width="1"/>
+  <rect x="402.0" y="2020.0" width="176.0" height="34.0" rx="8" fill="#ffffff" stroke="#cfcac2" stroke-width="1"/>
+  <rect x="602.0" y="2020.0" width="176.0" height="34.0" rx="8" fill="#ffffff" stroke="#cfcac2" stroke-width="1"/>
+  <rect x="797.0" y="2020.0" width="176.0" height="34.0" rx="8" fill="#ffffff" stroke="#cfcac2" stroke-width="1"/>
+  <rect x="987.0" y="2020.0" width="176.0" height="34.0" rx="8" fill="#ffffff" stroke="#cfcac2" stroke-width="1"/>
+  <rect x="1182.0" y="2020.0" width="176.0" height="34.0" rx="8" fill="#ffffff" stroke="#cfcac2" stroke-width="1"/>
+  <text class="sans" x="110.0" y="2042.0" style="font-size:13.5px;font-weight:600;fill:#6b665c" text-anchor="middle">Zeep</text>
+  <text class="sans" x="295.0" y="2042.0" style="font-size:13.5px;font-weight:600;fill:#6b665c" text-anchor="middle">Web server</text>
+  <text class="sans" x="490.0" y="2042.0" style="font-size:13.5px;font-weight:600;fill:#6b665c" text-anchor="middle">Friday agent</text>
+  <text class="sans" x="690.0" y="2042.0" style="font-size:13.5px;font-weight:600;fill:#6b665c" text-anchor="middle">Model</text>
+  <text class="sans" x="885.0" y="2042.0" style="font-size:13.5px;font-weight:600;fill:#6b665c" text-anchor="middle">Tools</text>
+  <text class="sans" x="1075.0" y="2042.0" style="font-size:13.5px;font-weight:600;fill:#6b665c" text-anchor="middle">His mailboxes</text>
+  <text class="sans" x="1270.0" y="2042.0" style="font-size:13.5px;font-weight:600;fill:#6b665c" text-anchor="middle">State</text>
+  <rect x="24.0" y="212.0" width="1352.0" height="34.0" rx="8" fill="#f6f4ef" stroke="#e2ded5" stroke-width="1"/>
+  <text class="sans" x="40.0" y="234.0" style="font-size:15px;font-weight:700;fill:#4a463f">Turn 1 — he asks; Friday drafts the reply and stops before sending</text>
+  <rect x="24.0" y="1371.0" width="1352.0" height="34.0" rx="8" fill="#f6f4ef" stroke="#e2ded5" stroke-width="1"/>
+  <text class="sans" x="40.0" y="1393.0" style="font-size:15px;font-weight:700;fill:#4a463f">Turn 2 — he says yes; only that exact action runs</text>
+  <path d="M110.0,284.0 L295.0,284.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="122.0" y="277.0" style="font-size:13.5px;font-weight:600;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">POST /api/chat/stream</text>
+  <text class="sans" x="122.0" y="302.0" style="font-size:12.5px;font-weight:400;fill:#6b665c;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">「回一下 John，说我明天下午两点能到」 (Reply to John: I can make it tomorrow at 2)</text>
+  <circle cx="34" cy="284" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="288.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">1</text>
+  <path d="M295.0,346.0 L490.0,346.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="307.0" y="339.0" style="font-size:13.5px;font-weight:600;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">friday.turn(conversation, message)</text>
+  <circle cx="34" cy="346" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="350.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">2</text>
+  <path d="M490.0,390.0 L1270.0,390.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="502.0" y="383.0" style="font-size:13.5px;font-weight:600;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">store his message · conversations.db</text>
+  <circle cx="34" cy="390" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="394.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">3</text>
+  <rect x="504.0" y="418.0" width="430.0" height="73.0" rx="8" fill="#ffffff" stroke="#c9bce6" stroke-width="1.2"/>
+  <rect x="504.0" y="418.0" width="5.0" height="73.0" rx="2" fill="#5a3e8e" stroke="none" stroke-width="1"/>
+  <text class="sans" x="520.0" y="440.0" style="font-size:13.5px;font-weight:600;fill:#3a362f">Instructions for this turn: persona + the time now</text>
+  <text class="sans" x="520.0" y="459.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">+ calendar and to-dos (read in parallel)</text>
+  <text class="sans" x="520.0" y="478.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">+ reminders, profile, memory</text>
+  <circle cx="34" cy="454.5" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="458.8" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">4</text>
+  <path d="M490.0,525.0 L690.0,525.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="502.0" y="518.0" style="font-size:13.5px;font-weight:600;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">call 1: instructions + session history + his message</text>
+  <circle cx="34" cy="525" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="529.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">5</text>
+  <path d="M690.0,569.0 L490.0,569.0" fill="none" stroke="#3f3b35" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arr)"/>
+  <text class="sans" x="502.0" y="562.0" style="font-size:13.5px;font-weight:500;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">tool call: search_emails("John")</text>
+  <circle cx="34" cy="569" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="573.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">6</text>
+  <path d="M490.0,613.0 L885.0,613.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="502.0" y="606.0" style="font-size:13.5px;font-weight:600;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">run search_emails("John")</text>
+  <circle cx="34" cy="613" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="617.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">7</text>
+  <path d="M885.0,657.0 L1075.0,657.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="897.0" y="650.0" style="font-size:13.5px;font-weight:600;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">search every connected mailbox</text>
+  <circle cx="34" cy="657" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="661.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">8</text>
+  <path d="M1075.0,701.0 L490.0,701.0" fill="none" stroke="#3f3b35" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arr)"/>
+  <text class="sans" x="502.0" y="694.0" style="font-size:13.5px;font-weight:500;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">matching emails, each tagged with its mailbox</text>
+  <circle cx="34" cy="701" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="705.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">9</text>
+  <path d="M490.0,745.0 L690.0,745.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="502.0" y="738.0" style="font-size:13.5px;font-weight:600;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">call 2: with the results</text>
+  <circle cx="34" cy="745" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="749.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">10</text>
+  <path d="M690.0,789.0 L490.0,789.0" fill="none" stroke="#3f3b35" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arr)"/>
+  <text class="sans" x="502.0" y="782.0" style="font-size:13.5px;font-weight:500;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">tool call: read_email(id)</text>
+  <circle cx="34" cy="789" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="793.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">11</text>
+  <path d="M490.0,833.0 L885.0,833.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="502.0" y="826.0" style="font-size:13.5px;font-weight:600;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">run read_email(id)</text>
+  <circle cx="34" cy="833" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="837.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">12</text>
+  <path d="M885.0,877.0 L1075.0,877.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="897.0" y="870.0" style="font-size:13.5px;font-weight:600;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">fetch the thread</text>
+  <circle cx="34" cy="877" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="881.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">13</text>
+  <path d="M1075.0,921.0 L490.0,921.0" fill="none" stroke="#3f3b35" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arr)"/>
+  <text class="sans" x="502.0" y="914.0" style="font-size:13.5px;font-weight:500;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">John's message</text>
+  <circle cx="34" cy="921" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="925.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">14</text>
+  <path d="M490.0,965.0 L690.0,965.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="502.0" y="958.0" style="font-size:13.5px;font-weight:600;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">call 3: with the thread</text>
+  <circle cx="34" cy="965" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="969.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">15</text>
+  <path d="M690.0,1009.0 L490.0,1009.0" fill="none" stroke="#3f3b35" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arr)"/>
+  <text class="sans" x="502.0" y="1002.0" style="font-size:13.5px;font-weight:500;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">tool call: send_email(to, subject, body, mailbox)</text>
+  <circle cx="34" cy="1009" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="1013.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">16</text>
+  <path d="M490.0,1053.0 L871.0,1053.0" fill="none" stroke="#a3271b" stroke-width="1.8" marker-end="url(#arr)"/>
+  <rect x="873.0" y="1041.0" width="24.0" height="24.0" rx="5" fill="#fde8e6" stroke="#a3271b" stroke-width="1.5"/>
+  <rect x="879.5" y="1047.0" width="4.0" height="12.0" rx="1" fill="#a3271b" stroke="none" stroke-width="1"/>
+  <rect x="886.5" y="1047.0" width="4.0" height="12.0" rx="1" fill="#a3271b" stroke="none" stroke-width="1"/>
+  <text class="sans" x="502.0" y="1046.0" style="font-size:13.5px;font-weight:600;fill:#a3271b;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">needs_approval=True → the run is interrupted; send_email does NOT run</text>
+  <circle cx="34" cy="1053" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="1057.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">17</text>
+  <path d="M490.0,1097.0 L1270.0,1097.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="502.0" y="1090.0" style="font-size:13.5px;font-weight:600;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">save the paused run (RunState) · pending/&lt;conversation&gt;</text>
+  <circle cx="34" cy="1097" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="1101.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">18</text>
+  <path d="M490.0,1141.0 L110.0,1141.0" fill="none" stroke="#3f3b35" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arr)"/>
+  <text class="sans" x="122.0" y="1134.0" style="font-size:13.5px;font-weight:500;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">SSE: streamed text · tool events · done {needs_confirm: true}</text>
+  <text class="sans" x="122.0" y="1159.0" style="font-size:12.5px;font-weight:400;fill:#6b665c;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">the card text is written by the server (approval.describe), not by the model</text>
+  <circle cx="34" cy="1141" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="1145.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">19</text>
+  <path d="M110.0,1443.0 L295.0,1443.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="122.0" y="1436.0" style="font-size:13.5px;font-weight:600;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">POST /api/chat/stream  「发」</text>
+  <text class="sans" x="122.0" y="1461.0" style="font-size:12.5px;font-weight:400;fill:#6b665c;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">or edits the subject / body in the card → POST /api/chat/revise</text>
+  <circle cx="34" cy="1443" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="1447.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">20</text>
+  <path d="M295.0,1505.0 L490.0,1505.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="307.0" y="1498.0" style="font-size:13.5px;font-weight:600;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">friday.turn(conversation, "发")</text>
+  <circle cx="34" cy="1505" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="1509.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">21</text>
+  <path d="M490.0,1549.0 L1270.0,1549.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="502.0" y="1542.0" style="font-size:13.5px;font-weight:600;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">load the paused run · pending/&lt;conversation&gt;</text>
+  <circle cx="34" cy="1549" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="1553.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">22</text>
+  <rect x="504.0" y="1577.0" width="520.0" height="73.0" rx="8" fill="#ffffff" stroke="#c9bce6" stroke-width="1.2"/>
+  <rect x="504.0" y="1577.0" width="5.0" height="73.0" rx="2" fill="#5a3e8e" stroke="none" stroke-width="1"/>
+  <text class="sans" x="520.0" y="1599.0" style="font-size:13.5px;font-weight:600;fill:#3a362f">approval.decide("发") → approve</text>
+  <text class="sans" x="520.0" y="1618.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">Only a plain yes (发 / 好 / 确认 / ok …) approves; 不发 / 取消 / 算了 rejects;</text>
+  <text class="sans" x="520.0" y="1637.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">anything else means he moved on, and nothing is sent</text>
+  <circle cx="34" cy="1613.5" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="1617.8" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">23</text>
+  <path d="M490.0,1684.0 L885.0,1684.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="502.0" y="1677.0" style="font-size:13.5px;font-weight:600;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">resume the run → send_email executes</text>
+  <circle cx="34" cy="1684" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="1688.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">24</text>
+  <path d="M885.0,1728.0 L1075.0,1728.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="897.0" y="1721.0" style="font-size:13.5px;font-weight:600;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">send from the mailbox the email came to (Gmail API / SMTP)</text>
+  <circle cx="34" cy="1728" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="1732.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">25</text>
+  <path d="M1075.0,1772.0 L885.0,1772.0" fill="none" stroke="#3f3b35" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arr)"/>
+  <text class="sans" x="897.0" y="1765.0" style="font-size:13.5px;font-weight:500;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">sent</text>
+  <circle cx="34" cy="1772" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="1776.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">26</text>
+  <path d="M885.0,1816.0 L1270.0,1816.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="897.0" y="1809.0" style="font-size:13.5px;font-weight:600;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">closed.record("mail") — a loop closed, counted in the 21:00 wrap-up</text>
+  <circle cx="34" cy="1816" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="1820.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">27</text>
+  <path d="M490.0,1860.0 L690.0,1860.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="502.0" y="1853.0" style="font-size:13.5px;font-weight:600;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">call 4: tool result</text>
+  <circle cx="34" cy="1860" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="1864.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">28</text>
+  <path d="M690.0,1904.0 L490.0,1904.0" fill="none" stroke="#3f3b35" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arr)"/>
+  <text class="sans" x="502.0" y="1897.0" style="font-size:13.5px;font-weight:500;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">「发了。」 (Sent.)</text>
+  <circle cx="34" cy="1904" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="1908.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">29</text>
+  <path d="M490.0,1948.0 L1270.0,1948.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="502.0" y="1941.0" style="font-size:13.5px;font-weight:600;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">store her reply · conversations.db</text>
+  <circle cx="34" cy="1948" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="1952.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">30</text>
+  <path d="M490.0,1992.0 L110.0,1992.0" fill="none" stroke="#3f3b35" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arr)"/>
+  <text class="sans" x="122.0" y="1985.0" style="font-size:13.5px;font-weight:500;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">SSE: done → her bubble</text>
+  <circle cx="34" cy="1992" r="10" fill="#8a8478"/>
+  <text class="sans" x="34" y="1996.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">31</text>
+  <rect x="70.0" y="1193.0" width="520.0" height="154.0" rx="14" fill="#ffffff" stroke="#a9c3e3" stroke-width="1.4"/>
+  <text class="sans" x="88.0" y="1219.0" style="font-size:12.5px;font-weight:700;fill:#2f5f93;letter-spacing:0.04em">What he sees: her bubble with a confirm card</text>
+  <text class="sans" x="88.0" y="1245.0" style="font-size:14.5px;font-weight:600;fill:#1c1a16">发邮件给 john@example.com</text>
+  <text class="sans" x="88.0" y="1266.0" style="font-size:14.5px;font-weight:400;fill:#1c1a16">从 Gmail 发</text>
+  <text class="sans" x="88.0" y="1287.0" style="font-size:14.5px;font-weight:400;fill:#1c1a16">主题：Re: Tomorrow</text>
+  <text class="sans" x="88.0" y="1308.0" style="font-size:14.5px;font-weight:400;fill:#3a362f">明天下午两点我能到。</text>
+  <text class="sans" x="88.0" y="1333.0" style="font-size:14.5px;font-weight:700;fill:#1c1a16">发吗？</text>
+  <rect x="418.0" y="1313.0" width="64.0" height="30.0" rx="15" fill="#1c1a16" stroke="#1c1a16" stroke-width="1.2"/>
+  <text class="sans" x="450.0" y="1333.0" style="font-size:14px;font-weight:600;fill:#ffffff" text-anchor="middle">发</text>
+  <rect x="494.0" y="1313.0" width="76.0" height="30.0" rx="15" fill="#ffffff" stroke="#1c1a16" stroke-width="1.2"/>
+  <text class="sans" x="532.0" y="1333.0" style="font-size:14px;font-weight:600;fill:#1c1a16" text-anchor="middle">不发</text>
+  <rect x="602.0" y="1193.0" width="774.0" height="154.0" rx="12" fill="#ffffff" stroke="#e2ded5" stroke-width="1"/>
+  <text class="sans" x="620.0" y="1223.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">Subject and body can be edited in the card before</text>
+  <text class="sans" x="620.0" y="1242.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">sending; the edited version is what he approves.</text>
+  <text class="sans" x="620.0" y="1261.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">The recipient cannot be changed there, only by</text>
+  <text class="sans" x="620.0" y="1280.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">telling her.</text>
+  <text class="sans" x="976.0" y="1223.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">The paused run lives on disk, so a restart or a</text>
+  <text class="sans" x="976.0" y="1242.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">deploy in between does not lose it. If she says</text>
+  <text class="sans" x="976.0" y="1261.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">anything else first (a push, the opener), the</text>
+  <text class="sans" x="976.0" y="1280.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">question expires.</text>
+  <rect x="24.0" y="2084.0" width="1352.0" height="112.0" rx="12" fill="#faf8fd" stroke="#d5cbea" stroke-width="1.1"/>
+  <text class="sans" x="44.0" y="2112.0" style="font-size:14px;font-weight:400;fill:#6b665c">•</text>
+  <text class="sans" x="60.0" y="2112.0" style="font-size:14px;font-weight:400;fill:#3a362f">Which tools are called, and in what order, is decided by the model at run time; the figure shows the usual path.</text>
+  <text class="sans" x="44.0" y="2138.0" style="font-size:14px;font-weight:400;fill:#6b665c">•</text>
+  <text class="sans" x="60.0" y="2138.0" style="font-size:14px;font-weight:400;fill:#3a362f">If Claude fails mid-turn (no credit, rate limit, outage), src/claude.py asks GPT-5 for the same call and the page folds away the half sentence.</text>
+  <text class="sans" x="44.0" y="2164.0" style="font-size:14px;font-weight:400;fill:#6b665c">•</text>
+  <text class="sans" x="60.0" y="2164.0" style="font-size:14px;font-weight:400;fill:#3a362f">Own to-dos, calendar events and reminders do not stop like this: they run straight away and the reply carries an Undo button (POST /api/undo, no model).</text>
+  <path d="M40.0,2225.0 L86.0,2225.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="96.0" y="2230.0" style="font-size:13px;font-weight:400;fill:#6b665c">call / request</text>
+  <path d="M210.0,2225.0 L256.0,2225.0" fill="none" stroke="#3f3b35" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arr)"/>
+  <text class="sans" x="266.0" y="2230.0" style="font-size:13px;font-weight:400;fill:#6b665c">result / response</text>
+  <text class="sans" x="1360.0" y="2230.0" style="font-size:13px;font-weight:400;fill:#6b665c" text-anchor="end">Steps follow src/agent.py Friday.turn() on develop.</text>
+</svg>

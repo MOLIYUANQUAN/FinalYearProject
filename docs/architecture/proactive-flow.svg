@@ -1,0 +1,178 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1143" viewBox="0 0 1400 1143">
+  <title>Friday — Proactive path (no model)</title>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3f3b35"/>
+    </marker>
+    <style>
+      .sans { font-family: Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", "WenQuanYi Zen Hei", Helvetica, Arial, sans-serif; }
+      .mono { font-family: "JetBrains Mono", Consolas, Menlo, "WenQuanYi Zen Hei Mono", monospace; }
+    </style>
+  </defs>
+  <rect x="0" y="0" width="1400" height="1143" fill="#ffffff"/>
+  <text class="sans" x="40.0" y="58.0" style="font-size:30px;font-weight:700;fill:#1c1a16">Friday — Proactive path: what happens before he asks</text>
+  <text class="sans" x="40.0" y="88.0" style="font-size:16px;font-weight:400;fill:#5c574e">The opener, the pushes and the evening wrap-up are computed by the server from his real calendar, to-dos and reminders. No model is asked.</text>
+  <rect x="24.0" y="122.0" width="1352.0" height="260.0" rx="14" fill="#eef4fb" stroke="#c6d8ee" stroke-width="1.2"/>
+  <text class="sans" x="44.0" y="150.0" style="font-size:13px;font-weight:700;fill:#2f5f93;letter-spacing:0.09em">WHEN HE OPENS FRIDAY</text>
+  <text class="sans" x="238.9" y="150.0" style="font-size:14px;font-weight:500;fill:#2f5f93">the opener 「现在」</text>
+  <rect x="40.0" y="170.0" width="195.0" height="186.0" rx="10" fill="#ffffff" stroke="#a9c3e3" stroke-width="1.1"/>
+  <circle cx="42.0" cy="172" r="10" fill="#2f5f93"/>
+  <text class="sans" x="42.0" y="176.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">1</text>
+  <text class="sans" x="53.0" y="200.0" style="font-size:15px;font-weight:700;fill:#1c1a16">He opens Friday</text>
+  <text class="mono" x="53.0" y="220.0" style="font-size:12.5px;font-weight:500;fill:#6b665c">Ctrl+Alt+F ·</text>
+  <text class="mono" x="53.0" y="238.0" style="font-size:12.5px;font-weight:500;fill:#6b665c">home-screen icon</text>
+  <text class="sans" x="53.0" y="264.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">The page asks for the</text>
+  <text class="sans" x="53.0" y="282.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">opener if the last</text>
+  <text class="sans" x="53.0" y="301.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">conversation has gone</text>
+  <text class="sans" x="53.0" y="319.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">quiet.</text>
+  <path d="M238.0,263.0 L262.0,263.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <rect x="265.0" y="170.0" width="195.0" height="186.0" rx="10" fill="#ffffff" stroke="#a9c3e3" stroke-width="1.1"/>
+  <circle cx="267.0" cy="172" r="10" fill="#2f5f93"/>
+  <text class="sans" x="267.0" y="176.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">2</text>
+  <text class="sans" x="278.0" y="200.0" style="font-size:15px;font-weight:700;fill:#1c1a16">POST</text>
+  <text class="sans" x="278.0" y="220.0" style="font-size:15px;font-weight:700;fill:#1c1a16">/api/presence/stream</text>
+  <text class="sans" x="278.0" y="248.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">Streamed, so the card and</text>
+  <text class="sans" x="278.0" y="266.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">the sentence arrive</text>
+  <text class="sans" x="278.0" y="285.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">together (about 0.7 s).</text>
+  <path d="M463.0,263.0 L487.0,263.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <rect x="490.0" y="170.0" width="195.0" height="186.0" rx="10" fill="#ffffff" stroke="#a9c3e3" stroke-width="1.1"/>
+  <circle cx="492.0" cy="172" r="10" fill="#2f5f93"/>
+  <text class="sans" x="492.0" y="176.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">3</text>
+  <text class="sans" x="503.0" y="200.0" style="font-size:15px;font-weight:700;fill:#1c1a16">Read what is real</text>
+  <text class="mono" x="503.0" y="220.0" style="font-size:12.5px;font-weight:500;fill:#6b665c">presence.py ·</text>
+  <text class="mono" x="503.0" y="238.0" style="font-size:12.5px;font-weight:500;fill:#6b665c">agenda.py · todos.py ·</text>
+  <text class="mono" x="503.0" y="256.0" style="font-size:12.5px;font-weight:500;fill:#6b665c">reminders.py</text>
+  <text class="sans" x="503.0" y="282.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">Calendar today → next</text>
+  <text class="sans" x="503.0" y="300.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">Sunday, at most 1 min old;</text>
+  <text class="sans" x="503.0" y="319.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">to-dos; reminders. Times</text>
+  <text class="sans" x="503.0" y="337.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">in local clock.</text>
+  <path d="M688.0,263.0 L712.0,263.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <rect x="715.0" y="170.0" width="195.0" height="186.0" rx="10" fill="#ffffff" stroke="#a9c3e3" stroke-width="1.1"/>
+  <circle cx="717.0" cy="172" r="10" fill="#2f5f93"/>
+  <text class="sans" x="717.0" y="176.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">4</text>
+  <text class="sans" x="728.0" y="200.0" style="font-size:15px;font-weight:700;fill:#1c1a16">Pick one focus</text>
+  <text class="sans" x="728.0" y="228.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">Important meeting within</text>
+  <text class="sans" x="728.0" y="246.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">3 h → overdue → due</text>
+  <text class="sans" x="728.0" y="265.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">today. Otherwise one</text>
+  <text class="sans" x="728.0" y="283.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">sentence from the</text>
+  <text class="sans" x="728.0" y="302.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">calendar: what is next,</text>
+  <text class="sans" x="728.0" y="320.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">how long he is free.</text>
+  <path d="M913.0,263.0 L937.0,263.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <rect x="940.0" y="170.0" width="195.0" height="186.0" rx="10" fill="#ffffff" stroke="#a9c3e3" stroke-width="1.1"/>
+  <circle cx="942.0" cy="172" r="10" fill="#2f5f93"/>
+  <text class="sans" x="942.0" y="176.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">5</text>
+  <text class="sans" x="953.0" y="200.0" style="font-size:15px;font-weight:700;fill:#1c1a16">Headline + one action</text>
+  <text class="sans" x="953.0" y="228.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">Big headline in his words,</text>
+  <text class="sans" x="953.0" y="246.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">details in small print, then</text>
+  <text class="sans" x="953.0" y="265.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">a quiet timeline of</text>
+  <text class="sans" x="953.0" y="283.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">classes, meetings,</text>
+  <text class="sans" x="953.0" y="302.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">reminders and deadlines.</text>
+  <path d="M1138.0,263.0 L1162.0,263.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <rect x="1165.0" y="170.0" width="195.0" height="186.0" rx="10" fill="#ffffff" stroke="#a9c3e3" stroke-width="1.1"/>
+  <circle cx="1167.0" cy="172" r="10" fill="#2f5f93"/>
+  <text class="sans" x="1167.0" y="176.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">6</text>
+  <text class="sans" x="1178.0" y="200.0" style="font-size:15px;font-weight:700;fill:#1c1a16">Saved in the thread</text>
+  <text class="mono" x="1178.0" y="220.0" style="font-size:12.5px;font-weight:500;fill:#6b665c">record_opener()</text>
+  <text class="sans" x="1178.0" y="246.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">Stored as her message,</text>
+  <text class="sans" x="1178.0" y="264.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">so on his next message</text>
+  <text class="sans" x="1178.0" y="283.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">the model knows what</text>
+  <text class="sans" x="1178.0" y="301.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">she has just said.</text>
+  <rect x="24.0" y="422.0" width="1352.0" height="297.5" rx="14" fill="#fdf2e9" stroke="#f0d3bd" stroke-width="1.2"/>
+  <text class="sans" x="44.0" y="450.0" style="font-size:13px;font-weight:700;fill:#9a4a17;letter-spacing:0.09em">WHEN SHE COMES TO FIND HIM</text>
+  <text class="sans" x="291.4" y="450.0" style="font-size:14px;font-weight:500;fill:#9a4a17">Web Push, decided by rules</text>
+  <rect x="40.0" y="470.0" width="195.0" height="223.5" rx="10" fill="#ffffff" stroke="#e8c3a6" stroke-width="1.1"/>
+  <circle cx="42.0" cy="472.0" r="10" fill="#9a4a17"/>
+  <text class="sans" x="42.0" y="476.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">1</text>
+  <text class="sans" x="53.0" y="500.0" style="font-size:15px;font-weight:700;fill:#1c1a16">Every 60 seconds</text>
+  <text class="mono" x="53.0" y="520.0" style="font-size:12.5px;font-weight:500;fill:#6b665c">push_api.run_scheduler()</text>
+  <text class="sans" x="53.0" y="546.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">Runs in the cloud copy</text>
+  <text class="sans" x="53.0" y="564.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">only, so he is never told</text>
+  <text class="sans" x="53.0" y="583.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">twice.</text>
+  <path d="M238.0,581.8 L262.0,581.8" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <rect x="265.0" y="470.0" width="195.0" height="223.5" rx="10" fill="#ffffff" stroke="#e8c3a6" stroke-width="1.1"/>
+  <circle cx="267.0" cy="472.0" r="10" fill="#9a4a17"/>
+  <text class="sans" x="267.0" y="476.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">2</text>
+  <text class="sans" x="278.0" y="500.0" style="font-size:15px;font-weight:700;fill:#1c1a16">His own reminders</text>
+  <text class="sans" x="278.0" y="520.0" style="font-size:15px;font-weight:700;fill:#1c1a16">first</text>
+  <text class="mono" x="278.0" y="540.0" style="font-size:12.5px;font-weight:500;fill:#6b665c">reminders.py</text>
+  <text class="sans" x="278.0" y="566.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">「三点提醒我…」 fires on</text>
+  <text class="sans" x="278.0" y="584.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">the minute: any hour,</text>
+  <text class="sans" x="278.0" y="603.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">outside the daily limit.</text>
+  <path d="M463.0,581.8 L487.0,581.8" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <rect x="490.0" y="470.0" width="195.0" height="223.5" rx="10" fill="#ffffff" stroke="#e8c3a6" stroke-width="1.1"/>
+  <circle cx="492.0" cy="472.0" r="10" fill="#9a4a17"/>
+  <text class="sans" x="492.0" y="476.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">3</text>
+  <text class="sans" x="503.0" y="500.0" style="font-size:15px;font-weight:700;fill:#1c1a16">Find candidates</text>
+  <text class="mono" x="503.0" y="520.0" style="font-size:12.5px;font-weight:500;fill:#6b665c">nudges.py ·</text>
+  <text class="mono" x="503.0" y="538.0" style="font-size:12.5px;font-weight:500;fill:#6b665c">engineering.py</text>
+  <text class="sans" x="503.0" y="564.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">Morning brief (08:30,</text>
+  <text class="sans" x="503.0" y="582.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">weekends 10:00) ·</text>
+  <text class="sans" x="503.0" y="601.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">meeting in 20 min–2 h ·</text>
+  <text class="sans" x="503.0" y="619.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">due today, after 17:00 ·</text>
+  <text class="sans" x="503.0" y="638.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">21:00 wrap-up · Cursor</text>
+  <text class="sans" x="503.0" y="656.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">finished, change live, CI</text>
+  <text class="sans" x="503.0" y="675.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">red.</text>
+  <path d="M688.0,581.8 L712.0,581.8" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <rect x="715.0" y="470.0" width="195.0" height="223.5" rx="10" fill="#ffffff" stroke="#e8c3a6" stroke-width="1.1"/>
+  <circle cx="717.0" cy="472.0" r="10" fill="#9a4a17"/>
+  <text class="sans" x="717.0" y="476.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">4</text>
+  <text class="sans" x="728.0" y="500.0" style="font-size:15px;font-weight:700;fill:#1c1a16">Rather miss than nag</text>
+  <text class="mono" x="728.0" y="520.0" style="font-size:12.5px;font-weight:500;fill:#6b665c">settings.json</text>
+  <text class="sans" x="728.0" y="546.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">At most 3 a day, quiet</text>
+  <text class="sans" x="728.0" y="564.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">22:00–08:00, each thing</text>
+  <text class="sans" x="728.0" y="583.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">once. Meeting &gt; brief &gt;</text>
+  <text class="sans" x="728.0" y="601.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">due &gt; wrap-up. He can</text>
+  <text class="sans" x="728.0" y="620.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">change the limits.</text>
+  <path d="M913.0,581.8 L937.0,581.8" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <rect x="940.0" y="470.0" width="195.0" height="223.5" rx="10" fill="#ffffff" stroke="#e8c3a6" stroke-width="1.1"/>
+  <circle cx="942.0" cy="472.0" r="10" fill="#9a4a17"/>
+  <text class="sans" x="942.0" y="476.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">5</text>
+  <text class="sans" x="953.0" y="500.0" style="font-size:15px;font-weight:700;fill:#1c1a16">Send</text>
+  <text class="mono" x="953.0" y="520.0" style="font-size:12.5px;font-weight:500;fill:#6b665c">webpush.py</text>
+  <text class="sans" x="953.0" y="546.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">VAPID-signed Web Push</text>
+  <text class="sans" x="953.0" y="564.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">to the iPhone</text>
+  <text class="sans" x="953.0" y="583.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">home-screen app and the</text>
+  <text class="sans" x="953.0" y="601.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">desktop window.</text>
+  <path d="M1138.0,581.8 L1162.0,581.8" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <rect x="1165.0" y="470.0" width="195.0" height="223.5" rx="10" fill="#ffffff" stroke="#e8c3a6" stroke-width="1.1"/>
+  <circle cx="1167.0" cy="472.0" r="10" fill="#9a4a17"/>
+  <text class="sans" x="1167.0" y="476.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">6</text>
+  <text class="sans" x="1178.0" y="500.0" style="font-size:15px;font-weight:700;fill:#1c1a16">Part of the thread</text>
+  <text class="mono" x="1178.0" y="520.0" style="font-size:12.5px;font-weight:500;fill:#6b665c">_into_thread()</text>
+  <text class="sans" x="1178.0" y="546.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">The push is also her</text>
+  <text class="sans" x="1178.0" y="564.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">message in the</text>
+  <text class="sans" x="1178.0" y="583.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">conversation; tapping it</text>
+  <text class="sans" x="1178.0" y="601.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">opens Friday right there.</text>
+  <rect x="24.0" y="759.5" width="1352.0" height="236.0" rx="14" fill="#f4f3f1" stroke="#dcd9d3" stroke-width="1.2"/>
+  <text class="sans" x="44.0" y="787.5" style="font-size:13px;font-weight:700;fill:#4a463f;letter-spacing:0.09em">CLOSING THE LOOP</text>
+  <text class="sans" x="201.0" y="787.5" style="font-size:14px;font-weight:500;fill:#4a463f">what Friday finished for him is counted, not guessed</text>
+  <rect x="40.0" y="809.5" width="300.0" height="54.0" rx="10" fill="#ffffff" stroke="#cfcac2" stroke-width="1.1"/>
+  <text class="sans" x="54.0" y="832.5" style="font-size:15px;font-weight:700;fill:#1c1a16">A to-do ticked off</text>
+  <text class="sans" x="54.0" y="852.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">complete_task · or a tap on Done</text>
+  <path d="M343.0,836.5 L516.0,900.5" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <rect x="40.0" y="873.5" width="300.0" height="54.0" rx="10" fill="#ffffff" stroke="#cfcac2" stroke-width="1.1"/>
+  <text class="sans" x="54.0" y="896.5" style="font-size:15px;font-weight:700;fill:#1c1a16">An email sent</text>
+  <text class="sans" x="54.0" y="916.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">send_email, after his yes</text>
+  <path d="M343.0,900.5 L516.0,900.5" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <rect x="40.0" y="937.5" width="300.0" height="54.0" rx="10" fill="#ffffff" stroke="#cfcac2" stroke-width="1.1"/>
+  <text class="sans" x="54.0" y="960.5" style="font-size:15px;font-weight:700;fill:#1c1a16">A change shipped</text>
+  <text class="sans" x="54.0" y="980.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">ship_pending_fix, after his yes</text>
+  <path d="M343.0,964.5 L516.0,900.5" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <rect x="520.0" y="809.5" width="300.0" height="182.0" rx="10" fill="#ffffff" stroke="#9b958a" stroke-width="1.4"/>
+  <text class="mono" x="536.0" y="839.5" style="font-size:16px;font-weight:700;fill:#1c1a16">closed.jsonl</text>
+  <text class="mono" x="536.0" y="859.5" style="font-size:12.5px;font-weight:500;fill:#6b665c">closed.record(kind, title)</text>
+  <text class="sans" x="536.0" y="889.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">One line per loop Friday closed. Undo</text>
+  <text class="sans" x="536.0" y="908.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">takes the line back out; "no longer</text>
+  <text class="sans" x="536.0" y="926.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">needed" is not counted as closed.</text>
+  <path d="M823.0,900.5 L856.0,900.5" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <rect x="860.0" y="809.5" width="500.0" height="182.0" rx="10" fill="#ffffff" stroke="#e8c3a6" stroke-width="1.1"/>
+  <text class="sans" x="876.0" y="839.5" style="font-size:15px;font-weight:700;fill:#1c1a16">21:00 wrap-up push</text>
+  <text class="sans" x="876.0" y="863.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">What she closed for him today, what is still open, and tomorrow's first</text>
+  <text class="sans" x="876.0" y="882.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">thing and deadlines. On Sundays also: 「这周替你关掉了 N 件」 (N loops</text>
+  <text class="sans" x="876.0" y="900.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">closed this week).</text>
+  <text class="sans" x="876.0" y="975.5" style="font-size:13.5px;font-weight:600;fill:#9a4a17;font-style:italic">This count is the product's long-term KPI.</text>
+  <rect x="24.0" y="1025.5" width="1352.0" height="72.0" rx="12" fill="#fbfaf7" stroke="#dcd9d3" stroke-width="1"/>
+  <text class="sans" x="44.0" y="1053.5" style="font-size:14px;font-weight:400;fill:#3a362f">Why no model here: these are the moments he trusts most and sees first. Computing them on the server makes them instant, free and never wrong about a time or a count. One exception: the first</text>
+  <text class="sans" x="44.0" y="1073.5" style="font-size:14px;font-weight:400;fill:#3a362f">time a calendar title appears, names.py asks the model once for a short name (「FYP meeting with mentor」 → 「见导师」) and caches it.</text>
+  <text class="sans" x="1360.0" y="1127.5" style="font-size:13px;font-weight:400;fill:#6b665c" text-anchor="end">Follows src/presence.py, src/nudges.py and src/closed.py on develop.</text>
+</svg>

@@ -30,6 +30,14 @@ Manchester CS Final Year Project (Zeep): **a single personal agent** that knows 
 - Fly.io for the always-on cloud Friday, with a mounted volume for her state
 - Demo data: `data/calendar.json`, `data/notes/*.md`, `data/mail/messages.json`, `data/tasks.json`
 
+## Architecture
+
+- [`docs/architecture/architecture.png`](docs/architecture/architecture.png): the whole system (clients, FastAPI, agent, 24 tools, server-computed opener and pushes, adapters, state, deploy)
+- [`docs/architecture/request-flow.png`](docs/architecture/request-flow.png): one conversation with an outward action (reply to an email: the run pauses for approval, then resumes)
+- [`docs/architecture/proactive-flow.png`](docs/architecture/proactive-flow.png): the opener, pushes and closed loops, computed without the model
+
+Captions, a component table and how to put the figures into the project Google Doc: [`docs/architecture/README.md`](docs/architecture/README.md).
+
 ## One brain
 
 Friday lives in the cloud (`friday-jimmy.fly.dev`). The phone and the desktop window open the same Friday, with the same memory and the same conversation.
@@ -274,6 +282,7 @@ Then follow Environment → API key → Open above. Details in [docs/baseline-v1
 │   ├── plan.md                    # direction and standards
 │   ├── engineering-log.md         # how things were built and why
 │   ├── baseline-v1.md             # reproduction and acceptance
+│   ├── architecture/              # architecture figures (PNG + SVG) and captions
 │   └── evaluation/                # evidence for the report (frozen)
 ├── src/
 │   ├── main.py                    # FastAPI: page, streaming chat, opener, undo

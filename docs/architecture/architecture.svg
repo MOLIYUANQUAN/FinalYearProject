@@ -1,0 +1,334 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="2165" viewBox="0 0 1600 2165">
+  <title>Friday — System Architecture (develop)</title>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3f3b35"/>
+    </marker>
+    <style>
+      .sans { font-family: Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", "WenQuanYi Zen Hei", Helvetica, Arial, sans-serif; }
+      .mono { font-family: "JetBrains Mono", Consolas, Menlo, "WenQuanYi Zen Hei Mono", monospace; }
+    </style>
+  </defs>
+  <rect x="0" y="0" width="1600" height="2165" fill="#ffffff"/>
+  <text class="sans" x="40.0" y="58.0" style="font-size:30px;font-weight:700;fill:#1c1a16">Friday — System Architecture</text>
+  <text class="sans" x="40.0" y="88.0" style="font-size:16px;font-weight:400;fill:#5c574e">A personal agent for one user (Zeep) · develop branch, 31 Oct 2026 · Manchester CS Final Year Project</text>
+  <rect x="30.0" y="112.0" width="1540.0" height="232.0" rx="14" fill="#eef4fb" stroke="#c6d8ee" stroke-width="1.2"/>
+  <text class="sans" x="50.0" y="139.0" style="font-size:13px;font-weight:700;fill:#2f5f93;letter-spacing:0.09em">CLIENT</text>
+  <text class="sans" x="116.1" y="139.0" style="font-size:13.5px;font-weight:500;fill:#2f5f93">one web page, three ways in</text>
+  <rect x="50.0" y="156.0" width="486.0" height="104.0" rx="10" fill="#ffffff" stroke="#a9c3e3" stroke-width="1.1"/>
+  <text class="sans" x="68.0" y="184.0" style="font-size:18px;font-weight:700;fill:#1c1a16">Desktop window (Windows)</text>
+  <text class="mono" x="68.0" y="206.0" style="font-size:13px;font-weight:500;fill:#6b665c">scripts/open_agent.py · src/desktop.py</text>
+  <text class="sans" x="68.0" y="230.0" style="font-size:14.5px;font-weight:400;fill:#3a362f">Ctrl+Alt+F shows / hides it · hold Right Ctrl to talk</text>
+  <text class="sans" x="68.0" y="250.0" style="font-size:14.5px;font-weight:400;fill:#3a362f">Resident launcher; opens the cloud Friday in an app window</text>
+  <rect x="557.0" y="156.0" width="486.0" height="104.0" rx="10" fill="#ffffff" stroke="#a9c3e3" stroke-width="1.1"/>
+  <text class="sans" x="575.0" y="184.0" style="font-size:18px;font-weight:700;fill:#1c1a16">iPhone home-screen app</text>
+  <text class="mono" x="575.0" y="206.0" style="font-size:13px;font-weight:500;fill:#6b665c">static/manifest.json · static/sw.js</text>
+  <text class="sans" x="575.0" y="230.0" style="font-size:14.5px;font-weight:400;fill:#3a362f">Safari → Add to Home Screen (no App Store build)</text>
+  <text class="sans" x="575.0" y="250.0" style="font-size:14.5px;font-weight:400;fill:#3a362f">Service worker shows her Web Push notifications</text>
+  <rect x="1064.0" y="156.0" width="486.0" height="104.0" rx="10" fill="#ffffff" stroke="#a9c3e3" stroke-width="1.1"/>
+  <text class="sans" x="1082.0" y="184.0" style="font-size:18px;font-weight:700;fill:#1c1a16">Evaluation &amp; demo scripts</text>
+  <text class="mono" x="1082.0" y="206.0" style="font-size:13px;font-weight:500;fill:#6b665c">scripts/eval_application_cli.py · demo_cli.py</text>
+  <text class="sans" x="1082.0" y="230.0" style="font-size:14.5px;font-weight:400;fill:#3a362f">Run the evaluation task set on the same agent</text>
+  <text class="sans" x="1082.0" y="250.0" style="font-size:14.5px;font-weight:400;fill:#3a362f">Call run_assistant() directly, no browser</text>
+  <rect x="50.0" y="272.0" width="1500.0" height="52.0" rx="10" fill="#f7fafd" stroke="#a9c3e3" stroke-width="1.1"/>
+  <text class="sans" x="68.0" y="294.0" style="font-size:15.5px;font-weight:700;fill:#1c1a16">Single-page UI</text>
+  <text class="mono" x="189.8" y="294.0" style="font-size:13px;font-weight:500;fill:#6b665c">static/index.html</text>
+  <text class="sans" x="68.0" y="314.0" style="font-size:14px;font-weight:400;fill:#3a362f">Chat bubbles · emoji reactions · photos &amp; screenshots · confirm cards he can edit · Undo · tap to dictate / hold to talk · read aloud · profile page (cost, memory, push settings)</text>
+  <rect x="62.0" y="392.0" width="1508.0" height="214.0" rx="14" fill="#ecf5f1" stroke="#bfdcd1" stroke-width="1.2"/>
+  <text class="sans" x="82.0" y="419.0" style="font-size:13px;font-weight:700;fill:#0f5c4c;letter-spacing:0.09em">WEB SERVER</text>
+  <text class="sans" x="189.6" y="419.0" style="font-size:13.5px;font-weight:500;fill:#0f5c4c">FastAPI · src/main.py · Docker on Fly.io (app friday-jimmy, London, always on) · or locally on 127.0.0.1:8765</text>
+  <rect x="82.0" y="436.0" width="236.0" height="150.0" rx="10" fill="#ffffff" stroke="#9fcbbb" stroke-width="1.1"/>
+  <text class="sans" x="98.0" y="464.0" style="font-size:17px;font-weight:700;fill:#1c1a16">Access gate</text>
+  <text class="mono" x="98.0" y="485.0" style="font-size:13px;font-weight:500;fill:#6b665c">src/access.py</text>
+  <text class="sans" x="98.0" y="510.0" style="font-size:14px;font-weight:400;fill:#3a362f">Every request passes here:</text>
+  <text class="sans" x="98.0" y="529.9" style="font-size:14px;font-weight:400;fill:#3a362f">password → session cookie</text>
+  <text class="sans" x="98.0" y="549.8" style="font-size:14px;font-weight:400;fill:#3a362f">(FRIDAY_ACCESS_TOKEN)</text>
+  <rect x="334.0" y="436.0" width="396.0" height="71.0" rx="10" fill="#f6fbf8" stroke="#9fcbbb" stroke-width="1.1"/>
+  <text class="mono" x="348.0" y="463.0" style="font-size:14px;font-weight:700;fill:#1c1a16">POST /api/presence/stream</text>
+  <text class="sans" x="348.0" y="488.0" style="font-size:14px;font-weight:400;fill:#3a362f">the opener: timeline card + one sentence</text>
+  <rect x="334.0" y="515.0" width="396.0" height="71.0" rx="10" fill="#f6fbf8" stroke="#9fcbbb" stroke-width="1.1"/>
+  <text class="mono" x="348.0" y="542.0" style="font-size:14px;font-weight:700;fill:#1c1a16">/api/push/* · /api/items/act</text>
+  <text class="sans" x="348.0" y="567.0" style="font-size:14px;font-weight:400;fill:#3a362f">device subscriptions · tap Done / Tomorrow</text>
+  <rect x="744.0" y="436.0" width="396.0" height="71.0" rx="10" fill="#f6fbf8" stroke="#9fcbbb" stroke-width="1.1"/>
+  <text class="mono" x="758.0" y="463.0" style="font-size:14px;font-weight:700;fill:#1c1a16">/api/me · /api/memory · /api/settings</text>
+  <text class="sans" x="758.0" y="488.0" style="font-size:14px;font-weight:400;fill:#3a362f">profile page: cost, what she remembers</text>
+  <rect x="744.0" y="515.0" width="396.0" height="71.0" rx="10" fill="#f6fbf8" stroke="#9fcbbb" stroke-width="1.1"/>
+  <text class="mono" x="758.0" y="542.0" style="font-size:14px;font-weight:700;fill:#1c1a16">GET /api/health</text>
+  <text class="sans" x="758.0" y="567.0" style="font-size:14px;font-weight:400;fill:#3a362f">model in use · git_sha of the live build</text>
+  <rect x="1154.0" y="436.0" width="396.0" height="71.0" rx="10" fill="#f6fbf8" stroke="#9fcbbb" stroke-width="1.1"/>
+  <text class="mono" x="1168.0" y="463.0" style="font-size:14px;font-weight:700;fill:#1c1a16">POST /api/chat/stream</text>
+  <text class="sans" x="1168.0" y="488.0" style="font-size:14px;font-weight:400;fill:#3a362f">one turn, streamed · also /chat/revise, /undo</text>
+  <rect x="1154.0" y="515.0" width="396.0" height="71.0" rx="10" fill="#f6fbf8" stroke="#9fcbbb" stroke-width="1.1"/>
+  <text class="mono" x="1168.0" y="542.0" style="font-size:14px;font-weight:700;fill:#1c1a16">POST /api/voice/ask · transcribe · speak</text>
+  <text class="sans" x="1168.0" y="567.0" style="font-size:14px;font-weight:400;fill:#3a362f">speech → text → a turn · text → speech</text>
+  <path d="M820.0,344.0 L820.0,392.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="832.0" y="374.0" style="font-size:13px;font-weight:500;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">HTTPS · JSON, her reply streams back as Server-Sent Events</text>
+  <rect x="530.0" y="654.0" width="640.0" height="404.0" rx="14" fill="#f3f0fa" stroke="#d5cbea" stroke-width="1.2"/>
+  <text class="sans" x="550.0" y="681.0" style="font-size:13px;font-weight:700;fill:#5a3e8e;letter-spacing:0.09em">AGENT</text>
+  <text class="sans" x="613.3" y="681.0" style="font-size:13.5px;font-weight:500;fill:#5a3e8e">reactive path: he says something, the model decides</text>
+  <rect x="550.0" y="698.0" width="600.0" height="262.0" rx="10" fill="#ffffff" stroke="#c9bce6" stroke-width="1.1"/>
+  <text class="sans" x="568.0" y="726.0" style="font-size:18px;font-weight:700;fill:#1c1a16">Friday</text>
+  <text class="mono" x="632.9" y="726.0" style="font-size:13px;font-weight:500;fill:#6b665c">src/agent.py · OpenAI Agents SDK</text>
+  <circle cx="578" cy="749" r="10" fill="#5a3e8e"/>
+  <text class="sans" x="578" y="753.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">1</text>
+  <text class="sans" x="598.0" y="754.0" style="font-size:14px;font-weight:400;fill:#3a362f">Fresh instructions every turn: persona, the time now, calendar (today → next</text>
+  <text class="sans" x="598.0" y="773.5" style="font-size:14px;font-weight:400;fill:#3a362f">Sunday), to-dos, reminders, profile, memory, open frictions</text>
+  <circle cx="578" cy="795.0" r="10" fill="#5a3e8e"/>
+  <text class="sans" x="578" y="799.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">2</text>
+  <text class="sans" x="598.0" y="800.0" style="font-size:14px;font-weight:400;fill:#3a362f">Runner.run_streamed(): model ↔ tool loop, up to 12 model calls; the session is</text>
+  <text class="sans" x="598.0" y="819.5" style="font-size:14px;font-weight:400;fill:#3a362f">the SQLite history, tool results included</text>
+  <circle cx="578" cy="841.0" r="10" fill="#5a3e8e"/>
+  <text class="sans" x="578" y="845.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">3</text>
+  <text class="sans" x="598.0" y="846.0" style="font-size:14px;font-weight:400;fill:#3a362f">Outward or destructive tools stop the run (needs_approval). The paused run is</text>
+  <text class="sans" x="598.0" y="865.5" style="font-size:14px;font-weight:400;fill:#3a362f">saved and resumes only on a plain yes</text>
+  <circle cx="578" cy="887.0" r="10" fill="#5a3e8e"/>
+  <text class="sans" x="578" y="891.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">4</text>
+  <text class="sans" x="598.0" y="892.0" style="font-size:14px;font-weight:400;fill:#3a362f">His own to-dos, events and reminders run straight away; Undo reverts them</text>
+  <text class="sans" x="598.0" y="911.5" style="font-size:14px;font-weight:400;fill:#3a362f">without the model</text>
+  <circle cx="578" cy="933.0" r="10" fill="#5a3e8e"/>
+  <text class="sans" x="578" y="937.3" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#fff">5</text>
+  <text class="sans" x="598.0" y="938.0" style="font-size:14px;font-weight:400;fill:#3a362f">A thread that grows too long rolls over, carrying its last lines</text>
+  <rect x="550.0" y="972.0" width="600.0" height="74.0" rx="10" fill="#faf8fd" stroke="#c9bce6" stroke-width="1.1"/>
+  <text class="sans" x="568.0" y="997.0" style="font-size:15.5px;font-weight:700;fill:#1c1a16">Model adapter</text>
+  <text class="mono" x="687.4" y="997.0" style="font-size:13px;font-weight:500;fill:#6b665c">src/claude.py</text>
+  <text class="sans" x="568.0" y="1018.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">Claude through the Anthropic Messages API, persona prompt-cached. If Claude cannot</text>
+  <text class="sans" x="568.0" y="1036.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">answer (credit, limit, outage), GPT-5 takes that call and the next 5 minutes.</text>
+  <rect x="530.0" y="1090.0" width="640.0" height="481.0" rx="14" fill="#fbf6e4" stroke="#eadca9" stroke-width="1.2"/>
+  <text class="sans" x="550.0" y="1117.0" style="font-size:13px;font-weight:700;fill:#7d5d0c;letter-spacing:0.09em">TOOLS</text>
+  <text class="sans" x="612.0" y="1117.0" style="font-size:13.5px;font-weight:500;fill:#7d5d0c">24 function tools · src/tools/</text>
+  <rect x="550.0" y="1134.0" width="294.0" height="95.0" rx="10" fill="#ffffff" stroke="#e0cd8a" stroke-width="1.1"/>
+  <text class="sans" x="564.0" y="1156.0" style="font-size:14.5px;font-weight:700;fill:#1c1a16">Calendar</text>
+  <text class="mono" x="636.2" y="1156.0" style="font-size:12px;font-weight:500;fill:#6b665c">calendar.py</text>
+  <text class="mono" x="564.0" y="1179.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">get_calendar_events</text>
+  <text class="mono" x="564.0" y="1200.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">create_calendar_event</text>
+  <rect x="723.5" y="1188.0" width="37.8" height="17.0" rx="8.5" fill="#e5f4ea" stroke="#9ccfac" stroke-width="0.9"/>
+  <text class="sans" x="729.5" y="1200.5" style="font-size:10.5px;font-weight:600;fill:#1d6b3a">undo</text>
+  <rect x="856.0" y="1134.0" width="294.0" height="95.0" rx="10" fill="#ffffff" stroke="#e0cd8a" stroke-width="1.1"/>
+  <text class="sans" x="870.0" y="1156.0" style="font-size:14.5px;font-weight:700;fill:#1c1a16">Mail</text>
+  <text class="mono" x="907.8" y="1156.0" style="font-size:12px;font-weight:500;fill:#6b665c">mail.py</text>
+  <text class="mono" x="870.0" y="1179.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">search_emails</text>
+  <text class="sans" x="967.5" y="1179.0" style="font-size:12.5px;font-weight:400;fill:#6b665c" xml:space="preserve"> · </text>
+  <text class="mono" x="978.1" y="1179.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">read_email</text>
+  <text class="mono" x="870.0" y="1200.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">send_email</text>
+  <rect x="947.0" y="1188.0" width="56.1" height="17.0" rx="8.5" fill="#fde8e6" stroke="#e2a39b" stroke-width="0.9"/>
+  <text class="sans" x="953.0" y="1200.5" style="font-size:10.5px;font-weight:600;fill:#a3271b">approval</text>
+  <text class="mono" x="870.0" y="1221.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">modify_email</text>
+  <rect x="962.0" y="1209.0" width="61.8" height="17.0" rx="8.5" fill="#fde8e6" stroke="#e2a39b" stroke-width="0.9"/>
+  <text class="sans" x="968.0" y="1221.5" style="font-size:10.5px;font-weight:600;fill:#a3271b">approval*</text>
+  <rect x="550.0" y="1239.0" width="294.0" height="74.0" rx="10" fill="#ffffff" stroke="#e0cd8a" stroke-width="1.1"/>
+  <text class="sans" x="564.0" y="1261.0" style="font-size:14.5px;font-weight:700;fill:#1c1a16">To-dos</text>
+  <text class="mono" x="622.4" y="1261.0" style="font-size:12px;font-weight:500;fill:#6b665c">tasks.py</text>
+  <text class="mono" x="564.0" y="1284.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">add_task</text>
+  <rect x="626.0" y="1272.0" width="37.8" height="17.0" rx="8.5" fill="#e5f4ea" stroke="#9ccfac" stroke-width="0.9"/>
+  <text class="sans" x="632.0" y="1284.5" style="font-size:10.5px;font-weight:600;fill:#1d6b3a">undo</text>
+  <text class="sans" x="664.8" y="1284.0" style="font-size:12.5px;font-weight:400;fill:#6b665c" xml:space="preserve"> · </text>
+  <text class="mono" x="675.4" y="1284.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">complete_task</text>
+  <rect x="774.9" y="1272.0" width="37.8" height="17.0" rx="8.5" fill="#e5f4ea" stroke="#9ccfac" stroke-width="0.9"/>
+  <text class="sans" x="780.9" y="1284.5" style="font-size:10.5px;font-weight:600;fill:#1d6b3a">undo</text>
+  <text class="sans" x="564.0" y="1305.0" style="font-size:12.5px;font-weight:400;fill:#1c1a16">only if a list is connected</text>
+  <rect x="856.0" y="1239.0" width="294.0" height="74.0" rx="10" fill="#ffffff" stroke="#e0cd8a" stroke-width="1.1"/>
+  <text class="sans" x="870.0" y="1261.0" style="font-size:14.5px;font-weight:700;fill:#1c1a16">Reminders</text>
+  <text class="mono" x="954.0" y="1261.0" style="font-size:12px;font-weight:500;fill:#6b665c">reminders.py</text>
+  <text class="mono" x="870.0" y="1284.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">remind_me</text>
+  <rect x="939.5" y="1272.0" width="37.8" height="17.0" rx="8.5" fill="#e5f4ea" stroke="#9ccfac" stroke-width="0.9"/>
+  <text class="sans" x="945.5" y="1284.5" style="font-size:10.5px;font-weight:600;fill:#1d6b3a">undo</text>
+  <text class="mono" x="870.0" y="1305.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">cancel_reminder</text>
+  <rect x="984.5" y="1293.0" width="37.8" height="17.0" rx="8.5" fill="#e5f4ea" stroke="#9ccfac" stroke-width="0.9"/>
+  <text class="sans" x="990.5" y="1305.5" style="font-size:10.5px;font-weight:600;fill:#1d6b3a">undo</text>
+  <rect x="550.0" y="1323.0" width="294.0" height="95.0" rx="10" fill="#ffffff" stroke="#e0cd8a" stroke-width="1.1"/>
+  <text class="sans" x="564.0" y="1345.0" style="font-size:14.5px;font-weight:700;fill:#1c1a16">Memory</text>
+  <text class="mono" x="631.1" y="1345.0" style="font-size:12px;font-weight:500;fill:#6b665c">memory.py · personal.py</text>
+  <text class="mono" x="564.0" y="1368.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">remember_fact</text>
+  <text class="sans" x="661.5" y="1368.0" style="font-size:12.5px;font-weight:400;fill:#6b665c" xml:space="preserve"> · </text>
+  <text class="mono" x="672.1" y="1368.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">search_memory</text>
+  <text class="mono" x="564.0" y="1389.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">forget_fact</text>
+  <rect x="648.5" y="1377.0" width="56.1" height="17.0" rx="8.5" fill="#fde8e6" stroke="#e2a39b" stroke-width="0.9"/>
+  <text class="sans" x="654.5" y="1389.5" style="font-size:10.5px;font-weight:600;fill:#a3271b">approval</text>
+  <text class="mono" x="564.0" y="1410.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">get_personal_context</text>
+  <rect x="856.0" y="1323.0" width="294.0" height="95.0" rx="10" fill="#ffffff" stroke="#e0cd8a" stroke-width="1.1"/>
+  <text class="sans" x="870.0" y="1345.0" style="font-size:14.5px;font-weight:700;fill:#1c1a16">Notes</text>
+  <text class="mono" x="919.9" y="1345.0" style="font-size:12px;font-weight:500;fill:#6b665c">files.py</text>
+  <text class="mono" x="870.0" y="1368.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">search_files</text>
+  <text class="sans" x="960.0" y="1368.0" style="font-size:12.5px;font-weight:400;fill:#6b665c" xml:space="preserve"> · </text>
+  <text class="mono" x="970.6" y="1368.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">read_file</text>
+  <text class="sans" x="870.0" y="1389.0" style="font-size:12.5px;font-weight:400;fill:#1c1a16">data/notes/ only</text>
+  <rect x="550.0" y="1428.0" width="600.0" height="95.0" rx="10" fill="#ffffff" stroke="#e0cd8a" stroke-width="1.1"/>
+  <text class="sans" x="564.0" y="1450.0" style="font-size:14.5px;font-weight:700;fill:#1c1a16">Product feedback &amp; engineering</text>
+  <text class="mono" x="799.6" y="1450.0" style="font-size:12px;font-weight:500;fill:#6b665c">feedback.py</text>
+  <text class="mono" x="564.0" y="1473.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">note_friction</text>
+  <text class="sans" x="661.5" y="1473.0" style="font-size:12.5px;font-weight:400;fill:#6b665c" xml:space="preserve"> · </text>
+  <text class="mono" x="672.1" y="1473.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">note_mistake</text>
+  <text class="sans" x="762.1" y="1473.0" style="font-size:12.5px;font-weight:400;fill:#6b665c" xml:space="preserve"> · </text>
+  <text class="mono" x="772.8" y="1473.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">list_friction</text>
+  <text class="sans" x="870.3" y="1473.0" style="font-size:12.5px;font-weight:400;fill:#6b665c" xml:space="preserve"> · </text>
+  <text class="mono" x="880.9" y="1473.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">resolve_friction</text>
+  <text class="mono" x="564.0" y="1494.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">fix_friction_with_cursor</text>
+  <rect x="746.0" y="1482.0" width="56.1" height="17.0" rx="8.5" fill="#fde8e6" stroke="#e2a39b" stroke-width="0.9"/>
+  <text class="sans" x="752.0" y="1494.5" style="font-size:10.5px;font-weight:600;fill:#a3271b">approval</text>
+  <text class="sans" x="803.1" y="1494.0" style="font-size:12.5px;font-weight:400;fill:#6b665c" xml:space="preserve"> · </text>
+  <text class="mono" x="813.8" y="1494.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">check_cursor_fix</text>
+  <text class="sans" x="933.8" y="1494.0" style="font-size:12.5px;font-weight:400;fill:#6b665c" xml:space="preserve"> · </text>
+  <text class="mono" x="944.4" y="1494.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">preview_pending_ship</text>
+  <text class="mono" x="564.0" y="1515.0" style="font-size:12.5px;font-weight:500;fill:#1c1a16">ship_pending_fix</text>
+  <rect x="686.0" y="1503.0" width="56.1" height="17.0" rx="8.5" fill="#fde8e6" stroke="#e2a39b" stroke-width="0.9"/>
+  <text class="sans" x="692.0" y="1515.5" style="font-size:10.5px;font-weight:600;fill:#a3271b">approval</text>
+  <rect x="550.0" y="1541.0" width="56.1" height="17.0" rx="8.5" fill="#fde8e6" stroke="#e2a39b" stroke-width="0.9"/>
+  <text class="sans" x="556.0" y="1553.5" style="font-size:10.5px;font-weight:600;fill:#a3271b">approval</text>
+  <text class="sans" x="612.1" y="1553.0" style="font-size:12.5px;font-weight:400;fill:#6b665c">waits for his yes</text>
+  <rect x="723.7" y="1541.0" width="37.8" height="17.0" rx="8.5" fill="#e5f4ea" stroke="#9ccfac" stroke-width="0.9"/>
+  <text class="sans" x="729.7" y="1553.5" style="font-size:10.5px;font-weight:600;fill:#1d6b3a">undo</text>
+  <text class="sans" x="767.5" y="1553.0" style="font-size:12.5px;font-weight:400;fill:#6b665c">runs now, Undo offered</text>
+  <text class="sans" x="922.1" y="1553.0" style="font-size:12.5px;font-weight:400;fill:#6b665c;font-style:italic">* only archive / trash</text>
+  <rect x="62.0" y="654.0" width="448.0" height="917.0" rx="14" fill="#fdf2e9" stroke="#f0d3bd" stroke-width="1.2"/>
+  <text class="sans" x="82.0" y="681.0" style="font-size:13px;font-weight:700;fill:#9a4a17;letter-spacing:0.09em">SERVER-COMPUTED</text>
+  <text class="sans" x="244.1" y="681.0" style="font-size:13.5px;font-weight:500;fill:#9a4a17">no model involved</text>
+  <text class="sans" x="82.0" y="708.0" style="font-size:13.5px;font-weight:400;fill:#7a3a12;font-style:italic">Dates, counts, priorities and when to interrupt him are</text>
+  <text class="sans" x="82.0" y="726.5" style="font-size:13.5px;font-weight:400;fill:#7a3a12;font-style:italic">computed here, so they are fast, free and never made up. The</text>
+  <text class="sans" x="82.0" y="745.0" style="font-size:13.5px;font-weight:400;fill:#7a3a12;font-style:italic">model only says them.</text>
+  <rect x="82.0" y="758.0" width="408.0" height="89.5" rx="10" fill="#ffffff" stroke="#e8c3a6" stroke-width="1.1"/>
+  <text class="mono" x="96.0" y="780.0" style="font-size:13px;font-weight:700;fill:#1c1a16">presence.py</text>
+  <text class="sans" x="96.0" y="800.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">Opener 「现在」: one sentence and one action, then a</text>
+  <text class="sans" x="96.0" y="818.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">timeline. Focus: important meeting within 3 h → overdue →</text>
+  <text class="sans" x="96.0" y="837.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">due today</text>
+  <rect x="82.0" y="856.5" width="408.0" height="71.0" rx="10" fill="#ffffff" stroke="#e8c3a6" stroke-width="1.1"/>
+  <text class="mono" x="96.0" y="878.5" style="font-size:13px;font-weight:700;fill:#1c1a16">agenda.py · todos.py</text>
+  <text class="sans" x="96.0" y="898.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">Calendar today → next Sunday in local time; 「周四」 → a</text>
+  <text class="sans" x="96.0" y="917.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">date; opener data ≤ 1 min old</text>
+  <rect x="82.0" y="936.5" width="408.0" height="52.5" rx="10" fill="#ffffff" stroke="#e8c3a6" stroke-width="1.1"/>
+  <text class="mono" x="96.0" y="958.5" style="font-size:13px;font-weight:700;fill:#1c1a16">reminders.py</text>
+  <text class="sans" x="96.0" y="978.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">「三点提醒我…」 → an exact time; fires on the minute</text>
+  <rect x="82.0" y="998.0" width="408.0" height="89.5" rx="10" fill="#ffffff" stroke="#e8c3a6" stroke-width="1.1"/>
+  <text class="mono" x="96.0" y="1020.0" style="font-size:13px;font-weight:700;fill:#1c1a16">push_api.py · nudges.py</text>
+  <text class="sans" x="96.0" y="1040.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">Scheduler every 60 s (cloud): morning brief, meeting in 20</text>
+  <text class="sans" x="96.0" y="1058.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">min–2 h, due today after 17:00, 21:00 wrap-up. At most 3 a</text>
+  <text class="sans" x="96.0" y="1077.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">day, quiet 22:00–08:00</text>
+  <rect x="82.0" y="1096.5" width="408.0" height="71.0" rx="10" fill="#ffffff" stroke="#e8c3a6" stroke-width="1.1"/>
+  <text class="mono" x="96.0" y="1118.5" style="font-size:13px;font-weight:700;fill:#1c1a16">engineering.py</text>
+  <text class="sans" x="96.0" y="1138.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">Cursor finished, change live, develop CI red → a push,</text>
+  <text class="sans" x="96.0" y="1157.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">never the home screen</text>
+  <rect x="82.0" y="1176.5" width="408.0" height="71.0" rx="10" fill="#ffffff" stroke="#e8c3a6" stroke-width="1.1"/>
+  <text class="mono" x="96.0" y="1198.5" style="font-size:13px;font-weight:700;fill:#1c1a16">webpush.py</text>
+  <text class="sans" x="96.0" y="1218.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">VAPID-signed Web Push to the iPhone app and the desktop</text>
+  <text class="sans" x="96.0" y="1237.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">window</text>
+  <rect x="82.0" y="1256.5" width="408.0" height="71.0" rx="10" fill="#ffffff" stroke="#e8c3a6" stroke-width="1.1"/>
+  <text class="mono" x="96.0" y="1278.5" style="font-size:13px;font-weight:700;fill:#1c1a16">workbench.py · closed.py</text>
+  <text class="sans" x="96.0" y="1298.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">Tap Done / Tomorrow without the model; every closed loop</text>
+  <text class="sans" x="96.0" y="1317.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">is logged for the wrap-up</text>
+  <rect x="82.0" y="1336.5" width="408.0" height="71.0" rx="10" fill="#ffffff" stroke="#e8c3a6" stroke-width="1.1"/>
+  <text class="mono" x="96.0" y="1358.5" style="font-size:13px;font-weight:700;fill:#1c1a16">ledger.py · usage_log.py</text>
+  <text class="sans" x="96.0" y="1378.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">Exact token cost per call; usage metadata only, never</text>
+  <text class="sans" x="96.0" y="1397.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">content</text>
+  <rect x="82.0" y="1475.0" width="408.0" height="78.0" rx="10" fill="#fffaf5" stroke="#e8c3a6" stroke-width="1.1" stroke-dasharray="4 4"/>
+  <text class="sans" x="96.0" y="1499.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">The opener and every push are also written into the</text>
+  <text class="sans" x="96.0" y="1517.5" style="font-size:13.5px;font-weight:400;fill:#3a362f">conversation, so on his next message the model knows</text>
+  <text class="sans" x="96.0" y="1536.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">what she has already told him.</text>
+  <path d="M82.0,1212.0 L44.0,1212.0 L44.0,344.0" fill="none" stroke="#3f3b35" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arr)"/>
+  <text class="sans" transform="translate(39,838) rotate(-90)" style="font-size:13px;font-weight:600;fill:#9a4a17;paint-order:stroke;stroke:#fff;stroke-width:5px">Web Push: she comes to find him</text>
+  <path d="M286.0,606.0 L286.0,654.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="296.0" y="636.0" style="font-size:13px;font-weight:500;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">opener, scheduler, taps</text>
+  <path d="M850.0,606.0 L850.0,654.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="860.0" y="636.0" style="font-size:13px;font-weight:500;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">friday.turn(): chat, voice, confirm</text>
+  <path d="M850.0,1058.0 L850.0,1090.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="860.0" y="1079.0" style="font-size:12.5px;font-weight:500;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">tool calls</text>
+  <rect x="62.0" y="1615.0" width="1108.0" height="196.0" rx="14" fill="#edf6f8" stroke="#c4dfe6" stroke-width="1.2"/>
+  <text class="sans" x="82.0" y="1642.0" style="font-size:13px;font-weight:700;fill:#1f6475;letter-spacing:0.09em">DATA-SOURCE ADAPTERS</text>
+  <text class="sans" x="285.1" y="1642.0" style="font-size:13.5px;font-weight:500;fill:#1f6475">chosen in .env; the tools and the server-computed side share them</text>
+  <rect x="82.0" y="1659.0" width="348.0" height="136.0" rx="10" fill="#ffffff" stroke="#a8d0da" stroke-width="1.1"/>
+  <text class="mono" x="96.0" y="1682.0" style="font-size:14px;font-weight:700;fill:#1c1a16">calendar_providers/</text>
+  <text class="sans" x="96.0" y="1705.0" style="font-size:13px;font-weight:400;fill:#3a362f">google — every selected calendar, incl. the</text>
+  <text class="sans" x="96.0" y="1722.5" style="font-size:13px;font-weight:400;fill:#3a362f">imported university timetable; creates events in</text>
+  <text class="sans" x="96.0" y="1740.0" style="font-size:13px;font-weight:400;fill:#3a362f">primary</text>
+  <text class="sans" x="96.0" y="1760.5" style="font-size:13px;font-weight:400;fill:#3a362f">mock — data/calendar.json (demos, tests)</text>
+  <rect x="442.0" y="1659.0" width="348.0" height="136.0" rx="10" fill="#ffffff" stroke="#a8d0da" stroke-width="1.1"/>
+  <text class="mono" x="456.0" y="1682.0" style="font-size:14px;font-weight:700;fill:#1c1a16">mail_providers/</text>
+  <text class="sans" x="456.0" y="1705.0" style="font-size:13px;font-weight:400;fill:#3a362f">gmail · imap (163, QQ: IMAP + SMTP) · outlook</text>
+  <text class="sans" x="456.0" y="1722.5" style="font-size:13px;font-weight:400;fill:#3a362f">(read-only) · mock</text>
+  <text class="sans" x="456.0" y="1743.0" style="font-size:13px;font-weight:400;fill:#3a362f">several.py reads every mailbox together; a reply</text>
+  <text class="sans" x="456.0" y="1760.5" style="font-size:13px;font-weight:400;fill:#3a362f">leaves from the mailbox the mail came to</text>
+  <rect x="802.0" y="1659.0" width="348.0" height="136.0" rx="10" fill="#ffffff" stroke="#a8d0da" stroke-width="1.1"/>
+  <text class="mono" x="816.0" y="1682.0" style="font-size:14px;font-weight:700;fill:#1c1a16">tasks_providers/</text>
+  <text class="sans" x="816.0" y="1705.0" style="font-size:13px;font-weight:400;fill:#3a362f">google — the Google Tasks default list</text>
+  <text class="sans" x="816.0" y="1725.5" style="font-size:13px;font-weight:400;fill:#3a362f">mock · none (then to-dos are never mentioned)</text>
+  <path d="M850.0,1571.0 L850.0,1615.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="860.0" y="1596.0" style="font-size:12.5px;font-weight:500;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">read / write</text>
+  <path d="M286.0,1571.0 L286.0,1615.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="296.0" y="1596.0" style="font-size:12.5px;font-weight:500;fill:#3f3b35;paint-order:stroke;stroke:#ffffff;stroke-width:5px;stroke-linejoin:round">read</text>
+  <rect x="1200.0" y="654.0" width="370.0" height="1157.0" rx="14" fill="#fbfaf7" stroke="#a8a294" stroke-width="1.2" stroke-dasharray="7 5"/>
+  <text class="sans" x="1220.0" y="681.0" style="font-size:13px;font-weight:700;fill:#5c574e;letter-spacing:0.09em">EXTERNAL SERVICES</text>
+  <rect x="1220.0" y="698.0" width="330.0" height="346.0" rx="10" fill="#ffffff" stroke="#cdc8bd" stroke-width="1.1"/>
+  <text class="sans" x="1236.0" y="723.0" style="font-size:13px;font-weight:700;fill:#5c574e;letter-spacing:0.06em">AI MODELS</text>
+  <text class="sans" x="1236.0" y="750.0" style="font-size:14.5px;font-weight:700;fill:#1c1a16">Anthropic API</text>
+  <text class="sans" x="1236.0" y="769.0" style="font-size:13px;font-weight:400;fill:#3a362f">Claude Opus 5.5 (claude-opus-5-5): the brain</text>
+  <text class="sans" x="1236.0" y="786.5" style="font-size:13px;font-weight:400;fill:#3a362f">when ANTHROPIC_API_KEY is set</text>
+  <text class="sans" x="1236.0" y="813.0" style="font-size:14.5px;font-weight:700;fill:#1c1a16">OpenAI API</text>
+  <text class="sans" x="1236.0" y="832.0" style="font-size:13px;font-weight:400;fill:#3a362f">GPT-5: the brain without it, and Claude's</text>
+  <text class="sans" x="1236.0" y="849.5" style="font-size:13px;font-weight:400;fill:#3a362f">backup · gpt-4.1-mini: last resort</text>
+  <text class="sans" x="1236.0" y="876.0" style="font-size:14.5px;font-weight:700;fill:#1c1a16">OpenAI audio</text>
+  <text class="sans" x="1236.0" y="895.0" style="font-size:13px;font-weight:400;fill:#3a362f">gpt-transcribe (→ gpt-4o-transcribe →</text>
+  <text class="sans" x="1236.0" y="912.5" style="font-size:13px;font-weight:400;fill:#3a362f">whisper-1) for speech; gpt-4o-mini-tts to read</text>
+  <text class="sans" x="1236.0" y="930.0" style="font-size:13px;font-weight:400;fill:#3a362f">aloud</text>
+  <text class="sans" x="1236.0" y="956.5" style="font-size:14.5px;font-weight:700;fill:#1c1a16">ElevenLabs (optional)</text>
+  <text class="sans" x="1236.0" y="975.5" style="font-size:13px;font-weight:400;fill:#3a362f">her voice when a key is set</text>
+  <rect x="1220.0" y="1377.5" width="330.0" height="196.0" rx="10" fill="#ffffff" stroke="#cdc8bd" stroke-width="1.1"/>
+  <text class="sans" x="1236.0" y="1402.5" style="font-size:13px;font-weight:700;fill:#5c574e;letter-spacing:0.06em">ENGINEERING</text>
+  <text class="sans" x="1236.0" y="1429.5" style="font-size:14.5px;font-weight:700;fill:#1c1a16">Cursor Cloud Agents API</text>
+  <text class="sans" x="1236.0" y="1448.5" style="font-size:13px;font-weight:400;fill:#3a362f">edits Friday's own repo on a branch, after he</text>
+  <text class="sans" x="1236.0" y="1466.0" style="font-size:13px;font-weight:400;fill:#3a362f">says yes</text>
+  <text class="sans" x="1236.0" y="1492.5" style="font-size:14.5px;font-weight:700;fill:#1c1a16">GitHub API</text>
+  <text class="sans" x="1236.0" y="1511.5" style="font-size:13px;font-weight:400;fill:#3a362f">pull request, CI status, merge into develop only</text>
+  <text class="sans" x="1236.0" y="1529.0" style="font-size:13px;font-weight:400;fill:#3a362f">when tests pass</text>
+  <rect x="1220.0" y="1659.0" width="330.0" height="136.0" rx="10" fill="#ffffff" stroke="#cdc8bd" stroke-width="1.1"/>
+  <text class="sans" x="1236.0" y="1684.0" style="font-size:13px;font-weight:700;fill:#5c574e;letter-spacing:0.06em">HIS ACCOUNTS</text>
+  <text class="sans" x="1236.0" y="1711.0" style="font-size:14.5px;font-weight:700;fill:#1c1a16">Google Calendar · Tasks · Gmail</text>
+  <text class="sans" x="1236.0" y="1730.0" style="font-size:13px;font-weight:400;fill:#3a362f">one OAuth sign-in for all three</text>
+  <text class="sans" x="1236.0" y="1756.5" style="font-size:14.5px;font-weight:700;fill:#1c1a16">Outlook · 163 / QQ mail</text>
+  <text class="sans" x="1236.0" y="1775.5" style="font-size:13px;font-weight:400;fill:#3a362f">Microsoft Graph · IMAP + SMTP</text>
+  <path d="M1150.0,1009.0 L1220.0,1009.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)" marker-start="url(#arr)"/>
+  <path d="M1150.0,1475.5 L1220.0,1475.5" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <path d="M1150.0,1727.0 L1220.0,1727.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)" marker-start="url(#arr)"/>
+  <rect x="30.0" y="1851.0" width="760.0" height="262.0" rx="14" fill="#f4f3f1" stroke="#dcd9d3" stroke-width="1.2"/>
+  <text class="sans" x="50.0" y="1878.0" style="font-size:13px;font-weight:700;fill:#4a463f;letter-spacing:0.09em">STATE</text>
+  <text class="sans" x="109.0" y="1878.0" style="font-size:13.5px;font-weight:500;fill:#4a463f">FRIDAY_STATE_DIR · both paths read and write it · on Fly a mounted volume, /state</text>
+  <text class="mono" x="52.0" y="1909.0" style="font-size:13px;font-weight:700;fill:#1c1a16">conversations.db</text>
+  <text class="sans" x="314.0" y="1909.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">SQLite: the model's session and the thread the page shows</text>
+  <text class="mono" x="52.0" y="1934.0" style="font-size:13px;font-weight:700;fill:#1c1a16">pending/</text>
+  <text class="sans" x="314.0" y="1934.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">paused runs waiting for his yes</text>
+  <text class="mono" x="52.0" y="1959.0" style="font-size:13px;font-weight:700;fill:#1c1a16">memory/facts.json</text>
+  <text class="sans" x="314.0" y="1959.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">what she remembers about him</text>
+  <text class="mono" x="52.0" y="1984.0" style="font-size:13px;font-weight:700;fill:#1c1a16">reminders.json · closed.jsonl</text>
+  <text class="sans" x="314.0" y="1984.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">reminders · loops she closed</text>
+  <text class="mono" x="52.0" y="2009.0" style="font-size:13px;font-weight:700;fill:#1c1a16">push/ · settings.json</text>
+  <text class="sans" x="314.0" y="2009.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">his devices, VAPID key, push limits</text>
+  <text class="mono" x="52.0" y="2034.0" style="font-size:13px;font-weight:700;fill:#1c1a16">feedback/ · usage/ · uploads/</text>
+  <text class="sans" x="314.0" y="2034.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">frictions, mistakes · cost and usage · photos</text>
+  <text class="sans" x="52.0" y="2067.0" style="font-size:13px;font-weight:400;fill:#6b665c;font-style:italic">Survives deploys and restarts. In the repo: data/personal/profile.md (who he is), data/*.json mock data; OAuth</text>
+  <text class="sans" x="52.0" y="2084.5" style="font-size:13px;font-weight:400;fill:#6b665c;font-style:italic">tokens in secrets/ (on Fly, from secrets).</text>
+  <rect x="810.0" y="1851.0" width="760.0" height="262.0" rx="14" fill="#f0f2f6" stroke="#cdd5e0" stroke-width="1.2"/>
+  <text class="sans" x="830.0" y="1878.0" style="font-size:13px;font-weight:700;fill:#3d4b5c;letter-spacing:0.09em">BUILD &amp; DEPLOY</text>
+  <rect x="830.0" y="1897.0" width="160.5" height="92.0" rx="10" fill="#ffffff" stroke="#b9c4d3" stroke-width="1.1"/>
+  <text class="sans" x="842.0" y="1922.0" style="font-size:14.5px;font-weight:700;fill:#1c1a16">git push develop</text>
+  <text class="sans" x="842.0" y="1944.0" style="font-size:13px;font-weight:400;fill:#3a362f">day-to-day branch</text>
+  <path d="M992.5,1943.0 L1014.5,1943.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <rect x="1016.5" y="1897.0" width="160.5" height="92.0" rx="10" fill="#ffffff" stroke="#b9c4d3" stroke-width="1.1"/>
+  <text class="sans" x="1028.5" y="1922.0" style="font-size:14.5px;font-weight:700;fill:#1c1a16">Tests</text>
+  <text class="sans" x="1028.5" y="1944.0" style="font-size:13px;font-weight:400;fill:#3a362f">199 offline tests,</text>
+  <text class="sans" x="1028.5" y="1961.5" style="font-size:13px;font-weight:400;fill:#3a362f">scripted fake model</text>
+  <path d="M1179.0,1943.0 L1201.0,1943.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <rect x="1203.0" y="1897.0" width="160.5" height="92.0" rx="10" fill="#ffffff" stroke="#b9c4d3" stroke-width="1.1"/>
+  <text class="sans" x="1215.0" y="1922.0" style="font-size:14.5px;font-weight:700;fill:#1c1a16">Deploy Friday</text>
+  <text class="sans" x="1215.0" y="1944.0" style="font-size:13px;font-weight:400;fill:#3a362f">flyctl deploy, then</text>
+  <text class="sans" x="1215.0" y="1961.5" style="font-size:13px;font-weight:400;fill:#3a362f">check /api/health</text>
+  <text class="sans" x="1215.0" y="1979.0" style="font-size:13px;font-weight:400;fill:#3a362f">git_sha</text>
+  <path d="M1365.5,1943.0 L1387.5,1943.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <rect x="1389.5" y="1897.0" width="160.5" height="92.0" rx="10" fill="#ffffff" stroke="#b9c4d3" stroke-width="1.1"/>
+  <text class="sans" x="1401.5" y="1922.0" style="font-size:14.5px;font-weight:700;fill:#1c1a16">Fly.io</text>
+  <text class="sans" x="1401.5" y="1944.0" style="font-size:13px;font-weight:400;fill:#3a362f">friday-jimmy is live</text>
+  <text class="sans" x="830.0" y="2017.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">GitHub Actions run Tests on every push, and Deploy Friday (tests first) on every push to develop. main holds</text>
+  <text class="sans" x="830.0" y="2036.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">milestones only (tag baseline-v1). Cursor's branches reach develop only through ship_pending_fix: he says yes,</text>
+  <text class="sans" x="830.0" y="2055.0" style="font-size:13.5px;font-weight:400;fill:#3a362f">tests pass, then merge.</text>
+  <path d="M40.0,2140.0 L86.0,2140.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text class="sans" x="96.0" y="2145.0" style="font-size:13px;font-weight:400;fill:#6b665c">request / call</text>
+  <path d="M210.0,2140.0 L256.0,2140.0" fill="none" stroke="#3f3b35" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arr)"/>
+  <text class="sans" x="266.0" y="2145.0" style="font-size:13px;font-weight:400;fill:#6b665c">push to his devices</text>
+  <text class="sans" x="1560.0" y="2145.0" style="font-size:13px;font-weight:400;fill:#6b665c" text-anchor="end">Generated from the code on develop; update with the code.</text>
+</svg>
