@@ -14,7 +14,7 @@ from typing import Any, Callable
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from src import agenda, claude, ledger, memory_store, push, settings, todos, usage_log
+from src import agenda, claude, ledger, memory_store, push, settings, todos, usage_log, voice
 from src.agent import active_model, answering_model
 from src.config import USAGE_LOG_PATH, effective_now, get_calendar_backend, get_mail_backend
 from src.mail_providers import get_mail_provider
@@ -66,8 +66,13 @@ def connections() -> list[dict[str, Any]]:
     issue = claude.issue()
     if active_model().startswith("claude"):
         out.insert(0, {"name": "Claude", "ok": not issue, "note": issue or "正常"})
-    out.append({"name": "语音（OpenAI）", "ok": bool((os.getenv("OPENAI_API_KEY") or "").strip()),
-                "note": "正常" if (os.getenv("OPENAI_API_KEY") or "").strip() else "没有 OpenAI key，按住说话用不了"})
+    if not (os.getenv("OPENAI_API_KEY") or "").strip():
+        out.append({"name": "语音（OpenAI）", "ok": False, "note": "没有 OpenAI key，按住说话用不了"})
+    elif voice.live_problem():
+        out.append({"name": "语音（OpenAI）", "ok": False,
+                    "note": f"边说边出字没连上，松手后照常转写：{voice.live_problem()}"})
+    else:
+        out.append({"name": "语音（OpenAI）", "ok": True, "note": "正常"})
     return out
 
 

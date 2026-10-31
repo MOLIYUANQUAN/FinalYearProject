@@ -72,12 +72,30 @@ def transcribe(audio: bytes, filename: str = "audio.webm") -> str:
     return ""
 
 
-def _vocabulary() -> str:
-    """转写提示：Friday、他的名字、课程代码、常去的楼——从档案里取，没有就给几个固定的。"""
+def vocabulary() -> list[str]:
+    """他常说的专有名词：Friday、他的名字、课程代码、常去的楼——从档案里取，没有就给几个固定的。"""
     from src.context import his_name, module_names
 
     words = ["Friday", his_name() or "Zeep", "FYP", "Kilburn", "Cursor", *module_names().keys()]
-    return "、".join(w for w in words if w)
+    return [w for w in words if w]
+
+
+def _vocabulary() -> str:
+    """转写提示（整段录音那条路）。"""
+    return "、".join(vocabulary())
+
+
+# 边说边出字最近一次没成的原因（资料页「语音」那行看得到）；成了一次就清掉
+_live_problem = ""
+
+
+def note_live_problem(reason: str) -> None:
+    global _live_problem
+    _live_problem = (reason or "").splitlines()[0][:80] if reason else ""
+
+
+def live_problem() -> str:
+    return _live_problem
 
 
 # 他明说要听才念：和页面上 wantsVoice 是同一套说法
