@@ -29,7 +29,7 @@ from src import claude
 from src.claude import ClaudeModel, for_openai
 from src.config import STATE_DIR, effective_now
 from src.context import memory_block, now_block, profile_block
-from src.conversation import Conversations, reaction_of, store
+from src.conversation import Conversations, split_reaction, store
 from src.tools import ALL_TOOLS, TASK_TOOLS
 from src.turn import Turn
 
@@ -53,7 +53,15 @@ VOICE = """你叫 Friday，是 Zeep 的管家，只为他一个人。不是顾�
 - 做成事（记下了、部署了、会准备好了）：一句到位的肯定或收束就停，别庆祝表演。
 - 纯文本：不用 Markdown 标题、加粗或表格；需要列举时每项一行。
 - 不用客套收尾：不问「有什么需要帮忙的吗」「有什么可以帮你」，不说「希望对你有帮助」「需要的话告诉我」。结尾也不提议、不反问：不说「需要我…吗」「要不要我…」——能读的直接读完再回答。真需要他拍板时，只问一个问题。
-- 他只是打招呼：问「在吗」就一句「在。」。他只是随口回应（好的、嗯、收到、谢谢、哈哈、或者只发了个表情）：不用说话，整条回复只写一个表情（👍 ❤️ 😂 😮 😢 🙏 选一个），它会贴在他那条消息上，像 WhatsApp 那样。不问他要做什么，不找话题。
+- 他只是打招呼：问「在吗」就一句「在。」不问他要做什么，不找话题。
+- 贴表情：像熟人在 WhatsApp 上那样，你可以在他那条消息上贴一个表情（👍 ❤️ 😂 😮 😢 🙏）。写法：回复第一行只放这个表情，空一行再写你要说的；不用说话时整条回复就只有这个表情。
+  - 他报好消息或进展（做完了、拿到了、过了）→ ❤️ 或 👍，再接一句到位的话。
+  - 他开玩笑、自嘲 → 😂，接不接话看有没有真想说的。
+  - 他吐槽、累了、遇到倒霉事 → 😢，再接住一句。
+  - 他说了让人意外的事 → 😮。
+  - 他道谢 → 🙏 或 ❤️，一般不用说话；他说好的、收到、嗯、或只发了个表情 → 👍，不用说话。
+  - 他问问题、交代事情、要你办事：正常回答，一般不贴。
+  - 贴是因为真有反应，不是礼貌动作：大多数消息不贴，同一个表情别连着用。
 - 有主见：直接给你认为最好的做法，不摆 A/B/C 菜单。下一步只在真有用时提一句。
 - 不提工具、接口、模型、后端或 Demo。
 
@@ -411,10 +419,13 @@ class Friday:
                     yield event
 
             reply = "\n\n".join(t for t in texts if t.strip())
-            emoji = None if approvals or undo else reaction_of(reply)
+            # 第一行只有一个表情：贴在他那条消息上（像 WhatsApp），剩下的才是她说的话
+            emoji, reply = split_reaction(reply)
+            if emoji and not reply and (approvals or undo):
+                emoji, reply = None, emoji  # 要确认、能撤销的，总得有她一条话挂按钮
             if emoji:
-                # 她没说话，只在他那条上贴了个表情（像 WhatsApp）
                 convs.update_message(said_id, reaction=emoji)
+            if emoji and not reply:
                 yield {"type": "done", "reply": "", "reaction": emoji, "ask": "", "tools_called": tools, "undo": [],
                        "needs_confirm": False, "approvals": [], "message_id": None, "conversation_id": cid}
                 return
@@ -434,6 +445,7 @@ class Friday:
             yield {
                 "type": "done",
                 "reply": reply,
+                "reaction": emoji or "",
                 "ask": ask,
                 "tools_called": tools,
                 "undo": undo,

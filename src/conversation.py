@@ -39,6 +39,13 @@ def reaction_of(text: str) -> str | None:
     return next((r for r in REACTIONS if said == r.replace("\ufe0f", "")), None)
 
 
+def split_reaction(text: str) -> tuple[str | None, str]:
+    """她回复的第一行只有一个表情：那是贴在他那条消息上的；剩下的才是她要说的话。"""
+    first, _, rest = (text or "").strip().partition("\n")
+    emoji = reaction_of(first)
+    return (emoji, rest.strip()) if emoji else (None, text)
+
+
 def paragraphs(text: str) -> list[str]:
     """和页面一样分段：一段一个气泡。"""
     return [p.strip() for p in re.split(r"\n\s*\n", text or "") if p.strip()]

@@ -89,6 +89,16 @@ class ApiTests(SandboxTestCase):
         thread = self.client.get("/api/conversation").json()["messages"]
         self.assertEqual([(m["role"], m.get("reaction")) for m in thread], [("user", "👍")])  # 没有多出一个她的气泡
 
+    def test_she_can_react_and_still_say_something(self) -> None:
+        self.use([[text("❤️\n\n恭喜。这周最好的消息。")], [text("😂 你这也太狠了")]])
+        done = self.chat("拿到 offer 了！")[-1]
+        self.assertEqual((done["reaction"], done["reply"]), ("❤️", "恭喜。这周最好的消息。"))
+        inline = self.chat("我把闹钟扔了")[-1]
+        self.assertEqual((inline["reaction"], inline["reply"]), ("", "😂 你这也太狠了"))  # 句子里的表情就是句子
+        thread = self.client.get("/api/conversation").json()["messages"]
+        self.assertEqual([(m["role"], m.get("reaction"), m["content"]) for m in thread[:2]],
+                         [("user", "❤️", "拿到 offer 了！"), ("assistant", None, "恭喜。这周最好的消息。")])
+
     def test_he_reacts_on_her_bubble_and_she_sees_it_next_time(self) -> None:
         self.use([[text("明天下午 2 点见导师。\n\n在 Kilburn 1.10。")]])
         mid = self.chat("明天有什么")[-1]["message_id"]

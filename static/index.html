@@ -1004,11 +1004,22 @@
       };
     }
 
+    // 她回复的第一行只有一个表情：那是贴在他那条消息上的，剩下的才是她说的话（和服务端一样分）
+    function splitReaction(text) {
+      const trimmed = (text || "").trim();
+      const cut = trimmed.indexOf("\n");
+      const first = (cut < 0 ? trimmed : trimmed.slice(0, cut)).trim().replace(/\uFE0F/g, "");
+      const emoji = REACTIONS.find((r) => r.replace(/\uFE0F/g, "") === first);
+      return emoji ? [emoji, cut < 0 ? "" : trimmed.slice(cut + 1).trim()] : ["", text];
+    }
+
     function replyView(reply, speaker) {
       return {
         onDelta(text) {
-          reply.show(text);
-          if (speaker) speaker.feed(text);
+          const [emoji, rest] = splitReaction(text);
+          if (emoji && reply.mine) setPill(reply.mine, emoji);
+          reply.show(rest);
+          if (speaker) speaker.feed(rest);
         },
         onTool(name) {
           reply.busy(DOING[name] || "");
@@ -1509,7 +1520,7 @@
             if (view.onTool) view.onTool(ev.name);
           } else if (ev.type === "done") {
             result = {
-              reply: ev.reaction ? "" : ev.reply || text,
+              reply: typeof ev.reply === "string" ? ev.reply : text,
               ask: ev.ask || "",
               reaction: ev.reaction || "",
               tools: ev.tools_called || [],
@@ -1531,11 +1542,11 @@
     // 这一轮说完：按最终的话重排气泡（写的时候已经分好的原样留着），要拍板的那段单独一个框
     function finish(reply, result) {
       const { reply: content, ask = "", tools = [], undo = [], needsConfirm = false, approvals = [], id, reaction } = result;
-      if (reaction) {
+      if (reply.mine) setPill(reply.mine, reaction);
+      if (reply.said) reply.said.reaction = reaction || "";
+      if (reaction && !content && !ask && !undo.length) {
         // 她没说话，只在他那条上贴了个表情
         reply.g.remove();
-        if (reply.mine) setPill(reply.mine, reaction);
-        if (reply.said) reply.said.reaction = reaction;
         return;
       }
       const m = { id, role: "assistant", content, ask, tools, needsConfirm, approvals, undo, at: Date.now() };
