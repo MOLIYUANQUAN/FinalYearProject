@@ -1,4 +1,4 @@
-"""Friday 在 Windows 桌面上：独立应用窗口、记住窗口位置、全局快捷键。"""
+"""Friday 在 Windows 桌面上：独立应用窗口、记住窗口位置、全局快捷键（Ctrl+Alt+F 叫出来、按住右 Ctrl 说话）。"""
 
 from __future__ import annotations
 
@@ -7,11 +7,14 @@ import ctypes.wintypes as wt
 import json
 import os
 import subprocess
+import threading
 import time
 import webbrowser
 import winreg
 from collections.abc import Callable
 from pathlib import Path
+
+from src.talk_key import TalkKey
 
 APP_NAME = "Friday"
 LOCAL_URL = "http://127.0.0.1:8765/"
@@ -58,6 +61,10 @@ SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN = 7
 MONITOR_DEFAULTTONEAREST = 2
 MOD_ALT, MOD_CONTROL, MOD_NOREPEAT = 0x0001, 0x0002, 0x4000
 WM_HOTKEY = 0x0312
+WM_TIMER = 0x0113
+WH_KEYBOARD_LL = 13
+WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP = 0x0100, 0x0101, 0x0104, 0x0105
+TALK_KEY_LABEL = "右 Ctrl"
 ASFW_ANY = -1
 INPUT_MOUSE = 0
 
@@ -68,6 +75,21 @@ _shcore = ctypes.windll.shcore
 _shcore.GetDpiForMonitor.argtypes = [wt.HMONITOR, ctypes.c_int, ctypes.POINTER(wt.UINT), ctypes.POINTER(wt.UINT)]
 
 Rect = tuple[int, int, int, int]
+
+
+class _KeyInfo(ctypes.Structure):
+    _fields_ = [("vkCode", wt.DWORD), ("scanCode", wt.DWORD), ("flags", wt.DWORD), ("time", wt.DWORD),
+                ("dwExtraInfo", ctypes.c_size_t)]
+
+
+_LRESULT = ctypes.c_ssize_t
+_HOOKPROC = ctypes.WINFUNCTYPE(_LRESULT, ctypes.c_int, wt.WPARAM, wt.LPARAM)
+_user32.SetWindowsHookExW.argtypes = [ctypes.c_int, _HOOKPROC, wt.HINSTANCE, wt.DWORD]
+_user32.SetWindowsHookExW.restype = wt.HHOOK
+_user32.CallNextHookEx.argtypes = [wt.HHOOK, ctypes.c_int, wt.WPARAM, wt.LPARAM]
+_user32.CallNextHookEx.restype = _LRESULT
+_kernel32 = ctypes.windll.kernel32
+_kernel32.GetModuleHandleW.restype = wt.HMODULE
 
 
 class _MouseInput(ctypes.Structure):
@@ -279,12 +301,42 @@ def toggle_window() -> None:
     show_window()
 
 
+def _summon_to_talk() -> None:
+    """右 Ctrl 单独按住了一会儿：Friday 不在最前面就叫出来。另开线程，键盘钩子这边一刻也不能等。"""
+    hwnd = find_window()
+    if hwnd and _user32.GetForegroundWindow() == hwnd:
+        return
+    threading.Thread(target=show_window, daemon=True).start()
+
+
 def listen_hotkey(on_press: Callable[[], None]) -> bool:
-    """在本线程注册 Ctrl+Alt+F 并一直等它；组合键已被别人占用就返回 False。"""
+    """在本线程注册 Ctrl+Alt+F 并一直等它；组合键已被别人占用就返回 False。
+
+    同一个线程里再盯着右 Ctrl（键盘钩子只看、不拦，别的软件照常收到这个键）：单独按住一会儿就叫 Friday 来听。
+    """
     if not _user32.RegisterHotKey(None, 1, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, ord("F")):
         return False
+    talk = TalkKey()
+
+    def on_key(code: int, w_param: int, l_param: int) -> int:
+        if code == 0:
+            info = ctypes.cast(l_param, ctypes.POINTER(_KeyInfo)).contents
+            if w_param in (WM_KEYDOWN, WM_SYSKEYDOWN):
+                talk.key_down(info.vkCode, time.monotonic())
+            elif w_param in (WM_KEYUP, WM_SYSKEYUP):
+                talk.key_up(info.vkCode, time.monotonic())
+        return _user32.CallNextHookEx(None, code, w_param, l_param)
+
+    proc = _HOOKPROC(on_key)  # 留着引用，不然会被回收
+    hook = _user32.SetWindowsHookExW(WH_KEYBOARD_LL, proc, _kernel32.GetModuleHandleW(None), 0)
+    if hook:
+        _user32.SetTimer(None, 0, 50, None)
+    else:
+        print("[WARN] could not watch the talk key; Ctrl+Alt+F still works")
     msg = wt.MSG()
     while _user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
         if msg.message == WM_HOTKEY:
             on_press()
+        elif msg.message == WM_TIMER and talk.due(time.monotonic()):
+            _summon_to_talk()
     return True

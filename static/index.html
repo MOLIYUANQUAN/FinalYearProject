@@ -3048,6 +3048,42 @@
       } else take.tapAt = Date.now();
     });
     sendBtn.addEventListener("contextmenu", (e) => { if (take) e.preventDefault(); });
+    // 电脑上：按住右 Ctrl 说话、松开就发（和按住麦克风一样）；轻按一下是听写，说完再按一下；Esc 不要了。
+    // 按着右 Ctrl 再按别的键（Ctrl+C 之类）是快捷键，不算说话。Friday 不在最前面时，后台的小程序会先把她叫出来
+    const TALK_KEY = "ControlRight";
+    document.addEventListener("keydown", (e) => {
+      if (e.code === TALK_KEY) {
+        if (!take) {
+          if (sendBtn.dataset.state !== "voice") return;
+          startTake({ pointerId: TALK_KEY, clientY: 0, preventDefault() {} });
+          // 已经按了一会儿才到这个窗口（是后台把她叫出来的）：那就是按住说话
+          if (e.repeat && take) {
+            take.hold = true;
+            showTake();
+          }
+        } else if (!e.repeat && !take.pressed && !take.working && Date.now() - take.tapAt > 300) {
+          finishTake();
+        }
+        return;
+      }
+      if (!take) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        if (take.hold) {
+          take.zone = "cancel";
+          endHold();
+        } else if (!take.working) discardTake();
+      } else if (take.id === TALK_KEY && take.pressed && !take.hold) {
+        discardTake();
+      }
+    });
+    document.addEventListener("keyup", (e) => {
+      if (e.code !== TALK_KEY || !take || take.id !== TALK_KEY || !take.pressed) return;
+      take.pressed = false;
+      clearTimeout(take.holdTimer);
+      if (take.hold) endHold();
+      else take.tapAt = Date.now();
+    });
     discardBtn.addEventListener("click", () => { if (take && !take.working) discardTake(); });
     // 退到后台就把麦克风关掉（正在录的那段不要了）；回来再点时再开
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") closeMic(); });

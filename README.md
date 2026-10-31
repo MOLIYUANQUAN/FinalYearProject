@@ -196,7 +196,9 @@ Run this once; Friday then appears on the desktop and in the Start menu, and is 
 .\.venv\Scripts\python.exe scripts\install_shortcuts.py
 ```
 
-After that, press **Ctrl+Alt+F**. Friday appears in her own window and opens with the one thing you most need to know right now; press it again while she is in front to hide her. You can also click Friday on the desktop or double-click `Friday.cmd` in the repo. The window uses its own browser profile (`data/browser/`, not in Git) without your main browser's extensions.
+After that, press **Ctrl+Alt+F**. Friday appears in her own window and opens with the one thing you most need to know right now; press it again while she is in front to hide her.
+
+**Hold right Ctrl to talk to her from anywhere.** Held on its own for a moment, it brings Friday to the front listening, like holding the mic on the phone: let go and it is sent, Esc throws it away. A quick tap starts a dictation instead; tap again when done and the words go into the box. Right Ctrl with another key (Ctrl+C…) is just a shortcut and does nothing here. The background program only watches the key (`src/talk_key.py`, a low-level keyboard hook in `src/desktop.py`); other apps still get it. After pulling new code, run `install_shortcuts.py` again to restart it. You can also click Friday on the desktop or double-click `Friday.cmd` in the repo. The window uses its own browser profile (`data/browser/`, not in Git) without your main browser's extensions.
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\install_shortcuts.py --remove  # remove shortcuts and the startup entry
