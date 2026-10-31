@@ -6,6 +6,8 @@ Anthropic Messages API（官方 anthropic SDK）。
   更早那几句的思考块是在另一份系统提示下想的，带回去 API 会当成改过历史拒掉。
 - 缓存：工具和她的性格（VOICE）几乎不变，打一个缓存点；这一句里的工具往返交给自动缓存。
 - 安全分类器误拦：服务端按类别换个模型重答（fallbacks: "default"）；整条链都拒了就照实说一句。
+- Claude 这会儿用不了（额度用完、key 失效、超限、Anthropic 出故障）：这一句交给备用的脑子（GPT-5）答，
+  接下来几分钟都先用它，过后再试 Claude——不把报错甩给他。
 - 工具参数不开 eager_input_streaming：页面从不显示生成中的参数，开了只会少掉服务端的校验。
 """
 
@@ -48,6 +50,36 @@ _KEY = "anthropic"
 MESSAGE_ID = "msg_claude_"
 # 每句都新建一个 ClaudeModel；连接（TLS）在同一个事件循环里共用
 _shared: tuple[int, Any] | None = None
+# Claude 用不了时歇多久再试；歇着的时候直接让备用的答，不每句先撞一次墙
+REST_S = 300
+_resting: tuple[float, str] | None = None
+
+
+def issue() -> str | None:
+    """Claude 正歇着的原因（/api/health 里看得到）；好好的就是 None。"""
+    return _resting[1] if _resting and time.monotonic() < _resting[0] else None
+
+
+def _unavailable(exc: Exception) -> str | None:
+    """是不是「Claude 这边暂时用不了」：是就说个原因；不是（那是代码的错）返回 None，照常抛出。"""
+    if isinstance(exc, anthropic.BadRequestError):
+        text = str(exc)
+        if "credit balance" in text:
+            return "Anthropic API 额度不够"
+        if "usage limits" in text:
+            return "到了 Anthropic 的用量上限"
+        return None
+    if isinstance(exc, (anthropic.AuthenticationError, anthropic.PermissionDeniedError)):
+        return "Anthropic key 不能用"
+    if isinstance(exc, anthropic.NotFoundError):
+        return "这个 Claude 型号用不了"
+    if isinstance(exc, anthropic.RateLimitError):
+        return "超了 Anthropic 的速率或额度上限"
+    if isinstance(exc, anthropic.APIStatusError) and exc.status_code >= 500:
+        return "Anthropic 那边出故障了"
+    if isinstance(exc, anthropic.APIConnectionError):
+        return "连不上 Anthropic"
+    return None
 
 
 def _get(item: Any, key: str, default: Any = None) -> Any:
@@ -270,12 +302,17 @@ def _bound_elsewhere(exc: anthropic.BadRequestError) -> bool:
 
 
 class ClaudeModel(Model):
-    """Agents SDK 的 Model：流式问 Claude，把结果翻回 Responses 的样子。"""
+    """Agents SDK 的 Model：流式问 Claude，把结果翻回 Responses 的样子。
 
-    def __init__(self, name: str, *, stable_prefix: str = "", client: Any = None) -> None:
+    fallback = (备用的 Model, 它的 ModelSettings)：Claude 用不了时由它来答。
+    """
+
+    def __init__(self, name: str, *, stable_prefix: str = "", client: Any = None,
+                 fallback: tuple[Model, ModelSettings] | None = None) -> None:
         self.name = name
         self.stable_prefix = stable_prefix
         self._client = client
+        self.fallback = fallback
 
     @property
     def client(self) -> Any:
@@ -309,6 +346,33 @@ class ClaudeModel(Model):
 
     async def stream_response(self, system_instructions, input, model_settings, tools, output_schema, handoffs,
                               tracing, **kwargs) -> AsyncIterator[Any]:
+        global _resting
+        args = (system_instructions, input, tools, output_schema, handoffs, tracing)
+        if self.fallback and issue():
+            async for event in self._backup(*args, **kwargs):
+                yield event
+            return
+        try:
+            async for event in self._claude(system_instructions, input, model_settings, tools):
+                yield event
+        except Exception as exc:  # noqa: BLE001 — 只接「Claude 暂时用不了」，别的照常抛
+            reason = _unavailable(exc) if self.fallback else None
+            if reason is None:
+                raise
+            _resting = (time.monotonic() + REST_S, reason)
+            print(f"[WARN] claude unavailable ({reason}): {exc}; answering with the backup for {REST_S // 60} min")
+            async for event in self._backup(*args, **kwargs):
+                yield event
+
+    async def _backup(self, system_instructions, input, tools, output_schema, handoffs, tracing,
+                      **kwargs) -> AsyncIterator[Any]:
+        model, settings = self.fallback
+        items = input if isinstance(input, str) else (for_openai(input) or input)
+        async for event in model.stream_response(system_instructions, items, settings, tools, output_schema,
+                                                 handoffs, tracing, **kwargs):
+            yield event
+
+    async def _claude(self, system_instructions, input, model_settings, tools) -> AsyncIterator[Any]:
         params = self.request(system_instructions, input, model_settings, tools)
         seq = 0
         message = None

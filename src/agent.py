@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from collections.abc import AsyncIterator
 from typing import Any
 
-from agents import Agent, Model, ModelSettings, RunConfig, RunState, Runner
+from agents import Agent, Model, ModelSettings, OpenAIProvider, RunConfig, RunState, Runner
 from agents.run_config import CallModelData, ModelInputData
 from openai.types.responses import ResponseTextDeltaEvent
 from openai.types.shared import Reasoning
@@ -23,6 +24,7 @@ from src.config import (
     require_openai_api_key,
 )
 from src import approval, cursor_fix, friction, reminders
+from src import claude
 from src.claude import ClaudeModel, for_openai
 from src.config import STATE_DIR, effective_now
 from src.context import memory_block, now_block, profile_block
@@ -126,10 +128,19 @@ def build_instructions(calendar: str = "", todo: str = "", *, spoken: bool = Fal
     return "\n\n".join(part for part in parts if part)
 
 
+_openai = OpenAIProvider()
+
+
 def brain(name: str) -> Model | str:
-    """型号名 → Agents SDK 用的模型：claude-* 走 Anthropic（她的性格那段每句都一样，单独缓存），其余交给 OpenAI。"""
+    """型号名 → Agents SDK 用的模型：claude-* 走 Anthropic（她的性格那段每句都一样，单独缓存），其余交给 OpenAI。
+
+    Claude 这会儿用不了（额度用完、key 失效、出故障）时由 GPT-5 顶上，见 claude.ClaudeModel。
+    """
     if name.startswith("claude"):
-        return ClaudeModel(name, stable_prefix=VOICE)
+        backup = None
+        if (os.getenv("OPENAI_API_KEY") or "").strip():
+            backup = (_openai.get_model(CLAUDE_FALLBACK), model_settings(CLAUDE_FALLBACK))
+        return ClaudeModel(name, stable_prefix=VOICE, fallback=backup)
     require_openai_api_key()
     return name
 
@@ -155,6 +166,11 @@ _active_model = DEFAULT_MODEL
 
 def active_model() -> str:
     return _active_model
+
+
+def answering_model() -> str:
+    """此刻真在答话的：Claude 歇着的那几分钟是 GPT-5。"""
+    return CLAUDE_FALLBACK if _active_model.startswith("claude") and claude.issue() else _active_model
 
 
 def verify_model() -> str:

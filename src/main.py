@@ -22,8 +22,8 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from src import agenda, closed, reminders, todos, usage_log, voice
-from src.agent import active_model, friday, run_assistant, verify_model
+from src import agenda, claude, closed, reminders, todos, usage_log, voice
+from src.agent import answering_model, friday, run_assistant, verify_model
 from src.calendar_providers import get_calendar_provider
 from src.presence import stream_presence
 from src.access import gate, router as access_router
@@ -178,7 +178,8 @@ def health() -> dict:
         "code_version": CODE_VERSION,
         # 云上部署时带进来的提交号：部署工作流靠它确认线上就是刚推的那一版
         "git_sha": (os.getenv("FRIDAY_GIT_SHA") or "").strip(),
-        "model": active_model(),
+        "model": answering_model(),
+        "claude_issue": claude.issue(),
         "has_openai_api_key": has_key,
         "calendar_backend": backend,
         "mail_backend": mail,

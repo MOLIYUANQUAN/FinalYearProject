@@ -93,9 +93,9 @@ def remember(named: dict[str, Any]) -> None:
 
 
 def name_batch(titles: list[str]) -> dict[str, str]:
-    from src.agent import active_model
+    from src.agent import answering_model
 
-    model, prompt = active_model(), PROMPT + json.dumps(titles, ensure_ascii=False)
+    model, prompt = answering_model(), PROMPT + json.dumps(titles, ensure_ascii=False)
     if model.startswith("claude"):
         from src import claude
 

@@ -44,7 +44,7 @@ Switching her to Claude is one command; Fly restarts her with the key and `/api/
 flyctl secrets set ANTHROPIC_API_KEY=sk-ant-... -a friday-jimmy
 ```
 
-If the key doesn't work she falls back to GPT-5 on her own and says so in the logs. `FRIDAY_MODEL` names a different model if you ever want one.
+Whenever Claude can't answer (no API credit left, a key that doesn't work, rate limits, an Anthropic outage), GPT-5 answers that message instead and she tries Claude again five minutes later; `/api/health` then shows `"model": "gpt-5"` and the reason in `claude_issue`. `FRIDAY_MODEL` names a different model if you ever want one.
 
 Switching to the cloud brain for the first time:
 

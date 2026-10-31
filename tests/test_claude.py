@@ -15,6 +15,7 @@ import anthropic
 from anthropic.types.beta import BetaMessage
 from openai.types.responses import ResponseFunctionToolCall, ResponseOutputMessage, ResponseReasoningItem
 
+from tests.fake_model import FakeModel, text
 from tests.helpers import SandboxTestCase, collect, of_type
 
 import src.agent as agent
@@ -101,12 +102,47 @@ def bad_request(message: str) -> anthropic.BadRequestError:
 
 
 class ClaudeConversationTests(SandboxTestCase):
-    def claude_friday(self, replies: list, db=None) -> tuple[Friday, FakeClaude]:
+    def setUp(self) -> None:
+        super().setUp()
+        claude._resting = None
+        self.addCleanup(setattr, claude, "_resting", None)
+
+    def claude_friday(self, replies: list, db=None, backup: FakeModel | None = None) -> tuple[Friday, FakeClaude]:
         fake = FakeClaude(replies)
         conversations = Conversations(db or self.tmp / "conversations.db")
         self.addCleanup(conversations.close)
-        model = claude.ClaudeModel(MODEL, stable_prefix=VOICE, client=fake)
+        fallback = (backup, agent.model_settings("gpt-5")) if backup else None
+        model = claude.ClaudeModel(MODEL, stable_prefix=VOICE, client=fake, fallback=fallback)
         return Friday(conversations, model=model), fake
+
+    def test_out_of_credit_she_still_answers_and_tries_claude_again_later(self) -> None:
+        broke = bad_request("Error code: 400 - Your credit balance is too low to access the Anthropic API.")
+        backup = FakeModel([[text("在。")], [text("还在。")], [text("这句又是 Claude 之前的备用。")]])
+        friday, fake = self.claude_friday([reply(think("s1"), say("好。")), broke, reply(say("回来了。"))], backup=backup)
+        cid = friday.conversations.create()
+        self.assertEqual(collect(friday.turn(cid, "早"))[-1]["reply"], "好。")
+
+        done = collect(friday.turn(cid, "在吗"))[-1]
+        self.assertEqual(done["reply"], "在。")  # 不再是一条红色的报错
+        self.assertEqual(claude.issue(), "Anthropic API 额度不够")
+        with patch.object(agent, "_active_model", MODEL):
+            self.assertEqual(agent.answering_model(), "gpt-5")
+        # 备用的看不到 Claude 的思考块
+        self.assertNotIn("anthropic", str(backup.inputs[-1]))
+
+        # 歇着的这几分钟不再先撞一次 Claude
+        self.assertEqual(collect(friday.turn(cid, "还在吗"))[-1]["reply"], "还在。")
+        self.assertEqual(len(fake.requests), 2)
+
+        claude._resting = None  # 几分钟过去了
+        self.assertEqual(collect(friday.turn(cid, "现在呢"))[-1]["reply"], "回来了。")
+        self.assertEqual(len(fake.requests), 3)
+
+    def test_without_a_backup_the_problem_is_not_hidden(self) -> None:
+        friday, _ = self.claude_friday([bad_request("Your credit balance is too low to access the Anthropic API.")])
+        cid = friday.conversations.create()
+        with self.assertRaises(anthropic.BadRequestError):
+            collect(friday.turn(cid, "在吗"))
 
     def test_a_plain_answer_streams_and_the_request_is_cache_friendly(self) -> None:
         friday, fake = self.claude_friday([reply(think("s1"), say("在。今天下午三点见导师。"))])
@@ -184,8 +220,8 @@ class ClaudeConversationTests(SandboxTestCase):
         self.assertEqual(blocks(fake.requests[1], "thinking"), [])
         self.assertEqual([b["id"] for b in blocks(fake.requests[1], "tool_use")], ["toolu_m"])
 
-    def test_other_bad_requests_are_not_retried(self) -> None:
-        friday, fake = self.claude_friday([bad_request("max_tokens: too large")])
+    def test_a_bug_in_the_request_is_not_papered_over(self) -> None:
+        friday, fake = self.claude_friday([bad_request("max_tokens: too large")], backup=FakeModel([]))
         cid = friday.conversations.create()
         with self.assertRaises(anthropic.BadRequestError):
             collect(friday.turn(cid, "在吗"))
@@ -251,6 +287,9 @@ class ChoosingTheBrainTests(unittest.TestCase):
         brain = agent.brain("claude-opus-5-5")
         self.assertIsInstance(brain, claude.ClaudeModel)
         self.assertEqual(brain.stable_prefix, VOICE)
+        backup, backup_settings = brain.fallback  # GPT-5 随时顶上
+        self.assertEqual(backup.model, "gpt-5")
+        self.assertEqual(backup_settings.verbosity, "low")
         settings = agent.model_settings("claude-opus-5-5")
         self.assertEqual(settings.reasoning.effort, agent.REASONING_EFFORT)
         self.assertIsNone(settings.temperature)
