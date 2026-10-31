@@ -35,7 +35,7 @@ Manchester CS Final Year Project (Zeep): **a single personal agent** that knows 
 Friday lives in the cloud (`friday-jimmy.fly.dev`). The phone and the desktop window open the same Friday, with the same memory and the same conversation.
 
 - Everything that changes — memory, conversations, friction list, mistakes, usage log, pending Cursor work — lives in `FRIDAY_STATE_DIR`. On Fly that is a volume mounted at `/state`, so deploys and restarts no longer wipe her memory. Locally it defaults to `data/`.
-- Conversations are stored on the server, including tool calls and results. Start on the phone, continue on the desktop. Coming back on the same day within two hours continues the conversation; otherwise she starts a fresh one with the day's card.
+- There is one conversation, stored on the server, shown as chat bubbles with the time marked when there's a gap. Start on the phone, continue on the desktop; there is no "new chat". Behind it, the model's session restarts after two idle hours or a new day so its context stays short, and each new session starts with the last few lines of the previous one. When you come back after a while she speaks first: a greeting, the one thing that matters now, and today's timeline.
 - With `FRIDAY_URL=https://friday-jimmy.fly.dev` in `.env`, Ctrl+Alt+F opens the cloud Friday and no local server is started. Without it, the local server is used (for development).
 
 Switching her to Claude is one command; Fly restarts her with the key and `/api/health` then reports `"model": "claude-opus-5-5"`:

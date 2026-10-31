@@ -30,6 +30,10 @@
       --danger-bg: #fff2f1;
       --danger-line: #ffc4c0;
       --user: #f2f2f7;
+      /* 气泡：他的黑底白字，她的浅灰 */
+      --mine: #000000;
+      --on-mine: #ffffff;
+      --hers: #f2f2f7;
       --radius: 14px;
       /* iPhone 上就是 SF；Windows 用近黑体。品牌感靠黑白与字距，不靠花色 */
       --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
@@ -52,6 +56,9 @@
         --danger-bg: #1c0504;
         --danger-line: #5c1a16;
         --user: #1c1c1e;
+        --mine: #f5f5f7;
+        --on-mine: #000000;
+        --hers: #1c1c1e;
       }
     }
     * { box-sizing: border-box; }
@@ -71,42 +78,11 @@
       padding: 22px 16px calc(18px + env(safe-area-inset-bottom, 0px));
       padding-left: max(16px, env(safe-area-inset-left, 0px));
       padding-right: max(16px, env(safe-area-inset-right, 0px));
-      padding-top: max(22px, env(safe-area-inset-top, 0px));
+      padding-top: max(12px, env(safe-area-inset-top, 0px));
       display: flex;
       flex-direction: column;
       gap: 16px;
     }
-    header {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 12px;
-      padding-bottom: 4px;
-      border-bottom: 1px solid var(--line);
-    }
-    header h1 {
-      margin: 0;
-      font-size: 1.35rem;
-      font-weight: 600;
-      letter-spacing: -0.045em;
-    }
-    .right {
-      display: flex;
-      align-items: baseline;
-      gap: 16px;
-      color: var(--muted);
-      font-size: 0.82rem;
-      font-weight: 400;
-    }
-    #newChat {
-      font: inherit;
-      color: var(--muted);
-      background: none;
-      border: none;
-      padding: 0;
-      cursor: pointer;
-    }
-    #newChat:hover { color: var(--ink); }
     #log {
       flex: 1;
       min-height: 0;
@@ -115,57 +91,52 @@
       scrollbar-color: var(--line) transparent;
       display: flex;
       flex-direction: column;
-      gap: 16px;
-      padding: 8px 2px 10px;
-      transition: padding-bottom 0.3s ease;
+      padding: 4px 2px 10px;
     }
-    /* 白环出来时给最后一句让位 */
+    /* 一条对话：他在右、她在左，都是气泡；隔得久了中间标一下时间 */
+    .stamp {
+      align-self: center;
+      margin: 22px 0 2px;
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .group { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; }
+    .group.mine { align-items: flex-end; }
+    .group.hers { align-items: flex-start; }
+    .group.mine + .group.mine, .group.hers + .group.hers { margin-top: 6px; }
     .msg {
-      max-width: 88%;
-      line-height: 1.65;
+      max-width: 82%;
+      padding: 9px 14px;
+      border-radius: 20px;
+      line-height: 1.5;
       white-space: pre-wrap;
       word-break: break-word;
       font-size: 1.02rem;
       letter-spacing: -0.01em;
     }
-    .msg.user {
-      align-self: flex-end;
-      background: var(--user);
-      padding: 10px 14px;
-      border-radius: var(--radius);
-    }
-    .msg.bot {
-      align-self: flex-start;
-      background: transparent;
-      border: none;
-      padding: 2px 0;
-    }
-    .msg.error {
-      align-self: stretch;
-      max-width: none;
-      background: var(--danger-bg);
-      border: 1px solid var(--danger-line);
-      color: var(--danger);
-      padding: 10px 13px;
-      border-radius: var(--radius);
-    }
-    .msg a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+    .msg.user { background: var(--mine); color: var(--on-mine); }
+    .msg.bot { background: var(--hers); color: var(--ink); }
+    .msg a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+    /* 要他拍板的那件事：原样写出来，和她平常说的话分开 */
+    .msg.draft { background: transparent; border: 1px solid var(--line); }
+    /* 没接上之类：她平静地说一句，不是红字 */
+    .msg.note { color: var(--muted); }
+    /* 开场：此刻最该知道的那句，第一句加粗，补充的小一号 */
+    .msg.say .head { display: block; font-weight: 600; }
+    .msg.say .sub { display: block; margin-top: 2px; color: var(--muted); font-size: 0.92rem; }
+    /* 她还在想、在查：一个打字的气泡，旁边一行小字说在干什么 */
+    .pending { display: flex; align-items: center; gap: 10px; max-width: 100%; }
+    .pending .msg { padding: 12px 14px; }
+    .pending .doing { color: var(--muted); font-size: 0.85rem; }
+    /* 今天的时间线：开场里的一张卡片 */
     .msg.today {
-      align-self: stretch;
-      max-width: none;
-      padding: 4px 0 8px;
+      width: min(100%, 460px);
+      max-width: 100%;
+      padding: 12px 14px;
       white-space: normal;
-      border: none;
-      background: transparent;
     }
-    /* 问候退到一边，「现在」那句话才是主角 */
-    .today .hello {
-      margin-bottom: 6px;
-      font-size: 0.92rem;
-      font-weight: 500;
-      color: var(--muted);
-    }
-    .today section + section { margin-top: 14px; }
+    .today section + section { margin-top: 12px; }
     .today h3 {
       display: flex;
       justify-content: space-between;
@@ -195,18 +166,18 @@
       color: var(--muted);
       font-size: 0.78rem;
     }
-    /* 能点的行：点开下面出动作；「需要你」那块用黑字标题，和日程区分开 */
+    /* 能点的行：点开下面出动作 */
     .today .row.tappable { cursor: pointer; }
     .today .more { color: var(--soft); }
     .today .row.handled { opacity: 0.45; }
     .today .row.handled .what { text-decoration: line-through; }
-    .today .row-actions {
+    .row-actions {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
-      margin: 2px 0 8px calc(6.6em + 10px);
     }
-    .today .row-actions button {
+    .today .row-actions { margin: 2px 0 8px calc(6.6em + 10px); }
+    .row-actions button {
       font: inherit;
       font-size: 0.8rem;
       padding: 5px 12px;
@@ -216,8 +187,9 @@
       color: var(--ink);
       cursor: pointer;
     }
-    .today .row-actions button:first-child { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-    .today .row-actions .hint { margin: 0; }
+    .row-actions button:first-child { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+    .row-actions .hint { margin: 0; }
+    .focus-actions { margin: 2px 0; }
     .today .where {
       display: block;
       overflow: hidden;
@@ -231,32 +203,6 @@
       padding: 3px 0;
       color: var(--muted);
     }
-    /* 「现在」：此刻最该做的那一件，一句大字、一个动作；下面才是今天安静的时间线 */
-    .today .say {
-      margin-top: 6px;
-      white-space: pre-wrap;
-      font-size: 1.5rem;
-      font-weight: 600;
-      line-height: 1.3;
-      letter-spacing: -0.02em;
-    }
-    .today .row-actions.focus-actions { margin: 12px 0 0; }
-    .today .say .head { display: block; }
-    .today .say .sub {
-      display: block;
-      margin-top: 4px;
-      font-size: 0.95rem;
-      font-weight: 400;
-      letter-spacing: 0;
-      color: var(--muted);
-    }
-    .today .say + section, .today .focus-actions + section {
-      margin-top: 20px;
-      padding-top: 14px;
-      border-top: 1px solid var(--line);
-    }
-    .today .say:empty { display: none; }
-    .today .say.failed { color: var(--danger); }
     @media (prefers-reduced-motion: no-preference) {
       .msg {
         animation: rise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -277,8 +223,8 @@
         from { opacity: 0; transform: translateY(10px) scale(0.98); }
         to { opacity: 1; transform: translateY(0) scale(1); }
       }
-      .fresh { animation: fresh 0.45s ease-out both; }
-      @keyframes fresh { from { opacity: 0; } }
+      /* 整条重画时（打开、换设备回来）不再一条条浮上来 */
+      #log.quiet .msg, #log.quiet .today > * { animation: none; }
     }
     .typing {
       display: inline-flex;
@@ -306,7 +252,7 @@
       color: var(--muted);
       font-size: 0.85rem;
     }
-    .actions { margin-top: 12px; display: flex; gap: 8px; }
+    .actions { margin-top: 4px; display: flex; gap: 8px; }
     .actions button {
       font: inherit;
       font-size: 0.9rem;
@@ -357,7 +303,7 @@
     .editor .hint { margin-left: 0; }
     /* 「来找你」：开场卡片下面一行，订阅过就不再出现 */
     .push-offer {
-      margin-top: 14px;
+      margin-top: 4px;
       display: flex;
       align-items: center;
       gap: 10px;
@@ -528,9 +474,7 @@
     }
     @media (max-width: 520px) {
       main { gap: 12px; }
-      header h1 { font-size: 1.4rem; }
-      #newChat { min-height: 44px; padding: 0 4px; }
-      .msg { max-width: 94%; }
+      .msg { max-width: 88%; }
       /* 手机上「18:00–19:00」放不进 5.2em，会和标题挤在一起：时间字小一号，列宽给够 */
       .today .row { grid-template-columns: 5.6em minmax(0, 1fr); }
       .today .row time { font-size: 0.84em; padding-top: 0.12em; }
@@ -545,14 +489,6 @@
 </head>
 <body>
   <main>
-    <header>
-      <h1>Friday</h1>
-      <div class="right">
-        <span id="today"></span>
-        <button type="button" id="newChat">新对话</button>
-      </div>
-    </header>
-
     <div id="unlock" aria-live="polite">
       <p>输入一次密码，之后这台设备会记住你。</p>
       <form id="unlockForm">
@@ -575,27 +511,40 @@
   <script>
     const ACCESS_KEY = "pa.access"; // 旧版曾把密码存在本机；登录后清掉
     const CARD_FRESH_MS = 15 * 60 * 1000;
-    const HINTS = {
-      get_calendar_events: "看日历",
-      create_calendar_event: "写日历",
-      search_emails: "翻邮件",
-      read_email: "读邮件",
-      send_email: "发邮件",
-      modify_email: "整理邮件",
-      search_files: "找笔记",
-      read_file: "读笔记",
-      search_memory: "回想",
-      remember_fact: "记下",
-      forget_fact: "忘掉",
-      note_friction: "记下",
-      list_friction: "翻反馈",
-      resolve_friction: "划掉",
-      fix_friction_with_cursor: "交给 Cursor",
-      check_cursor_fix: "看改代码进度",
-      preview_pending_ship: "看改动",
-      ship_pending_fix: "部署",
-      add_task: "记下",
-      complete_task: "划掉",
+    const GAP_MS = 60 * 60 * 1000; // 隔了一小时以上，中间标一下时间
+    // 她在干什么：一行小字，不出现工具名
+    const DOING = {
+      get_calendar_events: "在看你的日历…",
+      create_calendar_event: "在写进日历…",
+      search_emails: "在翻邮件…",
+      read_email: "在读那封邮件…",
+      send_email: "在准备邮件…",
+      modify_email: "在整理邮件…",
+      search_files: "在找笔记…",
+      read_file: "在读笔记…",
+      get_personal_context: "在翻你的档案…",
+      remind_me: "在定提醒…",
+      cancel_reminder: "在取消提醒…",
+      search_memory: "在回想…",
+      remember_fact: "在记下来…",
+      forget_fact: "在准备忘掉…",
+      note_friction: "在记下来…",
+      note_mistake: "在记下来…",
+      list_friction: "在翻反馈…",
+      resolve_friction: "在划掉…",
+      fix_friction_with_cursor: "在交给 Cursor…",
+      check_cursor_fix: "在看 Cursor 的进度…",
+      preview_pending_ship: "在看改动…",
+      ship_pending_fix: "在准备上线…",
+      add_task: "在记下来…",
+      complete_task: "在划掉…",
+    };
+    // 要他拍板时的两个按钮：按钮上的字就是他的回答（服务端认得这些话）
+    const ANSWERS = {
+      send_email: ["发", "不发"],
+      forget_fact: ["忘掉", "留着"],
+      fix_friction_with_cursor: ["交给它", "先不"],
+      ship_pending_fix: ["上线", "先不"],
     };
 
     const logEl = document.getElementById("log");
@@ -603,8 +552,6 @@
     const input = document.getElementById("input");
     const sendBtn = document.getElementById("send");
     const micBtn = document.getElementById("mic");
-    const todayEl = document.getElementById("today");
-    const newChatBtn = document.getElementById("newChat");
     const unlockEl = document.getElementById("unlock");
     const unlockForm = document.getElementById("unlockForm");
     const unlockInput = document.getElementById("unlockInput");
@@ -691,17 +638,12 @@
       return false;
     }
 
-    // 对话存在服务端：手机上聊的，电脑上打开也在；同一天两小时内回来算同一次，由服务端判断
-    async function freshSession() {
-      const res = await fetch("/api/conversation/new", { method: "POST", credentials: "include", headers: authHeaders() });
-      const data = await res.json().catch(() => ({}));
-      return { id: data.id || null, messages: [] };
-    }
-
-    // 只看了开场、还没聊：开场过了一刻钟就换成此刻的
-    function onlyStaleOpener(s) {
-      const [first, ...rest] = s.messages;
-      return !rest.length && !!first && first.role === "assistant" && Date.now() - (first.at || 0) > CARD_FRESH_MS;
+    // 页面上只有一条对话，存在服务端：手机上聊的，电脑上打开也在。
+    // session.id 是给模型的那一段（服务端按「同一天、两小时内」分段）；放久了是 null，就请她开场
+    function needsOpener(s) {
+      if (!s.id) return true;
+      const last = s.messages[s.messages.length - 1];
+      return !last || (!!last.agenda && Date.now() - (last.at || 0) > CARD_FRESH_MS);
     }
 
     function fromServer(m) {
@@ -713,20 +655,19 @@
         undo: m.undo || [],
         undone: !!m.undone,
         agenda: m.agenda || null,
+        ask: m.ask || "",
         needsConfirm: !!m.needs_confirm,
         approvals: m.approvals || [],
         at: m.at || 0,
       };
     }
 
-    // 当前这段对话；没有（过期了）就是 null
     async function loadSession() {
       try {
         const res = await fetch("/api/conversation", { credentials: "include", headers: authHeaders() });
         if (!res.ok) return null;
         const data = await res.json();
-        if (!data.id) return null;
-        return { id: data.id, messages: (data.messages || []).map(fromServer) };
+        return { id: data.id || null, messages: (data.messages || []).map(fromServer) };
       } catch (e) {
         return null;
       }
@@ -753,13 +694,118 @@
       logEl.scrollTop = logEl.scrollHeight;
     }
 
-    function addMessage(role, text) {
-      const div = document.createElement("div");
-      div.className = "msg " + role;
-      if (text != null) div.innerHTML = render(text);
-      logEl.appendChild(div);
+    // ---- 一条对话：他在右、她在左，都是气泡；她的一段话一个气泡 ----
+    let lastAt = 0;
+    const DOTS = '<span class="typing"><i></i><i></i><i></i></span>';
+
+    function stampText(at) {
+      const d = new Date(at);
+      const hm = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+      const midnight = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+      const days = Math.round((midnight(new Date()) - midnight(d)) / 86400000);
+      if (days === 0) return "今天 " + hm;
+      if (days === 1) return "昨天 " + hm;
+      if (days < 7) return "周" + "日一二三四五六"[d.getDay()] + " " + hm;
+      return d.getMonth() + 1 + "月" + d.getDate() + "日 " + hm;
+    }
+
+    // 一个人连着说的一次；离上一句隔了一小时以上或换了一天，先标时间
+    function group(role, at) {
+      at = at || Date.now();
+      if (!lastAt || at - lastAt >= GAP_MS || new Date(at).toDateString() !== new Date(lastAt).toDateString()) {
+        logEl.append(el("div", "stamp", stampText(at)));
+      }
+      lastAt = Math.max(lastAt, at);
+      const g = el("div", "group " + (role === "user" ? "mine" : "hers"));
+      logEl.append(g);
       scrollDown();
-      return div;
+      return g;
+    }
+
+    function bubble(g, text, extra) {
+      const b = el("div", "msg " + (g.classList.contains("mine") ? "user" : "bot") + (extra ? " " + extra : ""));
+      if (text != null) b.innerHTML = render(text);
+      g.append(b);
+      scrollDown();
+      return b;
+    }
+
+    function paragraphs(text) {
+      return (text || "").split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+    }
+
+    function note(text) {
+      return bubble(group("assistant"), text, "note");
+    }
+
+    // 她还在想、在查：打字的气泡，旁边一行小字说在干什么
+    function pending(g, doing) {
+      let p = g.querySelector(":scope > .pending");
+      if (!p) {
+        p = el("div", "pending");
+        g.append(p);
+      }
+      p.innerHTML = '<div class="msg bot">' + DOTS + "</div>" + (doing ? '<span class="doing">' + escapeHtml(doing) + "</span>" : "");
+      scrollDown();
+    }
+
+    function clearPending(g) {
+      const p = g.querySelector(":scope > .pending");
+      if (p) p.remove();
+    }
+
+    // 她正在说的这一轮：边写边分段，写到空行就开下一个气泡；去查东西时先收起来，换成「在…」
+    function herReply(g) {
+      const bubbles = [];
+      return {
+        g,
+        show(text) {
+          const parts = paragraphs(text);
+          if (parts.length) clearPending(g);
+          parts.forEach((p, i) => {
+            if (!bubbles[i]) bubbles[i] = bubble(g);
+            bubbles[i].innerHTML = render(p);
+          });
+          bubbles.splice(parts.length).forEach((b) => b.remove());
+          scrollDown();
+        },
+        busy(doing) {
+          bubbles.splice(0).forEach((b) => b.remove());
+          pending(g, doing);
+        },
+      };
+    }
+
+    function replyView(reply, speaker) {
+      return {
+        onDelta(text) {
+          reply.show(text);
+          if (speaker) speaker.feed(text);
+        },
+        onTool(name) {
+          reply.busy(DOING[name] || "");
+          if (speaker) speaker.reset();
+        },
+      };
+    }
+
+    // 要他拍板的那段（服务端拼的）：要做的事原样放进一个框，最后那句问话是她的一条
+    function drawAsk(g, ask) {
+      const cut = ask.lastIndexOf("\n\n");
+      if (cut > 0) bubble(g, ask.slice(0, cut), "draft");
+      bubble(g, cut > 0 ? ask.slice(cut + 2) : ask);
+    }
+
+    // 她说的话（不含要他拍板的那段）
+    function saidPart(m) {
+      const c = m.content || "";
+      return m.ask && c.endsWith(m.ask) ? c.slice(0, c.length - m.ask.length).trim() : c;
+    }
+
+    function calm(err) {
+      const raw = (err && err.message) || String(err || "");
+      if (/load failed|failed to fetch|networkerror|aborted|connection|连接断了/i.test(raw)) return "连不上了，网络好了再说一次。";
+      return raw || "这句没接上，再说一次。";
     }
 
     function el(tag, className, text) {
@@ -769,16 +815,35 @@
       return node;
     }
 
-    // 卡片上的安排是服务端读到的原样数据，不经过模型；返回写那句判断的位置
-    function drawToday(div, card) {
-      div.className = "msg bot today";
-      div.replaceChildren(el("div", "hello", card.hello));
-      if (card.error) div.append(el("p", "empty", card.error));
-      const say = el("div", "say");
-      div.append(say);
-      if (card.focus && card.focus.actions && card.focus.actions.length) {
-        div.append(focusActions(div, card.focus));
+    // 开场：问候一条，此刻最该知道的那句一条；最新的那次开场下面再挂今天的时间线和那一个动作
+    function drawOpener(g, m, full) {
+      g.classList.add("opener");
+      const card = m.agenda || {};
+      if (full && card.hello) bubble(g, card.hello);
+      if (m.content) fillSay(bubble(g, null, "say"), m.content);
+      if (full) {
+        g.classList.add("full");
+        attachToday(g, card);
       }
+    }
+
+    function attachToday(g, card) {
+      if (card.error) bubble(g, card.error, "note");
+      if (card.focus && card.focus.actions && card.focus.actions.length) g.append(focusActions(g, card.focus));
+      if ((card.sections || []).length) g.append(drawToday(card));
+    }
+
+    // 又开了一次场：之前那次只留那一句
+    function foldOpeners() {
+      logEl.querySelectorAll(".group.opener.full").forEach((g) => {
+        g.classList.remove("full");
+        g.querySelectorAll(".today, .focus-actions, .push-offer, .msg:not(.say)").forEach((n) => n.remove());
+      });
+    }
+
+    // 时间线上的安排是服务端读到的原样数据，不经过模型
+    function drawToday(card) {
+      const div = el("div", "msg bot today");
       for (const section of card.sections || []) {
         const box = el("section");
         // 空的日子只占一行、退到后面；版面留给真要去的事
@@ -803,7 +868,7 @@
         }
         div.append(box);
       }
-      return say;
+      return div;
     }
 
     // 「现在」：第一句大字，一眼看完（不带句号）；补充的（地点、还剩多久、空到几点）小一号放在下面
@@ -819,7 +884,7 @@
     }
 
     // 「现在」那句话下面的按钮：和时间线上同一件事是同一个动作，办完那一行也划掉
-    function focusActions(div, focus) {
+    function focusActions(g, focus) {
       const bar = el("div", "row-actions focus-actions");
       for (const action of focus.actions) {
         const b = el("button", "", action.label);
@@ -834,7 +899,7 @@
             b.textContent = action.confirm;
             return;
           }
-          const line = div.querySelector('.row[data-key="' + CSS.escape(focus.key) + '"]') || el("div");
+          const line = g.querySelector('.row[data-key="' + CSS.escape(focus.key) + '"]') || el("div");
           doRow(line, focus, action, bar);
         };
         bar.append(b);
@@ -899,25 +964,15 @@
         if (action.id !== "preview") line.classList.add("handled");
         clearActions();
         const m = { id: data.message_id, role: "assistant", content: data.say, tools: [], undo: data.undo, at: Date.now() };
-        const div = addMessage("bot", data.say);
-        if (m.undo && m.undo.length) addUndo(div, m);
+        const g = group("assistant", m.at);
+        bubble(g, data.say);
+        if (m.undo && m.undo.length) addUndo(g, m);
         session.messages.push(m);
       } catch (e) {
         bar.replaceChildren(el("span", "hint", (e && e.message) || String(e)));
       }
     }
 
-    function showTyping(div, hint) {
-      div.innerHTML =
-        '<span class="typing"><i></i><i></i><i></i></span>' +
-        (hint ? '<span class="hint">' + escapeHtml(hint) + "</span>" : "");
-    }
-
-    // 新写出来的字淡入，不是整段刷新；写完再换成排好版的全文
-    function appendFresh(target, chunk) {
-      if (target.querySelector(".typing")) target.textContent = "";
-      target.append(el("span", "fresh", chunk));
-    }
 
 
 
@@ -980,7 +1035,7 @@
     }
 
     // 开场卡片下面：这台设备还没订上，就问一句
-    async function offerPush(div) {
+    async function offerPush(g) {
       if (await pushSubscribed()) return;
       const line = el("div", "push-offer");
       if (isIOS && !standalone) {
@@ -993,7 +1048,7 @@
         b.onclick = () => enablePush(line);
         line.append(el("span", "", "想让我主动来找你？"), b);
       }
-      div.appendChild(line);
+      g.appendChild(line);
     }
 
     // 从通知点进来：记一笔「点开了」；会前提醒就直接把要点备好
@@ -1034,29 +1089,25 @@
       history.replaceState({}, "", u.pathname + u.search + u.hash);
     })();
 
-    function addConfirm(div, m) {
-      const bar = document.createElement("div");
-      bar.className = "actions";
-      [
-        ["确认", "确认", false],
-        ["取消", "取消，先不要执行。", true],
-      ].forEach(([label, message, secondary]) => {
-        const b = document.createElement("button");
+    // 要他拍板：她问一句，下面两个字就是他的回答；邮件还能当场改
+    function addConfirm(g, m) {
+      const bar = el("div", "actions");
+      const names = [...new Set((m.approvals || []).map((a) => a.name))];
+      const [yes, no] = (names.length === 1 && ANSWERS[names[0]]) || ["好", "不要"];
+      [[yes, ""], [no, "secondary"]].forEach(([label, kind]) => {
+        const b = el("button", kind, label);
         b.type = "button";
-        b.textContent = label;
-        if (secondary) b.className = "secondary";
-        b.onclick = () => ask(message);
-        bar.appendChild(b);
+        b.onclick = () => ask(label);
+        bar.append(b);
       });
-      // 邮件：卡片里直接改主题和正文再发，不用让她重写一遍
-      const mail = ((m && m.approvals) || []).find((a) => a.name === "send_email");
+      const mail = (m.approvals || []).find((a) => a.name === "send_email");
       if (mail) {
         const b = el("button", "secondary", "改一下");
         b.type = "button";
-        b.onclick = () => openMailEditor(div, bar, mail);
+        b.onclick = () => openMailEditor(g, bar, mail);
         bar.insertBefore(b, bar.lastChild);
       }
-      div.appendChild(bar);
+      g.append(bar);
     }
 
     function openMailEditor(div, bar, mail) {
@@ -1087,26 +1138,27 @@
       stopSpeaking();
       setBusy(true);
       box.remove();
-      addMessage("user", "（改了一下）按这个发。");
-      session.messages.push({ role: "user", content: "（改了一下）按这个发。", at: Date.now() });
-      const div = addMessage("bot");
-      showTyping(div, HINTS.send_email);
+      const said = "（改了一下）按这个发。";
+      bubble(group("user"), said);
+      session.messages.push({ role: "user", content: said, at: Date.now() });
+      const reply = herReply(group("assistant"));
+      reply.busy(DOING.send_email);
       try {
         const result = await stream(
           "/api/chat/revise",
           { conversation_id: session.id, call_id: mail.call_id, changes },
-          { el: div },
+          replyView(reply),
         );
-        finish(div, result);
+        finish(reply, result);
       } catch (e) {
-        fail(div, e);
+        fail(reply, e);
       } finally {
         setBusy(false);
       }
     }
 
     // 记下或划掉的待办不先问他，只在下面放一个「撤销」：直接撤回，不经过模型
-    function addUndo(div, m) {
+    function addUndo(g, m) {
       const bar = el("div", "actions");
       const b = el("button", "secondary", "撤销");
       b.type = "button";
@@ -1132,27 +1184,47 @@
         }
       };
       bar.append(b);
-      div.appendChild(bar);
+      g.appendChild(bar);
     }
 
     function clearActions() {
       logEl.querySelectorAll(".actions").forEach((el) => el.remove());
     }
 
-    function renderSession() {
-      logEl.innerHTML = "";
-      session.messages.forEach((m, i) => {
-        const shown = m.undone ? m.content + "（已撤销）" : m.content;
-        const div = addMessage(m.role === "user" ? "user" : "bot", m.agenda ? null : shown);
-        if (m.agenda) fillSay(drawToday(div, m.agenda), m.content);
-        const last = i === session.messages.length - 1;
-        if (m.needsConfirm && last) addConfirm(div, m);
-        if (m.undo && m.undo.length && !m.undone && last) addUndo(div, m);
+    // 整条重画：打开、换设备回来时。最新的那次开场带时间线，之前的只留那一句
+    function renderThread() {
+      logEl.classList.add("quiet");
+      logEl.replaceChildren();
+      lastAt = 0;
+      const msgs = session.messages;
+      let latestOpener = -1;
+      msgs.forEach((m, i) => {
+        if (m.agenda) latestOpener = i;
+      });
+      msgs.forEach((m, i) => {
+        const g = group(m.role, m.at);
+        if (m.role === "user") bubble(g, m.content);
+        else if (m.agenda) drawOpener(g, m, i === latestOpener);
+        else {
+          showHers(g, m);
+          const last = i === msgs.length - 1;
+          if (m.needsConfirm && last) addConfirm(g, m);
+          if (m.undo && m.undo.length && !m.undone && last) addUndo(g, m);
+        }
+        if (!g.children.length) g.remove();
       });
       scrollDown();
+      requestAnimationFrame(() => logEl.classList.remove("quiet"));
     }
 
-    // view.el 是正在写字的位置；开场的卡片到了以后它会换成卡片里那句判断
+    function showHers(g, m) {
+      const parts = paragraphs(saidPart(m));
+      if (m.undone && parts.length) parts[parts.length - 1] += "（已撤销）";
+      parts.forEach((p) => bubble(g, p));
+      if (m.ask) drawAsk(g, m.ask);
+    }
+
+    // view 上挂着各种事件怎么画：onDelta（她写到哪了）、onTool（她去查东西）、onAgenda（开场的时间线）、onHeard（听清他说的）
     async function stream(url, payload, view) {
       const form = payload instanceof FormData;
       const res = await fetch(url, {
@@ -1170,7 +1242,8 @@
         if (res.status === 404) {
           throw new Error("本地服务还是旧版本：双击 Friday.cmd 重开，再刷新这页。");
         }
-        throw new Error(data.detail || "请求失败：" + res.status);
+        console.warn("Friday:", res.status, data.detail || "");
+        throw new Error(res.status === 503 && data.detail ? data.detail : "这句没接上，再说一次。");
       }
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -1192,20 +1265,18 @@
           } else if (ev.type === "conversation") {
             if (session && ev.id) session.id = ev.id;
           } else if (ev.type === "agenda") {
-            view.onAgenda(ev);
+            if (view.onAgenda) view.onAgenda(ev);
             scrollDown();
           } else if (ev.type === "delta") {
             text += ev.text;
-            appendFresh(view.el, ev.text);
-            if (view.onText) view.onText(text);
-            scrollDown();
+            if (view.onDelta) view.onDelta(text);
           } else if (ev.type === "tool") {
             text = "";
-            if (view.onTool) view.onTool();
-            showTyping(view.el, HINTS[ev.name]);
+            if (view.onTool) view.onTool(ev.name);
           } else if (ev.type === "done") {
             result = {
               reply: ev.reply || text,
+              ask: ev.ask || "",
               tools: ev.tools_called || [],
               undo: ev.undo || [],
               needsConfirm: !!ev.needs_confirm,
@@ -1213,6 +1284,7 @@
               id: ev.message_id,
             };
           } else if (ev.type === "error") {
+            if (ev.detail) console.warn("Friday:", ev.detail);
             throw new Error(ev.message);
           }
         }
@@ -1221,19 +1293,24 @@
       return result;
     }
 
-    function finish(div, result) {
-      const { reply, tools = [], undo = [], needsConfirm = false, approvals = [], id } = result;
-      div.innerHTML = render(reply);
-      const m = { id, role: "assistant", content: reply, tools, needsConfirm, approvals, undo, at: Date.now() };
-      if (needsConfirm) addConfirm(div, m);
-      if (undo.length) addUndo(div, m);
+    // 这一轮说完：按最终的话重排气泡（写的时候已经分好的原样留着），要拍板的那段单独一个框
+    function finish(reply, result) {
+      const { reply: content, ask = "", tools = [], undo = [], needsConfirm = false, approvals = [], id } = result;
+      const m = { id, role: "assistant", content, ask, tools, needsConfirm, approvals, undo, at: Date.now() };
+      clearPending(reply.g);
+      reply.show(saidPart(m));
+      if (ask) drawAsk(reply.g, ask);
+      if (needsConfirm) addConfirm(reply.g, m);
+      if (undo.length) addUndo(reply.g, m);
+      if (!reply.g.children.length) reply.g.remove();
       session.messages.push(m);
       scrollDown();
     }
 
-    function fail(div, err) {
-      div.className = "msg error";
-      div.textContent = (err && err.message) || String(err);
+    function fail(reply, err) {
+      clearPending(reply.g);
+      reply.show("");
+      bubble(reply.g, calm(err), "note");
     }
 
     function setBusy(on) {
@@ -1647,26 +1724,26 @@
 
     // 松手气泡就出来；录音一趟传上去：转写好了先填进气泡（heard），她紧接着就回，不再多跑一趟
     async function sendVoice(blob, mime) {
-      const bubble = addMessage("user");
-      bubble.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>';
-      scrollDown();
+      const mine = group("user");
+      const heard = bubble(mine, null);
+      heard.innerHTML = DOTS;
       await whenIdle();
       setBusy(true);
       clearActions();
-      const div = addMessage("bot");
-      div.hidden = true; // 听清之前先不摆她的气泡
-      const view = { el: div };
+      const g = group("assistant");
+      g.hidden = true; // 听清之前先不摆她的气泡
+      const reply = herReply(g);
+      const view = replyView(reply);
       let speaker = null;
       view.onHeard = (ev) => {
-        bubble.textContent = ev.text;
+        heard.textContent = ev.text;
         session.messages.push({ role: "user", content: ev.text, at: Date.now() });
-        div.hidden = false;
-        showTyping(div);
+        g.hidden = false;
+        reply.busy();
         // 只有他明说要听（「念给我听」）才出声
         if (ev.spoken) {
           speaker = speakerFor();
-          view.onText = (text) => speaker.feed(text);
-          view.onTool = () => speaker.reset();
+          Object.assign(view, replyView(reply, speaker));
         }
         scrollDown();
       };
@@ -1676,15 +1753,15 @@
         formData.append("file", blob, "speech." + ext);
         if (session && session.id) formData.append("conversation_id", session.id);
         const result = await stream("/api/voice/ask", formData, view);
-        finish(div, result);
+        finish(reply, result);
         if (speaker) speaker.end(result.reply);
       } catch (e) {
-        if (div.hidden) {
-          bubble.remove();
-          div.remove();
-          addMessage("error", (e && e.message) || String(e));
+        if (g.hidden) {
+          mine.remove();
+          g.remove();
+          note(calm(e));
         } else {
-          fail(div, e);
+          fail(reply, e);
         }
         if (speaker) speaker.cancel();
       } finally {
@@ -1700,69 +1777,80 @@
       });
     }
 
+    // 她先开口：问候、此刻最该知道的那句、今天的时间线，接在那条对话的最后
     async function presence() {
       setBusy(true);
-      const div = addMessage("bot");
-      showTyping(div);
+      // 上一次开场之后什么都没聊：这次的替掉它，不叠两遍
+      const last = session.messages[session.messages.length - 1];
+      if (last && last.agenda) {
+        session.messages.pop();
+        renderThread();
+      }
+      foldOpeners();
+      const g = group("assistant");
+      g.classList.add("opener", "full");
+      pending(g);
+      let head = null;
+      let card = null;
       const view = {
-        el: div,
-        card: null,
-        onAgenda(card) {
-          view.card = card;
-          view.el = drawToday(div, card);
-          showTyping(view.el);
+        onAgenda(c) {
+          card = c;
+          clearPending(g);
+          if (c.hello) bubble(g, c.hello);
+          head = bubble(g, null, "say");
+          head.innerHTML = DOTS;
+          attachToday(g, c);
+        },
+        onDelta(text) {
+          if (head) fillSay(head, text);
         },
       };
       try {
         const result = await stream("/api/presence/stream", { conversation_id: session.id }, view);
-        if (!view.card) {
-          finish(div, result);
-          return;
-        }
-        fillSay(view.el, result.reply);
-        const opener = { id: result.id, role: "assistant", content: result.reply, tools: [], agenda: view.card, at: Date.now() };
-        offerPush(div);
-        session.messages.push(opener);
-        scrollDown();
+        clearPending(g);
+        if (!head && result.reply) head = bubble(g, null, "say");
+        if (head && result.reply) fillSay(head, result.reply);
+        else if (head) head.remove();
+        session.messages.push({ id: result.id, role: "assistant", content: result.reply, tools: [], agenda: card || {}, at: Date.now() });
+        offerPush(g);
       } catch (e) {
-        if (!view.card) {
-          fail(div, e);
-          return;
-        }
-        // 安排已经在了：那句判断没出来，就在卡片里说一声，卡片照样留着
-        view.el.classList.add("failed");
-        view.el.textContent = (e && e.message) || String(e);
-        session.messages.push({ role: "assistant", content: "", tools: [], agenda: view.card, at: Date.now() });
+        clearPending(g);
+        if (head) head.remove();
+        bubble(g, calm(e), "note");
       } finally {
         setBusy(false);
         input.focus();
       }
     }
 
-    async function startOver() {
-      stopSpeaking();
-      settleOrb();
-      setBusy(true);
-      logEl.innerHTML = "";
+    // 打开、登录之后、叫回窗口没准备好时都走这里：接上那条对话；放久了就请她开场
+    async function boot() {
       ready = await checkHealth();
-      session = ready ? await freshSession() : { id: null, messages: [] };
-      setBusy(false);
-      if (ready) await presence();
+      if (!ready) return;
+      const latest = await loadSession();
+      if (!latest) return;
+      session = latest;
+      renderThread();
+      if (needsOpener(session)) await presence();
+      else input.focus();
     }
 
-    // 叫回窗口：光标回到输入框；对话过期了或开场放久了，重新开场；
-    // 别的设备上接着聊过，就把那几句也显示出来；否则趁他打字先把日历读好
+    // 叫回窗口：别的设备上接着聊过，就把那几句也显示出来；放久了请她开场；否则趁他打字先把日历读好
     async function onReturn() {
-      if (document.visibilityState !== "visible" || busy || !session) return;
+      if (document.visibilityState !== "visible" || busy) return;
       input.focus();
-      if (!ready) return startOver();
+      if (!ready || !session) return boot();
       const latest = await loadSession();
-      if (busy) return;
-      if (!latest || latest.id !== session.id || onlyStaleOpener(latest)) return startOver();
-      if (latest.messages.length !== session.messages.length) {
+      if (busy || !latest) return;
+      const a = session.messages;
+      const b = latest.messages;
+      const moved = a.length !== b.length || (b.length && a.length && a[a.length - 1].id !== b[b.length - 1].id);
+      session.id = latest.id;
+      if (moved) {
         session = latest;
-        renderSession();
+        renderThread();
       }
+      if (needsOpener(session)) return presence();
       fetch("/api/calendar/warm", { method: "POST", credentials: "include", headers: authHeaders() }).catch(() => {});
     }
 
@@ -1779,36 +1867,20 @@
       if (!speaker) settleOrb();
       setBusy(true);
       clearActions();
-      if (opts && opts.userDiv) opts.userDiv.textContent = message;
-      else addMessage("user", message);
+      bubble(group("user"), message);
       session.messages.push({ role: "user", content: message, at: Date.now() });
-      const div = addMessage("bot");
-      showTyping(div);
-      const view = { el: div };
-      if (speaker) {
-        view.onText = (text) => speaker.feed(text);
-        view.onTool = () => speaker.reset();
-      }
+      const reply = herReply(group("assistant"));
+      reply.busy();
       try {
         const result = await stream(
           "/api/chat/stream",
           { message, conversation_id: session.id, spoken: !!speaker },
-          view,
+          replyView(reply, speaker),
         );
-        finish(div, result);
+        finish(reply, result);
         if (speaker) speaker.end(result.reply);
       } catch (e) {
-        const raw = (e && e.message) || String(e);
-        const network =
-          /load failed|failed to fetch|networkerror|aborted|connection/i.test(raw);
-        fail(
-          div,
-          network
-            ? new Error(
-                "连不上了（网络或云上刚重启）。Cursor 若已开跑，问我「改好了吗」就能接上，不必重说一整遍。",
-              )
-            : e,
-        );
+        fail(reply, e);
         if (speaker) speaker.cancel();
       } finally {
         setBusy(false);
@@ -1822,14 +1894,13 @@
         if (!(await ensureSignedIn())) return false;
         const res = await fetch("/api/health", { credentials: "include", headers: authHeaders() });
         const data = await res.json();
-        if (data.now_label) todayEl.textContent = data.now_label;
         if (!data.has_openai_api_key) {
-          addMessage("error", "缺少 OPENAI_API_KEY：在 .env 里填好后，双击 Friday.cmd 重开。");
+          note("缺少 OPENAI_API_KEY：在 .env 里填好后，双击 Friday.cmd 重开。");
           return false;
         }
         return true;
       } catch (e) {
-        addMessage("error", "连不上 Friday：电脑上的服务开着吗？云上打开 friday-jimmy.fly.dev。");
+        note("连不上 Friday：电脑上的服务开着吗？云上打开 friday-jimmy.fly.dev。");
         return false;
       }
     }
@@ -1893,10 +1964,6 @@
       }
     });
 
-    newChatBtn.addEventListener("click", () => {
-      if (!busy) startOver();
-    });
-
     unlockForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const t = unlockInput.value.trim();
@@ -1905,7 +1972,7 @@
         await loginWithPassword(t);
         unlockInput.value = "";
         showUnlock(false);
-        await startOver();
+        await boot();
       } catch (err) {
         unlockInput.value = "";
         unlockInput.placeholder = (err && err.message) || "密码不对";
@@ -1917,14 +1984,7 @@
     window.addEventListener("focus", onReturn);
 
     (async () => {
-      ready = await checkHealth();
-      session = ready ? await loadSession() : null;
-      if (session && session.messages.length && !onlyStaleOpener(session)) {
-        renderSession();
-        input.focus();
-      } else {
-        await startOver();
-      }
+      await boot();
       // 从「会快到了」的提醒点进来：开场之后直接准备
       if (pendingAsk && ready) {
         const message = pendingAsk;

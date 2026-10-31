@@ -4,7 +4,8 @@
 - 给模型看的：Agents SDK 的 SQLiteSession，含工具调用和结果（「回刚才那封」不用再搜）。
 - 给页面看的：每条消息的文字、开场卡片、工具、撤销、待确认。
 
-同一天、两小时内回来算同一次对话；否则重新开场（和以前浏览器里的规则一样）。
+页面上只有一条对话（thread：最近两周、按时间连着）。给模型的会话仍按「同一天、两小时内」分段，
+免得上下文无限长；新的一段会先带上前一段最后几句（carry_over）。
 """
 
 from __future__ import annotations
@@ -23,6 +24,10 @@ from agents import SQLiteSession
 from src.config import CONVERSATIONS_DB
 
 IDLE_S = 2 * 60 * 60
+THREAD_DAYS = 14
+THREAD_MAX = 200
+CARRY_LINES = 6
+CARRY_WITHIN_S = 24 * 60 * 60
 
 
 class Conversations:
@@ -127,6 +132,40 @@ class Conversations:
             {"id": r["id"], "role": r["role"], "content": r["content"], "at": int(r["at"] * 1000), **json.loads(r["data"] or "{}")}
             for r in rows
         ]
+
+    def thread(self, now: float | None = None) -> list[dict[str, Any]]:
+        """页面上的那一条对话：最近两周的消息按时间连起来。没聊就又开了一次场的，只留后一次。"""
+        since = (time.time() if now is None else now) - THREAD_DAYS * 24 * 60 * 60
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT id, conversation_id, role, content, data, at FROM conversation_messages "
+                "WHERE at >= ? ORDER BY at DESC, id DESC LIMIT ?",
+                (since, THREAD_MAX),
+            ).fetchall()
+        messages = [
+            {"id": r["id"], "conversation_id": r["conversation_id"], "role": r["role"], "content": r["content"],
+             "at": int(r["at"] * 1000), **json.loads(r["data"] or "{}")}
+            for r in reversed(rows)
+        ]
+        return [m for i, m in enumerate(messages) if not (m.get("agenda") is not None and i + 1 < len(messages)
+                                                          and messages[i + 1].get("agenda") is not None)]
+
+    def carry_over(self, cid: str, now: float | None = None) -> list[dict[str, str]]:
+        """新的一段要带上的：前一段（一天以内的）最后几句话，只要文字。"""
+        now = time.time() if now is None else now
+        with self._lock:
+            prev = self._conn.execute(
+                "SELECT id FROM conversations WHERE id != ? AND last_active_at >= ? ORDER BY last_active_at DESC LIMIT 1",
+                (cid, now - CARRY_WITHIN_S),
+            ).fetchone()
+            if prev is None:
+                return []
+            rows = self._conn.execute(
+                "SELECT role, content FROM conversation_messages WHERE conversation_id = ? AND content != '' "
+                "ORDER BY id DESC LIMIT ?",
+                (prev["id"], CARRY_LINES),
+            ).fetchall()
+        return [{"role": "user" if r["role"] == "user" else "assistant", "content": r["content"]} for r in reversed(rows)]
 
     def close(self) -> None:
         for session in self._sessions.values():

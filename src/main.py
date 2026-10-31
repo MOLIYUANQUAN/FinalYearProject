@@ -223,7 +223,9 @@ def _sse(kind: str, events: AsyncIterator[dict[str, Any]]) -> StreamingResponse:
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         except Exception as exc:  # noqa: BLE001
             ok = False
-            error = {"type": "error", "message": f"出了点问题：{exc}"}
+            # 他只看到她说一句；具体哪里坏了写进日志（flyctl logs）
+            print(f"[ERROR] {kind}: {exc!r}")
+            error = {"type": "error", "message": "这句没接上，再说一次。", "detail": str(exc)}
             yield f"data: {json.dumps(error, ensure_ascii=False)}\n\n"
         finally:
             usage_log.record(
@@ -243,23 +245,17 @@ def _sse(kind: str, events: AsyncIterator[dict[str, Any]]) -> StreamingResponse:
 
 @app.get("/api/conversation")
 def conversation_current() -> dict:
-    """页面打开时：接上当前这段对话（手机上聊的，电脑上也看得到）；过期了就是空的。"""
-    cid = friday.conversations.current()
-    if not cid:
-        return {"id": None, "messages": []}
-    messages = friday.conversations.messages(cid)
+    """页面打开时：那一条对话（手机上聊的，电脑上也看得到）。id 是给模型的那一段；放久了是 None，页面就请她开场。"""
+    messages = friday.conversations.thread()
     # 待确认的那一步如果已经没了（比如很久以前的），按钮就别再显示
-    if messages and messages[-1].get("needs_confirm") and not friday.pending_approvals(cid):
-        messages[-1]["needs_confirm"] = False
-    return {"id": cid, "messages": messages}
-
-
-@app.post("/api/conversation/new")
-def conversation_new() -> dict:
-    return {"id": friday.conversations.create()}
+    last = messages[-1] if messages else None
+    if last and last.get("needs_confirm") and not friday.pending_approvals(last["conversation_id"]):
+        last["needs_confirm"] = False
+    return {"id": friday.conversations.current(), "messages": messages}
 
 
 async def _presence_events(cid: str) -> AsyncIterator[dict[str, Any]]:
+    yield {"type": "conversation", "id": cid}
     card: dict[str, Any] | None = None
     async for event in stream_presence():
         if event["type"] == "agenda":

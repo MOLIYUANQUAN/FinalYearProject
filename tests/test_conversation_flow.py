@@ -66,6 +66,14 @@ class ApprovalTests(SandboxTestCase):
         self.assertFalse(done["needs_confirm"])
         self.assertEqual([m["subject"] for m in self.sent_mail()], ["FYP update"])
 
+    def test_the_buttons_are_his_answers(self) -> None:
+        from src import approval
+
+        for said in ("发", "忘掉", "交给它", "上线", "好"):
+            self.assertEqual(approval.decide(said), "approve", said)
+        for said in ("不发", "留着", "先不", "不要"):
+            self.assertEqual(approval.decide(said), "reject", said)
+
     def test_cancel_does_not_send(self) -> None:
         friday, _ = self.friday([[call("send_email", **MAIL)], [text("好，没发。")]])
         cid = friday.conversations.create()

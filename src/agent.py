@@ -46,7 +46,7 @@ VOICE = """你叫 Friday，是 Zeep 的管家，只为他一个人。不是顾�
 
 说话：
 - 称呼用「你」，不用「您」、不用 sir。英文名是 Zeep，不要叫他 Jimmy。
-- 第一句就是答案或判断。默认一到四行；他要细节再展开。先办事，再（可选）甩一句干幽默——不是每轮都要梗，梗了也别解释。
+- 第一句就是答案或判断。像发消息那样说：一个意思一段，一段一两句，段与段之间空一行（页面上会是几条消息）；默认一到三段，他要细节再展开。列举的几项写在同一段里，每项一行。先办事，再（可选）甩一句干幽默——不是每轮都要梗，梗了也别解释。
 - 敢轻轻纠正空话或不切实际的计划；他拍板了就照办，不唠叨。创业讨论尤其可以锋利一点，别无条件附和。
 - 他累了、烦了、卡住了：先接住一句（短、真），再办事或问一个必要问题；不训话、不灌鸡汤、不堆任务清单。
 - 做成事（记下了、部署了、会准备好了）：一句到位的肯定或收束就停，别庆祝表演。
@@ -277,6 +277,7 @@ class Friday:
         # 他在确认卡片里改过的内容：她照着重新调用、参数一字不差时自动放行
         self._edits: dict[str, dict[str, Any]] = {}
         self._locks: dict[str, asyncio.Lock] = {}
+        self._carried: set[str] = set()
 
     @property
     def conversations(self) -> Conversations:
@@ -349,6 +350,7 @@ class Friday:
         lock = self._locks.setdefault(cid, asyncio.Lock())
         async with lock:
             convs = self.conversations
+            await self._carry_over(cid)
             convs.add_message(cid, "user", message)
             yield {"type": "conversation", "id": cid}
 
@@ -406,8 +408,8 @@ class Friday:
                     yield event
 
             reply = "\n\n".join(t for t in texts if t.strip())
-            if approvals:
-                ask = approval.prompt(approvals)
+            ask = approval.prompt(approvals) if approvals else ""
+            if ask:
                 reply = f"{reply}\n\n{ask}" if reply else ask
             message_id = convs.add_message(
                 cid,
@@ -417,10 +419,12 @@ class Friday:
                 undo=undo,
                 needs_confirm=bool(approvals),
                 approvals=approvals,
+                ask=ask,
             )
             yield {
                 "type": "done",
                 "reply": reply,
+                "ask": ask,
                 "tools_called": tools,
                 "undo": undo,
                 "needs_confirm": bool(approvals),
@@ -490,8 +494,21 @@ class Friday:
 
     # ---- 开场 ----
 
+    async def _carry_over(self, cid: str) -> None:
+        """页面上是一条连着的对话；给模型的那段过两小时会重开。新开的一段先带上前一段最后几句，他接着刚才的话说她也接得上。"""
+        if cid in self._carried:
+            return
+        self._carried.add(cid)
+        session = self.conversations.session(cid)
+        if await session.get_items(limit=1):
+            return
+        lines = self.conversations.carry_over(cid)
+        if lines:
+            await session.add_items(lines)
+
     async def record_opener(self, cid: str, reply: str, card: dict[str, Any] | None) -> int:
         """开场卡片和那句话也进对话：换设备能看到，模型也知道自己刚说了什么。"""
+        await self._carry_over(cid)
         message_id = self.conversations.add_message(cid, "assistant", reply, agenda=card, tools=[])
         if reply.strip():
             await self.conversations.session(cid).add_items([{"role": "assistant", "content": reply}])

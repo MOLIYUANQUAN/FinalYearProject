@@ -16,9 +16,9 @@ from src import ship
 _YES = {
     "确认", "确定", "同意", "好", "好的", "好啊", "可以", "行", "嗯", "对", "是", "发吧", "发", "发送",
     "建吧", "创建", "创建吧", "确认创建", "确认发送", "部署", "部署吧", "确认部署", "上线", "删吧", "删", "改吧",
-    "开工", "去吧", "执行", "ok", "okay", "yes", "y", "sure", "go", "do it", "confirm",
+    "开工", "去吧", "执行", "忘掉", "忘了吧", "交给它", "ok", "okay", "yes", "y", "sure", "go", "do it", "confirm",
 }
-_NO = re.compile(r"^(取消|不要|不用|别|算了|先不|不发|不建|不删|不部署|停|no\b|nope|cancel|don'?t)", re.IGNORECASE)
+_NO = re.compile(r"^(取消|不要|不用|别|算了|先不|不发|不建|不删|不部署|留着|停|no\b|nope|cancel|don'?t)", re.IGNORECASE)
 _PUNCT = re.compile(r"[\s。，、！？!?,.~～…：:；;「」\"'（）()]+")
 
 
@@ -78,7 +78,19 @@ def describe(name: str, args: dict[str, Any]) -> str:
     return f"{name}（{shown}）"
 
 
+# 她问的那一句和页面上的两个按钮是一对（按钮上的字就是他的回答，decide 认得）
+QUESTIONS = {
+    "send_email": "发吗？",
+    "modify_email": "这样办吗？",
+    "forget_fact": "忘掉吗？",
+    "fix_friction_with_cursor": "交给 Cursor 吗？",
+    "ship_pending_fix": "上线吗？",
+}
+
+
 def prompt(approvals: list[dict[str, Any]]) -> str:
-    """待确认时页面上的那段话。"""
+    """待确认时她给他看的那段：要做的事原样写出来，最后问一句。"""
     body = "\n\n".join(describe(a["name"], a.get("arguments") or {}) for a in approvals)
-    return f"{body}\n\n确认就办，取消就不动。"
+    names = {a["name"] for a in approvals}
+    question = QUESTIONS.get(next(iter(names)), "这样办吗？") if len(names) == 1 else "这样办吗？"
+    return f"{body}\n\n{question}"
