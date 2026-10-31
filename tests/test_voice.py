@@ -45,6 +45,33 @@ class VoiceAskTests(SandboxTestCase):
         self.assertEqual(self.ask("").status_code, 400)
 
 
+class DictationTests(SandboxTestCase):
+    """点一下麦克风听写、说完点 ✓：只转成字给页面放进输入框，不问她、不进对话。"""
+
+    def test_the_words_come_back_and_nothing_is_said_to_her(self) -> None:
+        friday, model = self.friday([])
+        with patch.object(main, "friday", friday), patch.object(voice, "transcribe", return_value="明天下午三点见导师"):
+            res = TestClient(main.app).post("/api/voice/transcribe", files={"file": ("speech.m4a", b"audio", "audio/mp4")})
+        self.assertEqual(res.json(), {"text": "明天下午三点见导师"})
+        self.assertEqual(model.inputs, [])
+        self.assertEqual(friday.conversations.thread(), [])
+
+    def test_a_failed_transcription_says_so(self) -> None:
+        with patch.object(voice, "transcribe", side_effect=RuntimeError("这段太长了，短一点再说。")):
+            res = TestClient(main.app).post("/api/voice/transcribe", files={"file": ("speech.m4a", b"audio", "audio/mp4")})
+        self.assertEqual(res.status_code, 502)
+        self.assertIn("这段太长了", res.json()["detail"])
+
+    def test_her_page_says_which_model_transcribed(self) -> None:
+        client = MagicMock()
+        client.audio.transcriptions.create.return_value = MagicMock(text="在吗")
+        with patch.object(voice, "_client", return_value=client), patch.object(voice, "last_model", ""):
+            voice.transcribe(b"audio", "speech.webm")
+            rows = TestClient(main.app).get("/api/me").json()["connections"]
+        row = next(r for r in rows if r["name"].startswith("语音"))
+        self.assertEqual(row["note"], "正常 · 转写用 gpt-transcribe")
+
+
 class TranscribeTests(unittest.TestCase):
     def test_the_most_accurate_model_with_his_words_then_older_ones_as_fallback(self) -> None:
         client = MagicMock()

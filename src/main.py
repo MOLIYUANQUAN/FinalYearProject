@@ -10,7 +10,6 @@ import time
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -18,17 +17,17 @@ if str(ROOT) not in sys.path:
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile, WebSocket
+from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from src import agenda, claude, closed, live, reminders, todos, usage_log, voice
+from src import agenda, claude, closed, reminders, todos, usage_log, voice
 from src.agent import answering_model, friday, run_assistant, verify_model
 from src.conversation import REACTIONS
 from src.calendar_providers import get_calendar_provider
 from src.presence import stream_presence
-from src.access import authorized, gate, router as access_router
+from src.access import gate, router as access_router
 from src.push_api import router as push_router, run_scheduler, scheduler_enabled
 from src.state_sync import router as state_router
 from src.about import router as about_router
@@ -422,19 +421,22 @@ class SpeakBody(BaseModel):
     text: str = Field(..., min_length=1)
 
 
-@app.websocket("/api/voice/live")
-async def voice_live(page: WebSocket) -> None:
-    """按住时边说边出字（见 live.py）。网页的登录检查管不到 WebSocket，这里自己查。"""
-    origin = urlparse(page.headers.get("origin") or "").netloc
-    if not authorized(page) or (origin and origin != page.headers.get("host")):  # type: ignore[arg-type]
-        await page.close(code=1008)
-        return
-    await live.relay(page)
+@app.post("/api/voice/transcribe")
+async def voice_transcribe(file: UploadFile = File(...)) -> dict[str, str]:
+    """点一下麦克风听写、说完点 ✓：整段录音转成字，放进他的输入框（他看一眼再发）。"""
+    _require_key()
+    data = await file.read()
+    try:
+        text = await asyncio.to_thread(voice.transcribe, data, file.filename or "audio.webm")
+    except Exception as exc:  # noqa: BLE001
+        reason = str(exc).splitlines()[0]
+        raise HTTPException(status_code=502, detail=f"没听清：{reason}") from exc
+    return {"text": text}
 
 
 @app.post("/api/voice/ask")
 async def voice_ask(file: UploadFile = File(...), conversation_id: str | None = Form(None)) -> StreamingResponse:
-    """按住说话松手：整段录音转写完就接着回答。先回 {"type": "heard"} 让气泡填上他说的话（换掉边说边出的预览）。"""
+    """按住说话松手：整段录音转写完就接着回答。先回 {"type": "heard"} 让气泡立刻填上他说的话。"""
     _require_key()
     data = await file.read()
     try:

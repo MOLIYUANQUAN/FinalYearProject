@@ -117,14 +117,13 @@ Shipping still goes through the test gate: a change whose tests fail is not merg
 
 ## Talking to Friday
 
-Like WeChat: tap "说" and the input bar becomes "按住 说话".
+One mic button, at the right of the input bar when it is empty.
 
-- Hold to record, release to send, slide up to cancel. A press that is too short says so.
-- The mic opens once and stays open while Friday is in front, so every press records instantly. The iPhone does not keep asking for permission; the mic closes when Friday goes to the background.
-- While you hold, a faded preview of your words grows in your bubble (OpenAI `gpt-live-transcribe`, relayed through the server so the key never reaches the phone; `src/live.py`). The preview is only a preview: a streaming model guesses without hearing the rest of the sentence. When you let go, the whole recording is transcribed by `gpt-transcribe` (with your usual names as keywords, Chinese and English) and that line replaces the preview and is what she answers. If the preview is unavailable nothing else changes, and her page says why under 语音.
-- She answers in text, as if you had typed. She reads aloud only when you ask ("念给我听", "听听你的声音").
-- You can talk while she is speaking: she stops and listens.
-- "打字" switches back. The last mode is remembered.
+- **Tap it (like Claude's dictation):** the bar becomes ✕ · a live waveform and timer · ✓. Speak as long as you like (up to five minutes). Tap ✓ and the whole recording is transcribed by OpenAI `gpt-transcribe` (with your usual names as keywords, Chinese and English) and put into the input box, after anything already typed. Look, fix a word if needed, tap ↑. ✕ throws it away.
+- **Hold it (like WeChat):** speak, let go and it is sent straight away; slide up to cancel. A press that is too short says so.
+- Recording starts the moment the finger touches the button, so the first word is not lost. The mic opens once and stays open while Friday is in front, so the iPhone does not keep asking for permission; it closes when Friday goes to the background.
+- She answers in text, as if you had typed. She reads aloud only when you ask ("念给我听", "听听你的声音"). Touching the mic while she is speaking stops her.
+- Her page shows which model did the last transcription under 语音.
 
 There is deliberately no Siri Shortcut or share-sheet setup. Friday is one tap from the home screen and listens as soon as you hold the mic. A second assistant in front of her, plus a hand-built Shortcut, would only add steps.
 

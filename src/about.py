@@ -68,11 +68,9 @@ def connections() -> list[dict[str, Any]]:
         out.insert(0, {"name": "Claude", "ok": not issue, "note": issue or "正常"})
     if not (os.getenv("OPENAI_API_KEY") or "").strip():
         out.append({"name": "语音（OpenAI）", "ok": False, "note": "没有 OpenAI key，按住说话用不了"})
-    elif voice.live_problem():
-        out.append({"name": "语音（OpenAI）", "ok": False,
-                    "note": f"边说边出字没连上，松手后照常转写：{voice.live_problem()}"})
     else:
-        out.append({"name": "语音（OpenAI）", "ok": True, "note": "正常"})
+        out.append({"name": "语音（OpenAI）", "ok": True,
+                    "note": f"正常 · 转写用 {voice.last_model}" if voice.last_model else "正常"})
     return out
 
 

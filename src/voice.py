@@ -16,6 +16,7 @@ MAX_AUDIO_BYTES = 12 * 1024 * 1024
 # 整段录音转写：用 OpenAI 最准的那个；用不了依次退回
 TRANSCRIBE_MODEL = os.getenv("FRIDAY_TRANSCRIBE_MODEL", "gpt-transcribe")
 TRANSCRIBE_FALLBACKS = ("gpt-4o-transcribe", "whisper-1")
+last_model = ""  # 上一次真正转出字的是哪个（资料页「语音」那行写着）
 # 播报别念太长：长回复仍显示全文，只念前面
 MAX_SPEAK_CHARS = 800
 
@@ -50,6 +51,7 @@ def _client() -> OpenAI:
 
 def transcribe(audio: bytes, filename: str = "audio.webm") -> str:
     """把一段录音转成文字；空录音或听不清就返回空字符串。"""
+    global last_model
     if not audio:
         raise RuntimeError("没有录到声音。")
     if len(audio) > MAX_AUDIO_BYTES:
@@ -75,6 +77,7 @@ def transcribe(audio: bytes, filename: str = "audio.webm") -> str:
                 raise
             print(f"[WARN] {model} unavailable ({exc}); falling back to {models[i + 1]}")
             continue
+        last_model = model
         return (result.text or "").strip()
     return ""
 
@@ -90,19 +93,6 @@ def vocabulary() -> list[str]:
 def _vocabulary() -> str:
     """转写提示（整段录音那条路）。"""
     return "、".join(vocabulary())
-
-
-# 边说边出字最近一次没成的原因（资料页「语音」那行看得到）；成了一次就清掉
-_live_problem = ""
-
-
-def note_live_problem(reason: str) -> None:
-    global _live_problem
-    _live_problem = (reason or "").splitlines()[0][:80] if reason else ""
-
-
-def live_problem() -> str:
-    return _live_problem
 
 
 # 他明说要听才念：和页面上 wantsVoice 是同一套说法
