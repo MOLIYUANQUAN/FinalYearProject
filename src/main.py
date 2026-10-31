@@ -30,6 +30,7 @@ from src.presence import stream_presence
 from src.access import gate, router as access_router
 from src.push_api import router as push_router, run_scheduler, scheduler_enabled
 from src.state_sync import router as state_router
+from src.uploads import MAX_PER_MESSAGE, router as uploads_router
 from src.workbench import router as workbench_router
 from src.config import (
     STATIC_DIR,
@@ -107,10 +108,12 @@ app.include_router(access_router)
 app.include_router(state_router)
 app.include_router(push_router)
 app.include_router(workbench_router)
+app.include_router(uploads_router)
 
 
 class ChatRequest(BaseModel):
-    message: str = Field(..., min_length=1, description="用户自然语言输入")
+    message: str = Field("", description="用户自然语言输入；只发图时可以是空的")
+    images: list[str] = Field(default_factory=list, max_length=MAX_PER_MESSAGE, description="先传到 /api/uploads 的图的编号")
     conversation_id: str | None = Field(
         None,
         max_length=64,
@@ -201,7 +204,7 @@ def _require_key() -> None:
 
 def _parse_chat(body: ChatRequest) -> str:
     message = body.message.strip()
-    if not message:
+    if not message and not body.images:
         raise HTTPException(status_code=400, detail="消息不能为空")
     return message
 
@@ -375,7 +378,7 @@ async def chat_stream(body: ChatRequest) -> StreamingResponse:
     _require_key()
     message = _parse_chat(body)
     cid = friday.resolve_conversation(body.conversation_id)
-    return _sse("chat", friday.turn(cid, message, spoken=body.spoken))
+    return _sse("chat", friday.turn(cid, message, spoken=body.spoken, images=body.images))
 
 
 @app.post("/api/chat", response_model=ChatResponse)

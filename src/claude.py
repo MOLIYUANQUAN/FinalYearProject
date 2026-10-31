@@ -112,6 +112,31 @@ def _text(content: Any) -> str:
     return "".join(parts)
 
 
+def _image(url: str) -> dict[str, Any] | None:
+    if url.startswith("data:"):
+        head, _, data = url.partition(",")
+        return {"type": "image", "source": {"type": "base64", "media_type": head[5:].split(";")[0], "data": data}}
+    if url.startswith(("https://", "http://")):
+        return {"type": "image", "source": {"type": "url", "url": url}}
+    return None
+
+
+def _his_blocks(content: Any) -> list[dict[str, Any]]:
+    """他的一条消息：图在前、字在后（Claude 看图时推荐这个顺序）。"""
+    if isinstance(content, str):
+        return [{"type": "text", "text": content}] if content.strip() else []
+    pictures, words = [], []
+    for part in content or []:
+        if _get(part, "type") == "input_image":
+            block = _image(str(_get(part, "image_url") or ""))
+            if block:
+                pictures.append(block)
+    text = _text(content)
+    if text.strip():
+        words.append({"type": "text", "text": text})
+    return pictures + words
+
+
 def _is_user(item: Any) -> bool:
     return (_get(item, "type") or "message") == "message" and _get(item, "role") == "user"
 
@@ -136,9 +161,13 @@ def to_messages(items: str | list[Any]) -> list[dict[str, Any]]:
     for index, item in enumerate(items):
         kind = _get(item, "type") or "message"
         if kind == "message":
-            text = _text(_get(item, "content"))
-            if text.strip():
-                add("assistant" if _get(item, "role") == "assistant" else "user", {"type": "text", "text": text})
+            if _get(item, "role") == "assistant":
+                text = _text(_get(item, "content"))
+                if text.strip():
+                    add("assistant", {"type": "text", "text": text})
+            else:
+                for block in _his_blocks(_get(item, "content")):
+                    add("user", block)
         elif kind == "reasoning":
             block = thinking_block(item)
             if block and index > turn:

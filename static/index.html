@@ -404,6 +404,75 @@
       gap: 8px;
       align-items: flex-end;
     }
+    /* 「+」发图：手机上是相册 / 拍照，电脑上也能直接粘贴或拖进来 */
+    #attach {
+      flex: none;
+      width: 44px;
+      height: 48px;
+      padding: 0;
+      font: inherit;
+      font-size: 1.5rem;
+      font-weight: 300;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: transparent;
+      color: var(--ink);
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    #attach:hover { border-color: var(--ink); }
+    form.voice #attach { display: none; }
+    #attachments { display: flex; flex-wrap: wrap; gap: 8px; }
+    #attachments[hidden] { display: none; }
+    .att {
+      position: relative;
+      width: 64px;
+      height: 64px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+    }
+    .att img { display: block; width: 100%; height: 100%; object-fit: cover; }
+    .att button {
+      position: absolute;
+      top: 3px;
+      right: 3px;
+      width: 22px;
+      height: 22px;
+      padding: 0;
+      border: none;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.65);
+      color: #fff;
+      font-size: 14px;
+      line-height: 22px;
+      cursor: pointer;
+    }
+    /* 他发的图：在他的气泡上面，点开看大图 */
+    .shot {
+      display: block;
+      max-width: min(72%, 280px);
+      max-height: 320px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      object-fit: cover;
+      cursor: zoom-in;
+    }
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(0, 0, 0, 0.9);
+      cursor: zoom-out;
+    }
+    .lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; }
+    /* 拖图进来时整页提示一下 */
+    body.dropping main { outline: 2px dashed var(--muted); outline-offset: -8px; }
+    #send.stop { background: transparent; color: var(--ink); border: 1px solid var(--line); }
     #input {
       flex: 1;
       font: inherit;
@@ -577,9 +646,12 @@
 
     <div id="log" role="log" aria-live="polite"></div>
 
+    <div id="attachments" hidden></div>
     <form id="form">
       <button id="mic" type="button" aria-label="切换到说话">说</button>
-      <textarea id="input" rows="1" placeholder="问我，或者告诉我一件事" autocomplete="off" enterkeyhint="send"></textarea>
+      <button id="attach" type="button" aria-label="发图片">+</button>
+      <input id="file" type="file" accept="image/*" multiple hidden />
+      <textarea id="input" rows="1" placeholder="发消息" autocomplete="off" enterkeyhint="send"></textarea>
       <button id="hold" type="button"><span class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="label">按住 说话</span></button>
       <button id="send" type="submit">发送</button>
     </form>
@@ -631,6 +703,9 @@
     const form = document.getElementById("form");
     const input = document.getElementById("input");
     const sendBtn = document.getElementById("send");
+    const attachBtn = document.getElementById("attach");
+    const fileInput = document.getElementById("file");
+    const attachEl = document.getElementById("attachments");
     const micBtn = document.getElementById("mic");
     const unlockEl = document.getElementById("unlock");
     const unlockForm = document.getElementById("unlockForm");
@@ -741,6 +816,7 @@
         agenda: m.agenda || null,
         ask: m.ask || "",
         items: m.items || [],
+        images: m.images || [],
         reaction: m.reaction || "",
         reactions: m.reactions || {},
         needsConfirm: !!m.needs_confirm,
@@ -943,6 +1019,90 @@
     document.addEventListener("pointerdown", (e) => {
       if (picker && !e.target.closest(".picker")) closePicker();
     });
+
+    // ---- 发图：「+」、粘贴、拖进来都行；发之前先缩到模型看图的上限（长边 1568），省流量也省钱 ----
+    const MAX_IMAGES = 5;
+    let attachments = [];
+
+    async function shrink(file) {
+      const bitmap = await createImageBitmap(file).catch(() => null);
+      if (!bitmap) return file;
+      const scale = Math.min(1, 1568 / Math.max(bitmap.width, bitmap.height));
+      if (scale === 1 && file.size < 1.5e6) return file;
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(bitmap.width * scale);
+      canvas.height = Math.round(bitmap.height * scale);
+      canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      return new Promise((resolve) => canvas.toBlob((b) => resolve(b || file), "image/jpeg", 0.9));
+    }
+
+    async function addFiles(files) {
+      for (const f of files) {
+        if (!f.type.startsWith("image/") || attachments.length >= MAX_IMAGES) continue;
+        const blob = await shrink(f);
+        attachments.push({ blob, url: URL.createObjectURL(blob) });
+      }
+      drawAttachments();
+      setMode(false);
+      input.focus();
+    }
+
+    function drawAttachments() {
+      attachEl.replaceChildren(
+        ...attachments.map((a) => {
+          const box = el("div", "att");
+          const img = el("img");
+          img.src = a.url;
+          img.alt = "";
+          const x = el("button", "", "×");
+          x.type = "button";
+          x.setAttribute("aria-label", "不发这张");
+          x.onclick = () => {
+            URL.revokeObjectURL(a.url);
+            attachments = attachments.filter((b) => b !== a);
+            drawAttachments();
+          };
+          box.append(img, x);
+          return box;
+        }),
+      );
+      attachEl.hidden = !attachments.length;
+    }
+
+    async function uploadAll(list) {
+      const ids = [];
+      for (const a of list) {
+        const fd = new FormData();
+        fd.append("file", a.blob, "image");
+        const res = await fetch("/api/uploads", { method: "POST", credentials: "include", headers: authHeaders(), body: fd });
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 401) showUnlock(true);
+        if (!res.ok) throw new Error(data.detail || "图没传上去，再发一次。");
+        ids.push(data.id);
+      }
+      return ids;
+    }
+
+    function drawShots(g, urls) {
+      for (const url of urls) {
+        const img = el("img", "shot");
+        img.src = url;
+        img.alt = "图片";
+        img.loading = "lazy";
+        img.onclick = () => showShot(url);
+        g.append(img);
+      }
+    }
+
+    function showShot(url) {
+      const box = el("div", "lightbox");
+      const img = el("img");
+      img.src = url;
+      img.alt = "";
+      box.append(img);
+      box.onclick = () => box.remove();
+      document.body.append(box);
+    }
 
     // 推送里没下文的事：一件一行，「做完了 / 明天再说」点一下就办，办过的划掉
     function drawItems(g, m) {
@@ -1447,7 +1607,10 @@
       });
       msgs.forEach((m, i) => {
         const g = group(m.role, m.at);
-        if (m.role === "user") setPill(bubble(g, m.content), m.reaction);
+        if (m.role === "user") {
+          drawShots(g, (m.images || []).map((i) => i.url));
+          if (m.content) setPill(bubble(g, m.content), m.reaction);
+        }
         else if (m.agenda) drawOpener(g, m, i === latestOpener);
         else {
           showHers(g, m);
@@ -1470,9 +1633,12 @@
     }
 
     // view 上挂着各种事件怎么画：onDelta（她写到哪了）、onTool（她去查东西）、onAgenda（开场的时间线）、onHeard（听清他说的）
+    let streaming = null; // 正在说的那一轮：点「停」就断开
     async function stream(url, payload, view) {
       const form = payload instanceof FormData;
+      streaming = new AbortController();
       const res = await fetch(url, {
+        signal: streaming.signal,
         method: "POST",
         credentials: "include",
         headers: form ? authHeaders() : authHeaders({ "Content-Type": "application/json" }),
@@ -1535,8 +1701,13 @@
           }
         }
       }
+      streaming = null;
       if (!result) throw new Error("连接断了，再试一次。");
       return result;
+    }
+
+    function stopped(e) {
+      return !!e && e.name === "AbortError";
     }
 
     // 这一轮说完：按最终的话重排气泡（写的时候已经分好的原样留着），要拍板的那段单独一个框
@@ -1563,13 +1734,22 @@
 
     function fail(reply, err) {
       clearPending(reply.g);
+      if (stopped(err)) {
+        // 他点了「停」：说到哪儿留在哪儿
+        if (!reply.bubbles.length) reply.g.remove();
+        return;
+      }
       reply.show("");
       bubble(reply.g, calm(err), "note");
     }
 
+    // 她在说的时候「发送」变成「停」，像 Claude 那样
     function setBusy(on) {
       busy = on;
-      sendBtn.disabled = on;
+      sendBtn.textContent = on ? "停" : "发送";
+      sendBtn.classList.toggle("stop", on);
+      sendBtn.setAttribute("aria-label", on ? "停下" : "发送");
+      if (!on) streaming = null;
     }
 
     // ---- 声音：你说话时听麦克风；她一句写完就念一句；白环跟着真实的响度起伏 ----
@@ -2072,7 +2252,7 @@
       } catch (e) {
         clearPending(g);
         if (head) head.remove();
-        bubble(g, calm(e), "note");
+        if (!stopped(e)) bubble(g, calm(e), "note");
       } finally {
         setBusy(false);
         input.focus();
@@ -2118,21 +2298,26 @@
     async function ask(message, opts) {
       if (busy || !ready) return;
       stopSpeaking();
+      const pictures = (opts && opts.images) || [];
       const speak = !!(opts && opts.speak) || wantsVoice(message);
       const speaker = speak ? speakerFor() : null;
       if (!speaker) settleOrb();
       setBusy(true);
       clearActions();
-      const mine = bubble(group("user"), message);
+      const g = group("user");
+      drawShots(g, pictures.map((a) => a.url));
+      const mine = message ? bubble(g, message) : null;
       const said = { role: "user", content: message, at: Date.now() };
       session.messages.push(said);
       const reply = herReply(group("assistant"));
       Object.assign(reply, { mine, said });
-      reply.busy();
+      reply.busy(pictures.length ? "在看图…" : "");
       try {
+        const images = pictures.length ? await uploadAll(pictures) : [];
+        said.images = images.map((id) => ({ id, url: "/api/uploads/" + id }));
         const result = await stream(
           "/api/chat/stream",
-          { message, conversation_id: session.id, spoken: !!speaker },
+          { message, images, conversation_id: session.id, spoken: !!speaker },
           replyView(reply, speaker),
         );
         finish(reply, result);
@@ -2171,11 +2356,47 @@
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       if (mediaRecorder && mediaRecorder.state === "recording") return;
+      if (busy) {
+        if (streaming) streaming.abort();
+        return;
+      }
       const message = input.value.trim();
-      if (!message || busy) return;
+      if (!message && !attachments.length) return;
+      const images = attachments;
+      attachments = [];
+      drawAttachments();
       input.value = "";
       fitInput();
-      ask(message);
+      ask(message, { images });
+    });
+
+    attachBtn.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", () => {
+      addFiles([...fileInput.files]);
+      fileInput.value = "";
+    });
+    // 截图直接 Ctrl+V 粘进来
+    input.addEventListener("paste", (e) => {
+      const files = [...((e.clipboardData && e.clipboardData.files) || [])].filter((f) => f.type.startsWith("image/"));
+      if (!files.length) return;
+      e.preventDefault();
+      addFiles(files);
+    });
+    // 图拖到窗口里任何地方
+    const hasFiles = (e) => [...((e.dataTransfer && e.dataTransfer.types) || [])].includes("Files");
+    document.addEventListener("dragover", (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      document.body.classList.add("dropping");
+    });
+    document.addEventListener("dragleave", (e) => {
+      if (!e.relatedTarget) document.body.classList.remove("dropping");
+    });
+    document.addEventListener("drop", (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      document.body.classList.remove("dropping");
+      addFiles([...e.dataTransfer.files]);
     });
 
     micBtn.addEventListener("click", () => {

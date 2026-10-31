@@ -24,7 +24,7 @@ from src.config import (
     get_tasks_backend,
     require_openai_api_key,
 )
-from src import approval, cursor_fix, friction, nudges, reminders
+from src import approval, cursor_fix, friction, nudges, reminders, uploads
 from src import claude
 from src.claude import ClaudeModel, for_openai
 from src.config import STATE_DIR, effective_now
@@ -72,6 +72,7 @@ VOICE = """你叫 Friday，是 Zeep 的管家，只为他一个人。不是顾�
   1. get_calendar_events 从「日历」最后一天的第二天起再看 14 天；
   2. search_emails 用关键词搜（比如导师的名字）；
   3. 都没有才说没有，并说清查到了哪天、搜了邮件。
+- 他发来截图或照片：先看图再答。图里的字、数字、时间照实读，看不清就说看不清，不猜。
 - 搜到的东西和问题无关时，直说没找到相关的，不要把无关结果当答案。
 - 只说你这次真查过的：没调用过 search_emails，就不能说邮件里没有。
 - 他说你说错了（「不对」「你说错了」）：认一句、改正，再 note_mistake 记下（说错的那句、对的是什么）。同类的事以后照着避开。
@@ -221,12 +222,43 @@ def model_settings(name: str) -> ModelSettings:
     return ModelSettings(temperature=0.2)
 
 
+def _with_images(items: list[Any]) -> list[Any] | None:
+    """对话里的图只记编号；问模型这一刻才换成真正的图（文件不在了就说一句）。没有图就返回 None。"""
+    out, changed = [], False
+    for item in items:
+        content = item.get("content") if isinstance(item, dict) else None
+        if isinstance(content, list) and any(
+            isinstance(p, dict) and str(p.get("image_url") or "").startswith(uploads.PREFIX) for p in content
+        ):
+            parts = []
+            for part in content:
+                ref = part.get("image_url") if isinstance(part, dict) else None
+                if isinstance(ref, str) and ref.startswith(uploads.PREFIX):
+                    url = uploads.data_url(ref)
+                    parts.append({**part, "image_url": url} if url else {"type": "input_text", "text": "（这张图已经不在了）"})
+                else:
+                    parts.append(part)
+            item, changed = {**item, "content": parts}, True
+        out.append(item)
+    return out if changed else None
+
+
 def _model_input(data: CallModelData[Any]) -> ModelInputData:
-    """换回 OpenAI 时，把 Claude 留在对话里的东西收拾掉（见 claude.for_openai）。"""
-    if isinstance(data.agent.model, ClaudeModel):
+    """问模型之前：把图编号换成图；换回 OpenAI 时再把 Claude 留在对话里的东西收拾掉（见 claude.for_openai）。"""
+    items = _with_images(data.model_data.input) or data.model_data.input
+    if not isinstance(data.agent.model, ClaudeModel):
+        items = for_openai(items) or items
+    if items is data.model_data.input:
         return data.model_data
-    cleaned = for_openai(data.model_data.input)
-    return data.model_data if cleaned is None else ModelInputData(input=cleaned, instructions=data.model_data.instructions)
+    return ModelInputData(input=items, instructions=data.model_data.instructions)
+
+
+def _said(message: str, images: list[str]) -> Any:
+    """他这一句：带图就是一条有图的用户消息（图只记编号）。"""
+    if not images:
+        return message
+    pictures = [{"type": "input_image", "image_url": uploads.PREFIX + i, "detail": "auto"} for i in images]
+    return [{"role": "user", "content": [{"type": "input_text", "text": message or "（看图）"}, *pictures]}]
 
 
 RUN_CONFIG = RunConfig(call_model_input_filter=_model_input)
@@ -352,7 +384,8 @@ class Friday:
         return convs.current() or convs.create()
 
     async def turn(
-        self, cid: str, message: str, *, spoken: bool = False, revision: dict[str, Any] | None = None
+        self, cid: str, message: str, *, spoken: bool = False, revision: dict[str, Any] | None = None,
+        images: list[str] | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """他说了一句：存进对话，跑 Friday，事件流给页面，最后把她的回复也存进对话。
 
@@ -362,7 +395,10 @@ class Friday:
         async with lock:
             convs = self.conversations
             await self._carry_over(cid)
-            said_id = convs.add_message(cid, "user", message)
+            images = [i for i in images or [] if uploads.find(i)][: uploads.MAX_PER_MESSAGE]
+            shown = {"images": [{"id": i, "url": uploads.PREFIX + i} for i in images]} if images else {}
+            said_id = convs.add_message(cid, "user", message, **shown)
+            said = _said(message, images)
             yield {"type": "conversation", "id": cid}
 
             pending = await self._load_pending(cid, spoken)
@@ -411,11 +447,11 @@ class Friday:
                     # 他换了话题：上一步已作罢，接着回答他这句
                     yield {"type": "tool", "name": ""}
                     agent = await _assistant(spoken, self._model, self._context())
-                    async for event in run(agent, message):
+                    async for event in run(agent, said):
                         yield event
             else:
                 agent = await _assistant(spoken, self._model, self._context())
-                async for event in run(agent, message):
+                async for event in run(agent, said):
                     yield event
 
             reply = "\n\n".join(t for t in texts if t.strip())
