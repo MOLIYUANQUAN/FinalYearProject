@@ -559,24 +559,14 @@
     #send[data-state="voice"] { background: transparent; color: var(--soft); }
     #send[data-state="voice"]:hover { color: var(--ink); opacity: 1; }
     #send[data-state="voice"] svg { width: 22px; height: 22px; }
-    /* 在说话时：左边 ✕，中间声波和时间，右边 ↑ */
+    /* 听写时：左边 ✕，中间声波和时间，右边 ✓（按住说时是 ↑，上滑到取消变红） */
     #discard, #dictation { display: none; }
     #form.dictating #attach, #form.dictating #input { display: none; }
     #form.dictating #discard { display: grid; }
     #form.dictating #dictation { display: flex; }
-    /* 他停下来时外圈慢慢画满，满了就发 */
-    #send { position: relative; }
-    #form.dictating #send::after {
-      content: "";
-      position: absolute;
-      inset: -5px;
-      border-radius: 50%;
-      background: conic-gradient(var(--ink) calc(var(--p, 0) * 360deg), transparent 0);
-      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
-      mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
-      pointer-events: none;
-    }
-    #dictation { cursor: pointer; }
+    #form.holding #discard { visibility: hidden; }
+    #send:disabled, #discard:disabled { opacity: 0.4; cursor: default; }
+    #send { touch-action: none; }
     #attachments { display: flex; flex-wrap: wrap; gap: 8px; }
     #attachments[hidden] { display: none; }
     .att {
@@ -663,10 +653,68 @@
     }
     #dictation .wave i { flex: 0 0 3px; height: 3px; border-radius: 2px; background: currentColor; opacity: 0.75; transition: height 0.08s linear; }
     #dictation .clock { flex: none; font-size: 15px; font-variant-numeric: tabular-nums; color: var(--soft); }
-    /* 改上一句：输入框上面一个小标签，点 ✕ 就不改了 */
-    #editing { display: flex; align-items: center; gap: 6px; padding: 0 6px 6px; color: var(--soft); font-size: 13px; }
-    #editing[hidden] { display: none; }
-    #editing button { padding: 0 6px; border: none; background: transparent; color: var(--soft); font: inherit; cursor: pointer; }
+    #dictation.working .wave { opacity: 0.3; }
+    /* 按住说话（像微信）：页面暗下来，中间一个跟着声音跳的气泡；滑到左边 ✕ 取消，滑到右边「文」转成字，原地松手就发 */
+    #talk {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.62);
+      -webkit-backdrop-filter: blur(6px);
+      backdrop-filter: blur(6px);
+      pointer-events: none;
+      color: #fff;
+    }
+    #talk[hidden] { display: none; }
+    #talk .say {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: min(240px, 70vw);
+      height: 76px;
+      margin-bottom: 36px;
+      border-radius: 22px;
+      background: #fff;
+      color: #1d1d1f;
+      transition: background 0.15s ease, color 0.15s ease, width 0.15s ease;
+    }
+    #talk .say .wave { display: flex; align-items: center; justify-content: center; gap: 2px; height: 36px; overflow: hidden; }
+    #talk .say .wave i { flex: 0 0 3px; height: 3px; border-radius: 2px; background: currentColor; transition: height 0.08s linear; }
+    #talk.cancel .say { background: var(--danger); color: #fff; }
+    #talk .targets { display: flex; justify-content: space-between; width: min(300px, 82vw); margin-bottom: 22px; }
+    #talk .target { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 13px; opacity: 0.85; }
+    #talk .dot {
+      display: grid;
+      place-items: center;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.16);
+      font-size: 22px;
+      font-weight: 600;
+      transition: transform 0.12s ease, background 0.12s ease, color 0.12s ease;
+    }
+    #talk .dot svg { width: 24px; height: 24px; }
+    #talk.cancel .target.cancel .dot { transform: scale(1.18); background: #fff; color: var(--danger); }
+    #talk.text .target.text .dot { transform: scale(1.18); background: #fff; color: #1d1d1f; }
+    #talk.cancel .target.cancel, #talk.text .target.text { opacity: 1; }
+    #talk .base {
+      display: grid;
+      place-items: center;
+      width: 140%;
+      height: calc(130px + env(safe-area-inset-bottom, 0px));
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      border-radius: 50% 50% 0 0 / 70px 70px 0 0;
+      background: rgba(255, 255, 255, 0.92);
+      color: #1d1d1f;
+      font-weight: 600;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    #talk.cancel .base, #talk.text .base { background: rgba(255, 255, 255, 0.2); color: rgba(255, 255, 255, 0.85); }
     #voiceHint {
       position: fixed;
       left: 50%;
@@ -748,7 +796,6 @@
 
     <div id="log" role="log" aria-live="polite"></div>
 
-    <div id="editing" hidden><span>改上一句</span><button type="button" aria-label="不改了">✕</button></div>
     <div id="attachments" hidden></div>
     <form id="form">
       <button id="discard" class="icon-btn" type="button" aria-label="不要了"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg></button>
@@ -756,9 +803,17 @@
       <input id="file" type="file" accept="image/*" multiple hidden />
       <textarea id="input" rows="1" placeholder="发消息" autocomplete="off" enterkeyhint="send" data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false"></textarea>
       <div id="dictation" aria-live="polite"><span class="wave" aria-hidden="true"></span><span class="clock">0:00</span></div>
-      <button id="send" class="icon-btn" type="submit" aria-label="说话" data-state="voice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></button>
+      <button id="send" class="icon-btn" type="submit" aria-label="说话（点一下听写，按住直接发）" data-state="voice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></button>
     </form>
     <div id="voiceHint" aria-live="polite"></div>
+    <div id="talk" hidden aria-live="polite">
+      <div class="say"><span class="wave" aria-hidden="true"></span></div>
+      <div class="targets">
+        <div class="target cancel"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg></span><span class="name">取消</span></div>
+        <div class="target text"><span class="dot">文</span><span class="name">转文字</span></div>
+      </div>
+      <div class="base"><span class="label">松开 发送</span></div>
+    </div>
   </main>
   <section id="about" hidden aria-label="Friday 的资料">
     <div class="sheet">
@@ -834,7 +889,8 @@
     let pendingPassword = ""; // 桌面 ?access= 或旧 localStorage，登录后清掉
     let mediaRecorder = null;
     let mediaStream = null;
-    let take = null; // 正在录的这一段：开始时间、响度、说过话没有、安静了多久……
+    let take = null; // 正在录的这一段：{ id, at, pressed, hold, zone, working, tapAt, interrupting }
+    let lastHoldEnd = 0;
     let recordChunks = [];
     let recordTimer = null;
 
@@ -2165,11 +2221,11 @@
 
     // 右边那一个圆按钮：没字时是麦克风，有字（或有图）是发送，她在回答或在念时是停
     const SEND_ICONS = { voice: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>', send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>', stop: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor"/></svg>' };
-    SEND_ICONS.done = SEND_ICONS.send;
-    const SEND_LABELS = { voice: "说话", send: "发送", stop: "停下", done: "说完了，发给她" };
+    SEND_ICONS.done = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+    const SEND_LABELS = { voice: "说话（点一下听写，按住直接发）", send: "发送", stop: "停下", done: "说完了" };
     function syncSend() {
       const speaking = typeof orbState !== "undefined" && orbState === "speaking";
-      const state = take ? "done" : busy || speaking ? "stop"
+      const state = take ? (take.hold ? "send" : "done") : busy || speaking ? "stop"
         : input.value.trim() || attachments.length ? "send" : "voice";
       if (sendBtn.dataset.state === state) return;
       sendBtn.dataset.state = state;
@@ -2236,10 +2292,7 @@
       const target = orbState === "listening" ? micLevel() : orbState === "speaking" ? voiceLevel(now) : 0;
       // 起得快、落得慢，像呼吸
       orbLevel += (target - orbLevel) * (target > orbLevel ? 0.5 : 0.12);
-      if (take && orbState === "listening") {
-        drawWave(now, orbLevel);
-        listen(now, target);
-      }
+      if (take && orbState === "listening") drawWave(now, orbLevel);
       orbFrame = orbState || orbLevel > 0.01 ? requestAnimationFrame(orbTick) : 0;
     }
 
@@ -2429,22 +2482,26 @@
       return "";
     }
 
-    // ---- 说话，像跟人说话：点一下麦克风，说，停一下她就收到了 ----
-    // 开口之后安静 1.6 秒算说完，自动发；想早点结束点声波或 ↑，不要了点 ✕。听错了点自己那条改
+    // ---- 说话，平时像 Claude：点一下麦克风开始听写，说完点 ✓，整段录音转成字放进输入框，看一眼再点 ↑ 发；✕ 不要了 ----
+    // 按住像微信：页面暗下来，原地松手直接发，滑到 ✕ 取消，滑到「文」转成字放进输入框。一按下就开录，开头不丢；没过 0.35 秒就松开算「点一下」
     const voiceHint = document.getElementById("voiceHint");
     const dictationEl = document.getElementById("dictation");
     const waveEl = dictationEl.querySelector(".wave");
     const clockEl = dictationEl.querySelector(".clock");
     const discardBtn = document.getElementById("discard");
-    const SILENCE_MS = 1600;
-    const NO_SPEECH_MS = 8000;
-    const MIN_TAKE_MS = 600;
-    const TAKE_MAX_MS = 5 * 60 * 1000;
+    const HOLD_MS = 350;
+    const MIN_HOLD_MS = 600;
+    const talkEl = document.getElementById("talk");
+    const talkWave = talkEl.querySelector(".wave");
+    const talkLabel = talkEl.querySelector(".base .label");
+    const TALK_BARS = 34;
+    const DICTATE_MAX_MS = 5 * 60 * 1000;
     const WAVE_BARS = 40;
     let hintTimer = 0;
     let waveHistory = [];
     let waveAt = 0;
     waveEl.append(...Array.from({ length: WAVE_BARS }, () => document.createElement("i")));
+    talkWave.append(...Array.from({ length: TALK_BARS }, () => document.createElement("i")));
 
     // 麦克风开一次就一直开着，直到 Friday 退到后台：每次都立刻开录，iPhone 也不会反复问权限
     async function ensureMic() {
@@ -2487,24 +2544,42 @@
       voiceHint.style.bottom = Math.max(0, innerHeight - form.getBoundingClientRect().top + 10) + "px";
     }
 
-    function flashHint(text, ms) {
+    function flashHint(text) {
       placeHint();
       voiceHint.textContent = text;
       voiceHint.className = "on";
       clearTimeout(hintTimer);
-      hintTimer = setTimeout(() => (voiceHint.className = ""), ms || 1800);
+      hintTimer = setTimeout(() => { if (!(take && take.hold)) voiceHint.className = ""; }, 1800);
     }
 
-    // 输入栏跟着录音变：✕ · 声波和时间 · ↑（外圈在他停下来时慢慢画满，满了就发）
+    // 输入栏跟着录音的样子变：✕ · 声波和时间 · ✓（按住时是 ↑，上滑到取消变红）
     function showTake() {
       form.classList.toggle("dictating", !!take);
+      form.classList.toggle("holding", !!(take && take.hold));
+      const zone = take && take.hold ? take.zone || "send" : "";
+      talkEl.hidden = !zone;
+      talkEl.classList.toggle("cancel", zone === "cancel");
+      talkEl.classList.toggle("text", zone === "text");
+      talkLabel.textContent = { cancel: "松开 取消", text: "松开 转成文字", send: "松开 发送" }[zone] || "";
+      dictationEl.classList.toggle("working", !!(take && take.working));
+      if (take && take.working) clockEl.textContent = "转写中…";
       if (!take) {
         clockEl.textContent = "0:00";
         waveHistory = [];
-        [...waveEl.children].forEach((bar) => (bar.style.height = ""));
-        sendBtn.style.removeProperty("--p");
+        [...waveEl.children, ...talkWave.children].forEach((bar) => (bar.style.height = ""));
       }
+      discardBtn.disabled = sendBtn.disabled = !!(take && take.working);
       syncSend();
+    }
+
+    // 按住时手指在哪：碰到（或靠近）左边 ✕ 就是取消，右边「文」就是转成字，别处就是发
+    function zoneAt(x, y) {
+      for (const [name, el] of [["cancel", talkEl.querySelector(".target.cancel .dot")], ["text", talkEl.querySelector(".target.text .dot")]]) {
+        const r = el.getBoundingClientRect();
+        const pad = 28;
+        if (x > r.left - pad && x < r.right + pad && y > r.top - pad && y < r.bottom + pad) return name;
+      }
+      return "send";
     }
 
     // 声波从右往左走，最新的在右边；每 60ms 记一格
@@ -2519,47 +2594,33 @@
         const v = i >= offset ? waveHistory[i - offset] : 0;
         bars[i].style.height = (3 + v * 25).toFixed(1) + "px";
       }
-    }
-
-    // 听他是不是说完了：环境有多吵先记着，比它响一截才算在说话；说过话以后安静 1.6 秒就是说完了
-    // 麦克风读不到响度（比如这台设备不给）就不自动结束，等他点
-    function listen(now, level) {
-      const t = take;
-      if (!t || !mediaRecorder || !micAnalyser) return;
-      const dt = t.last ? Math.min(100, now - t.last) : 16;
-      t.last = now;
-      t.peak = Math.max(t.peak, level);
-      if (t.noise === null) t.noise = Math.min(level, 0.12);
-      if (level < t.noise) t.noise = level;
-      const loud = level > Math.max(0.2, t.noise + 0.16);
-      if (loud) {
-        t.voiced += dt;
-        if (t.voiced > 250) t.spoke = true;
-        t.quietSince = 0;
-      } else {
-        t.noise = Math.min(0.35, t.noise + (level - t.noise) * 0.02);
-        if (!t.quietSince) t.quietSince = now;
-      }
-      const quiet = t.spoke && t.quietSince ? now - t.quietSince : 0;
-      sendBtn.style.setProperty("--p", Math.min(1, quiet / SILENCE_MS).toFixed(3));
-      if (t.spoke && quiet >= SILENCE_MS) finishTake();
-      else if (!t.spoke && t.peak > 0.02 && now - t.t0 > NO_SPEECH_MS) {
-        discardTake();
-        flashHint("没听到声音");
+      if (talkEl.hidden) return;
+      // 按住时的气泡：中间高、两边低，跟着最近的响度一起跳
+      const talk = talkWave.children;
+      for (let i = 0; i < talk.length; i++) {
+        const v = waveHistory[waveHistory.length - 1 - Math.abs(i - (talk.length >> 1))] || 0;
+        talk[i].style.height = (3 + v * 32).toFixed(1) + "px";
       }
     }
 
     function tickClock() {
-      if (!take) return;
+      if (!take || take.working) return;
       const secs = Math.floor((Date.now() - take.at) / 1000);
       clockEl.textContent = Math.floor(secs / 60) + ":" + String(secs % 60).padStart(2, "0");
     }
 
-    async function startTake() {
-      if (take) return;
+    async function startTake(e) {
+      if (take || sendBtn.dataset.state !== "voice") return;
+      const pointer = !!(e && e.pointerId != null);
+      if (pointer) {
+        e.preventDefault();
+        try { sendBtn.setPointerCapture(e.pointerId); } catch (err) {}
+      }
+      const interrupting = orbState === "speaking";
+      stopSpeaking(); // 她正在说：你一碰她就停
       hintTimer = 0;
-      const mine = { at: Date.now(), t0: performance.now(), last: 0, peak: 0, noise: null, voiced: 0, spoke: false,
-                     quietSince: 0, replace: editing };
+      const mine = { id: pointer ? e.pointerId : null, at: Date.now(), pressed: pointer,
+                     hold: false, zone: "", working: false, tapAt: pointer ? 0 : Date.now(), interrupting };
       take = mine;
       showTake();
       if (!(await ensureMic())) {
@@ -2575,17 +2636,26 @@
       };
       mediaRecorder.start();
       mine.at = Date.now();
-      mine.t0 = performance.now();
       waveHistory = [];
       mine.clock = setInterval(tickClock, 250);
-      recordTimer = setTimeout(finishTake, TAKE_MAX_MS);
+      // 第一次弹权限框时手指早松开了：那就是点了一下，开始听写
+      if (mine.pressed) mine.holdTimer = setTimeout(() => {
+        if (take === mine && mine.pressed) {
+          mine.hold = true;
+          showTake();
+        }
+      }, HOLD_MS);
+      recordTimer = setTimeout(finishTake, DICTATE_MAX_MS);
       orbSet("listening");
     }
 
     function endTake() {
       const done = take;
       take = null;
-      if (done) clearInterval(done.clock);
+      if (done) {
+        clearTimeout(done.holdTimer);
+        clearInterval(done.clock);
+      }
       showTake();
       return done;
     }
@@ -2612,71 +2682,70 @@
       orbSet("");
     }
 
-    // 说完了（自己停下来，或者点了 ↑ / 声波）：直接发给她
-    async function finishTake() {
-      const done = take;
-      if (!done) return;
-      endTake();
+    // 按住说、松手发（上滑就是不要了）
+    async function endHold() {
+      lastHoldEnd = Date.now();
+      // 滑到「文」松手：变成听写说完——转成字放进输入框，他看一眼再发
+      if (take && take.zone === "text") {
+        take.hold = false;
+        take.zone = "";
+        return finishTake();
+      }
+      const done = endTake();
       const got = await stopRecording();
       orbSet("");
-      if (!got || Date.now() - done.at < MIN_TAKE_MS) {
-        flashHint("说话时间太短");
+      if (!done || done.zone === "cancel") return;
+      if (!got || Date.now() - done.at < MIN_HOLD_MS) {
+        if (!done.interrupting) flashHint("说话时间太短");
         return;
       }
-      sendVoice(got.blob, got.mime, done.replace);
+      sendVoice(got.blob, got.mime);
     }
 
-    // ---- 听错了：点自己最后那条，字回到输入框；改好发出去（或者清空了重新说）就替掉那一轮，她办掉的事也撤回 ----
-    const editingEl = document.getElementById("editing");
-    let editing = false;
-
-    function lastSaid() {
-      return [...session.messages].reverse().find((m) => m.role === "user");
-    }
-
-    function startEdit() {
-      const said = lastSaid();
-      if (!said || !said.content || (said.images && said.images.length)) return;
-      editing = true;
-      editingEl.hidden = false;
-      input.value = said.content;
-      fitInput();
-      syncSend();
-      input.focus();
-      try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) {}
-    }
-
-    function stopEdit() {
-      editing = false;
-      editingEl.hidden = true;
-    }
-
-    // 页面上把那一轮收起来：他最后那条和后面她说的
-    function takeBackOnPage() {
-      const mines = logEl.querySelectorAll(".group.mine");
-      const last = mines[mines.length - 1];
-      if (!last) return;
-      const before = last.previousElementSibling;
-      for (let node = last; node; ) {
-        const next = node.nextElementSibling;
-        node.remove();
-        node = next;
+    // 听写说完（✓）：整段录音转成字，接在输入框里已有的字后面；他看一眼再发
+    async function finishTake() {
+      const done = take;
+      if (!done || done.working) return;
+      if (done.hold) return endHold(); // 按着说到了上限
+      done.working = true;
+      clearInterval(done.clock);
+      showTake();
+      const got = await stopRecording();
+      orbSet("");
+      if (!got) {
+        endTake();
+        flashHint("没录到声音，再说一次");
+        return;
       }
-      if (before && before.classList.contains("stamp")) before.remove();
-      const said = lastSaid();
-      if (said) session.messages.splice(session.messages.indexOf(said));
-      const tail = session.messages[session.messages.length - 1];
-      lastAt = tail ? tail.at || 0 : 0;
-    }
-
-    // 说完了：气泡马上出来；录音一趟传上去，转写好（按上下文改过错字）了填进气泡（heard），她紧接着就回
-    async function sendVoice(blob, mime, replace) {
-      if (replace) {
-        stopEdit();
-        input.value = "";
+      try {
+        const text = await transcribe(got);
+        endTake();
+        if (!text) return flashHint("没听清，再说一次");
+        const before = input.value.replace(/\s+$/, "");
+        const joint = !before || /[　-鿿＀-￯]$/.test(before) ? "" : " ";
+        input.value = before + joint + text;
         fitInput();
-        takeBackOnPage();
+        syncSend();
+        // 电脑上接着就能改；手机上不弹键盘，想改再点
+        if (window.matchMedia && matchMedia("(pointer: fine)").matches) input.focus();
+      } catch (e) {
+        endTake();
+        flashHint(calm(e));
       }
+    }
+
+    async function transcribe(got) {
+      const formData = new FormData();
+      const ext = got.mime.includes("mp4") ? "m4a" : got.mime.includes("ogg") ? "ogg" : "webm";
+      formData.append("file", got.blob, "speech." + ext);
+      const res = await fetch("/api/voice/transcribe", { method: "POST", body: formData, credentials: "include", headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "没听清，再说一次");
+      return (data.text || "").trim();
+    }
+
+    // 按住说完松手：气泡马上出来；录音一趟传上去，转写好了填进气泡（heard），她紧接着就回
+    async function sendVoice(blob, mime) {
       const mine = group("user");
       const heard = bubble(mine, null);
       heard.innerHTML = DOTS;
@@ -2690,12 +2759,6 @@
       let speaker = null;
       view.onHeard = (ev) => {
         heard.textContent = ev.text;
-        try {
-          if (!localStorage.getItem("pa.editHint")) {
-            localStorage.setItem("pa.editHint", "1");
-            flashHint("听错了点你这条就能改", 3200);
-          }
-        } catch (e) {}
         const said = { role: "user", content: ev.text, at: Date.now() };
         session.messages.push(said);
         Object.assign(reply, { mine: heard, said });
@@ -2713,7 +2776,6 @@
         const ext = mime.includes("mp4") ? "m4a" : mime.includes("ogg") ? "ogg" : "webm";
         formData.append("file", blob, "speech." + ext);
         if (session && session.id) formData.append("conversation_id", session.id);
-        if (replace) formData.append("replace_last", "true");
         const result = await stream("/api/voice/ask", formData, view);
         finish(reply, result);
         if (speaker) speaker.end(result.reply);
@@ -2828,11 +2890,9 @@
       const pictures = (opts && opts.images) || [];
       const speak = !!(opts && opts.speak) || wantsVoice(message);
       const speaker = speak ? speakerFor() : null;
-      const replace = !!(opts && opts.replace);
       if (!speaker) settleOrb();
       setBusy(true);
       clearActions();
-      if (replace) takeBackOnPage();
       const g = group("user");
       const shots = drawShots(g, pictures.map((a) => a.url));
       const mine = message ? bubble(g, message) : shots;
@@ -2862,7 +2922,7 @@
         said.images = images.map((id) => ({ id, url: "/api/uploads/" + id }));
         const result = await stream(
           "/api/chat/stream",
-          { message, images, conversation_id: session.id, spoken: !!speaker, replace_last: replace },
+          { message, images, conversation_id: session.id, spoken: !!speaker },
           replyView(reply, speaker),
         );
         finish(reply, result);
@@ -2903,9 +2963,10 @@
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       if (take) {
-        finishTake();
+        if (Date.now() - take.tapAt > 400) finishTake();
         return;
       }
+      if (Date.now() - lastHoldEnd < 500) return; // 按住说完松手带出来的那下 click
       // 圆按钮是「停」：停下正在回答的这一轮、或者正在念的
       if (sendBtn.dataset.state === "stop") {
         if (streaming) streaming.abort();
@@ -2922,13 +2983,11 @@
         return;
       }
       const images = attachments;
-      const replace = editing && !!message;
       attachments = [];
       drawAttachments();
       input.value = "";
       fitInput();
-      stopEdit();
-      ask(message, { images, replace });
+      ask(message, { images });
     });
 
     attachBtn.addEventListener("click", () => fileInput.click());
@@ -2960,23 +3019,36 @@
       addFiles([...e.dataTransfer.files]);
     });
 
-    discardBtn.addEventListener("click", () => { if (take) discardTake(); });
-    dictationEl.addEventListener("click", () => { if (take) finishTake(); });
-    editingEl.querySelector("button").addEventListener("click", () => {
-      stopEdit();
-      input.value = "";
-      fitInput();
-      syncSend();
+    // 麦克风：按下就开录。很快松开 = 点了一下，开始听写；按住不放 = 说完松手直接发，往上滑取消
+    sendBtn.addEventListener("pointerdown", (e) => {
+      if (sendBtn.dataset.state === "voice" && !take) startTake(e);
     });
-    // 点自己最后那条（没在选字的时候）：改
-    logEl.addEventListener("click", (e) => {
-      const b = e.target.closest(".group.mine .msg.user");
-      if (!b || busy || take || e.target.closest("a, button, .react")) return;
-      if (String(window.getSelection && window.getSelection()).trim()) return;
-      const mines = logEl.querySelectorAll(".group.mine");
-      if (b.closest(".group.mine") !== mines[mines.length - 1]) return;
-      startEdit();
+    sendBtn.addEventListener("pointermove", (e) => {
+      if (!take || !take.hold || e.pointerId !== take.id) return;
+      const zone = zoneAt(e.clientX, e.clientY);
+      if (zone !== (take.zone || "send")) {
+        take.zone = zone;
+        showTake();
+      }
     });
+    sendBtn.addEventListener("pointerup", (e) => {
+      if (!take || e.pointerId !== take.id || !take.pressed) return;
+      take.pressed = false;
+      clearTimeout(take.holdTimer);
+      if (take.hold) endHold();
+      else take.tapAt = Date.now();
+    });
+    sendBtn.addEventListener("pointercancel", (e) => {
+      if (!take || e.pointerId !== take.id || !take.pressed) return;
+      take.pressed = false;
+      clearTimeout(take.holdTimer);
+      if (take.hold) {
+        take.zone = "cancel";
+        endHold();
+      } else take.tapAt = Date.now();
+    });
+    sendBtn.addEventListener("contextmenu", (e) => { if (take) e.preventDefault(); });
+    discardBtn.addEventListener("click", () => { if (take && !take.working) discardTake(); });
     // 退到后台就把麦克风关掉（正在录的那段不要了）；回来再点时再开
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") closeMic(); });
 

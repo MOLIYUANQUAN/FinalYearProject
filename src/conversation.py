@@ -181,20 +181,6 @@ class Conversations:
         return {"id": r["id"], "conversation_id": r["conversation_id"], "role": r["role"], "content": r["content"],
                 "at": int(r["at"] * 1000), **json.loads(r["data"] or "{}")}
 
-    def last_user(self) -> dict[str, Any] | None:
-        """他最后说的那一条（整条对话里）；带着它在哪一段。"""
-        with self._lock:
-            row = self._conn.execute(
-                "SELECT id, conversation_id FROM conversation_messages WHERE role = 'user' ORDER BY id DESC LIMIT 1"
-            ).fetchone()
-        return {**(self.message(row["id"]) or {}), "conversation_id": row["conversation_id"]} if row else None
-
-    def delete_from(self, cid: str, message_id: int) -> None:
-        """这一段里从这条起往后的都删掉（他改了上一句重说）。"""
-        with self._lock:
-            self._conn.execute("DELETE FROM conversation_messages WHERE conversation_id = ? AND id >= ?", (cid, message_id))
-            self._conn.commit()
-
     def last_hers(self, before: int) -> dict[str, Any] | None:
         """在这条消息之前，她最后说的那一条（整条对话里，不分段）。"""
         with self._lock:

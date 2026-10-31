@@ -22,11 +22,6 @@ os.environ.setdefault("OPENAI_API_KEY", "sk-test-not-used")
 os.environ["FRIDAY_GITHUB_OFFLINE"] = "1"
 # 也不去请模型给日历标题起名（要测的地方自己 mock）
 os.environ["FRIDAY_NAMING"] = "off"
-# 说的话转写完也不去请小模型改错字（要测的地方自己 mock）
-os.environ["FRIDAY_TIDY_SPEECH"] = "0"
-# 也不读本机放的邮箱授权码
-os.environ["MAIL_ADDRESS"] = ""
-os.environ["MAIL_PASSWORD"] = ""
 
 from agents import set_tracing_disabled  # noqa: E402
 
