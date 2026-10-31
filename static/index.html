@@ -148,9 +148,10 @@
     .meter i { display: block; height: 100%; border-radius: 999px; background: var(--ink); }
     .line {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      gap: 6px 12px;
       min-height: 44px;
       padding: 6px 0;
       border-top: 1px solid var(--line);
@@ -158,6 +159,8 @@
     }
     .panel .line:first-of-type, .panel h3 + .line { border-top: none; }
     .line .muted { color: var(--muted); text-align: right; }
+    /* 窄屏放不下（比如安静时段的两个时间）就折到下一行，靠右 */
+    .line > :last-child { margin-left: auto; }
     .line.bad .muted { color: var(--danger); }
     .line.tap { cursor: pointer; }
     .line.gone > span:first-child { text-decoration: line-through; opacity: 0.5; }
@@ -174,8 +177,9 @@
       cursor: pointer;
       touch-action: manipulation;
     }
+    .stepper.times { gap: 6px; }
     .panel input[type="time"] {
-      padding: 4px 8px;
+      padding: 4px 6px;
       border: 1px solid var(--line);
       border-radius: 10px;
       background: transparent;
@@ -1353,7 +1357,7 @@
       plus.onclick = () => setDaily(me.push.daily_max + 1);
       stepper.append(minus, count, plus);
       pushes.append(line("每天最多", stepper));
-      const quiet = el("span", "stepper");
+      const quiet = el("span", "stepper times");
       const from = el("input");
       const until = el("input");
       from.type = until.type = "time";
