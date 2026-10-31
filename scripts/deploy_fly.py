@@ -156,6 +156,7 @@ def main() -> None:
     # 有 Claude / ElevenLabs / Cursor key 就上云；没有则跳过（有 ANTHROPIC_API_KEY 她就用 Claude）
     for name in (
         "ANTHROPIC_API_KEY",
+        "ANTHROPIC_ADMIN_KEY",
         "FRIDAY_MODEL",
         "ELEVENLABS_API_KEY",
         "ELEVENLABS_VOICE_ID",

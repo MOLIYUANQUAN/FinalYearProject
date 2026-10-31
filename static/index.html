@@ -184,6 +184,34 @@
     }
     .panel details summary { padding-top: 8px; color: var(--muted); font-size: 0.85rem; cursor: pointer; }
     .fineprint { margin: 6px 0 0; color: var(--muted); font-size: 0.8rem; }
+    /* 她记得的事：大标题、按「这周 / 这个月 / 更早」分组；点一下那条才出现删除 */
+    .page-title { margin: 4px 0 2px; font-size: 1.75rem; font-weight: 700; letter-spacing: -0.03em; }
+    .page-sub { margin: 0 0 14px; color: var(--muted); font-size: 0.9rem; }
+    .find {
+      width: 100%;
+      margin: 0 0 6px;
+      padding: 10px 14px;
+      border: none;
+      border-radius: 12px;
+      outline: none;
+      background: var(--hers);
+      color: var(--ink);
+      font: inherit;
+      font-size: 16px;
+    }
+    .group-label { margin: 18px 6px 6px; color: var(--muted); font-size: 0.78rem; font-weight: 500; letter-spacing: 0.04em; }
+    .facts { overflow: hidden; border-radius: 16px; background: var(--hers); }
+    .fact { padding: 12px 16px; border-top: 1px solid var(--line); cursor: pointer; transition: background 0.15s ease; }
+    .fact:first-child { border-top: none; }
+    .fact p { margin: 0; line-height: 1.5; }
+    .fact time { display: block; margin-top: 2px; color: var(--muted); font-size: 0.78rem; }
+    .fact .acts { display: none; gap: 18px; margin-top: 8px; }
+    .fact.open .acts, .fact.gone .acts { display: flex; }
+    .fact .acts button { padding: 4px 0; border: none; background: none; color: var(--ink); font: inherit; font-size: 0.9rem; cursor: pointer; }
+    .fact .acts .del { color: var(--danger); }
+    .fact.gone p { text-decoration: line-through; opacity: 0.45; }
+    @media (hover: hover) { .fact:hover { background: rgba(127, 127, 127, 0.07); } }
+    .empty-state { margin: 40px 16px; color: var(--muted); text-align: center; line-height: 1.6; white-space: pre-line; }
 
     /* 一条对话：他在右、她在左，都是气泡；隔得久了中间标一下时间 */
     .stamp {
@@ -1230,7 +1258,16 @@
       return data;
     }
 
+    const aboutBack = document.getElementById("aboutBack");
+    let aboutView = "profile";
+
+    function setAboutView(view) {
+      aboutView = view;
+      aboutBack.textContent = view === "memory" ? "‹ Friday" : "‹ 返回";
+    }
+
     async function openAbout() {
+      setAboutView("profile");
       if (aboutEl.hidden) history.pushState({ about: true }, "");
       aboutEl.hidden = false;
       aboutBody.replaceChildren(el("p", "fineprint", "读取中…"));
@@ -1273,7 +1310,7 @@
       profile.append(avatar, el("h2", "", "Friday"), el("p", "", (me.issue ? "备用的在答 · " : "在线 · ") + me.model));
 
       // 用量：钱和比例在最上面；token 收在「细节」里
-      const use = panel("这个月用量", "估计值，准的数在控制台");
+      const use = panel("这个月用量", u.source === "bill" ? "Anthropic 账单上的数" : "按 token 算的");
       const big = el("div", "money");
       big.append(money(u.spent), el("small", "", " / $" + u.budget));
       const meter = el("div", "meter");
@@ -1290,7 +1327,11 @@
       const k = (n) => (n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "K" : String(n || 0));
       more.append(line("输入 token", k(u.tokens.in) + " · 缓存命中 " + Math.round((u.tokens.cache_hit || 0) * 100) + "%"));
       more.append(line("输出 token", k(u.tokens.out)));
-      more.append(el("p", "fineprint", u.since ? "从 " + u.since + " 开始记。GPT-5 顶班的部分走 OpenAI 的账。" : "这个月还没记到。"));
+      if (u.source === "bill") more.append(line("Friday 自己记的", money(u.counted)));
+      more.append(el("p", "fineprint", u.source === "bill"
+        ? "上面是 Anthropic 账单上的数，和控制台一致（约 5 分钟更新一次），GPT-5 顶班的部分走 OpenAI 的账、另外加上。"
+        : (u.since ? "从 " + u.since + " 开始记：每一次的 token 数是 Anthropic 回复里带的原数，按官方单价算。记账以前的、同一账户别处用的看不到；" : "")
+          + "放一把 Anthropic 管理员 key，这里就直接显示账单上的数。"));
       use.append(more);
 
       // 连接：都好就一句话；有问题的那一行写怎么修
@@ -1360,58 +1401,132 @@
       open.onclick = showMemories;
       mind.append(open);
 
+      setAboutView("profile");
       aboutBody.replaceChildren(profile, use, links, pushes, mind, el("p", "fineprint", me.version ? "版本 " + me.version : ""));
     }
 
-    async function showMemories() {
-      const back = el("button", "pill", "‹ 资料");
-      back.type = "button";
-      back.onclick = () => drawAbout(lastMe);
-      const box = panel("她记得你的事", "删了能撤销");
-      aboutBody.replaceChildren(back, el("div", "", ""), box);
-      try {
-        const facts = await api("/api/memory");
-        if (!facts.length) box.append(el("p", "fineprint", "她还没记下什么。"));
-        for (const f of facts) {
-          const row = line(f.content, null);
-          const del = el("button", "pill", "删除");
-          del.type = "button";
-          del.onclick = async () => {
-            del.disabled = true;
-            try {
-              await api("/api/memory/" + encodeURIComponent(f.id), { method: "DELETE" });
-              row.classList.add("gone");
-              lastMe.memory = Math.max(0, lastMe.memory - 1);
-              const undo = el("button", "pill", "撤销");
-              undo.type = "button";
-              undo.onclick = async () => {
-                await api("/api/memory/restore", { method: "POST", body: JSON.stringify({ fact: f.fact }) });
-                row.classList.remove("gone");
-                lastMe.memory += 1;
-                undo.replaceWith(del);
-                del.disabled = false;
-              };
-              del.replaceWith(undo);
-            } catch (e) {
-              del.disabled = false;
-            }
-          };
-          row.lastChild.replaceWith(del);
-          box.append(row);
+    // 她记得你的事：大标题和件数，事情多了能搜；按「这周 / 这个月 / 更早」分组，每条下面写哪天记的；
+    // 点一下那条才出现「删除」，删了的划掉、留着「撤销」
+    function factDay(at) {
+      const d = new Date(at + "T00:00:00");
+      return isNaN(d) ? "" : d.getMonth() + 1 + "月" + d.getDate() + "日记下";
+    }
+
+    function factGroup(at) {
+      const d = new Date(at + "T00:00:00");
+      if (isNaN(d)) return "更早";
+      const now = new Date();
+      if ((now - d) / 86400000 < 7) return "这周";
+      if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()) return "这个月";
+      return "更早";
+    }
+
+    function factRow(f) {
+      const row = el("div", "fact");
+      row.append(el("p", "", f.content));
+      if (f.at) row.append(el("time", "", factDay(f.at)));
+      const acts = el("div", "acts");
+      const del = el("button", "del", "删除");
+      del.type = "button";
+      const undo = el("button", "", "撤销");
+      undo.type = "button";
+      undo.hidden = true;
+      acts.append(del, undo);
+      row.append(acts);
+      row.onclick = (e) => {
+        if (e.target.closest("button") || row.classList.contains("gone")) return;
+        const was = row.classList.contains("open");
+        aboutBody.querySelectorAll(".fact.open").forEach((r) => r.classList.remove("open"));
+        row.classList.toggle("open", !was);
+      };
+      del.onclick = async () => {
+        del.disabled = true;
+        try {
+          await api("/api/memory/" + encodeURIComponent(f.id), { method: "DELETE" });
+          row.classList.remove("open");
+          row.classList.add("gone");
+          del.hidden = true;
+          undo.hidden = false;
+          lastMe.memory = Math.max(0, lastMe.memory - 1);
+          setCount();
+        } finally {
+          del.disabled = false;
         }
+      };
+      undo.onclick = async () => {
+        undo.disabled = true;
+        try {
+          await api("/api/memory/restore", { method: "POST", body: JSON.stringify({ fact: f.fact }) });
+          row.classList.remove("gone");
+          undo.hidden = true;
+          del.hidden = false;
+          lastMe.memory += 1;
+          setCount();
+        } finally {
+          undo.disabled = false;
+        }
+      };
+      return row;
+    }
+
+    let setCount = () => {};
+
+    async function showMemories() {
+      setAboutView("memory");
+      const sub = el("p", "page-sub", "读取中…");
+      aboutBody.replaceChildren(el("h2", "page-title", "她记得的"), sub);
+      setCount = () => (sub.textContent = lastMe.memory + " 件 · 跟她说「记住…」她就会记下");
+      let facts;
+      try {
+        facts = await api("/api/memory");
       } catch (e) {
-        box.append(el("p", "fineprint", "没读到，过会儿再看。"));
+        sub.textContent = "没读到，过会儿再看。";
+        return;
       }
+      setCount();
+      if (!facts.length) {
+        aboutBody.append(el("p", "empty-state", "她还没记下什么。\n跟她说「记住我周三下午有课」就行。"));
+        return;
+      }
+      const list = el("div");
+      const draw = (query) => {
+        const q = (query || "").trim().toLowerCase();
+        const shown = facts.filter((f) => !q || f.content.toLowerCase().includes(q));
+        const groups = new Map();
+        for (const f of shown) {
+          const name = factGroup(f.at);
+          if (!groups.has(name)) groups.set(name, []);
+          groups.get(name).push(f);
+        }
+        const parts = [];
+        for (const name of ["这周", "这个月", "更早"]) {
+          if (!groups.has(name)) continue;
+          const box = el("div", "facts");
+          groups.get(name).forEach((f) => box.append(factRow(f)));
+          parts.push(el("div", "group-label", name), box);
+        }
+        list.replaceChildren(...(parts.length ? parts : [el("p", "empty-state", "没找到「" + query + "」。")]));
+      };
+      if (facts.length > 8) {
+        const find = el("input", "find");
+        find.type = "search";
+        find.placeholder = "搜她记得的";
+        find.oninput = () => draw(find.value);
+        aboutBody.append(find);
+      }
+      aboutBody.append(list);
+      draw("");
     }
 
     document.getElementById("who").addEventListener("click", openAbout);
-    document.getElementById("aboutBack").addEventListener("click", () => {
+    aboutBack.addEventListener("click", () => {
+      if (aboutView === "memory" && lastMe) return drawAbout(lastMe);
       if (history.state && history.state.about) history.back();
       else closeAbout();
     });
     window.addEventListener("popstate", closeAbout);
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && !aboutEl.hidden) document.getElementById("aboutBack").click();
+      if (e.key === "Escape" && !aboutEl.hidden) aboutBack.click();
     });
 
     // 推送里没下文的事：一件一行，「做完了 / 明天再说」点一下就办，办过的划掉

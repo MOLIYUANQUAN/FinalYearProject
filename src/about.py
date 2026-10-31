@@ -90,7 +90,7 @@ def me() -> dict[str, Any]:
         "model": ledger.label(answering),
         "backup": answering != active_model() or not active_model().startswith("claude"),
         "issue": claude.issue(),
-        "usage": {**ledger.month(), "today": _today(now)},
+        "usage": {**ledger.month(), "today": _today(now), "admin_key": bool((os.getenv("ANTHROPIC_ADMIN_KEY") or "").strip())},
         "connections": connections(),
         "push": {"devices": len(push.devices()), **settings.get()},
         "memory": len(memory_store.all_facts()),

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import unittest
+import unittest.mock
 from datetime import datetime
 from unittest.mock import patch
 
@@ -54,6 +55,43 @@ class EveryCallIsRecorded(SandboxTestCase):
         friday, _ = self.friday([[text("在。")]])
         collect(friday.turn(friday.conversations.create(), "在吗"))
         self.assertEqual(ledger.month()["calls"], 1)
+
+
+class BillTests(unittest.TestCase):
+    def setUp(self) -> None:
+        fresh_files()
+        self.addCleanup(fresh_files)
+        ledger._billing = None
+        self.addCleanup(setattr, ledger, "_billing", None)
+
+    def test_without_an_admin_key_it_counts_by_tokens(self) -> None:
+        ledger.record("claude-opus-5-5", 100_000, 1_000)
+        with patch.dict("os.environ", {"ANTHROPIC_ADMIN_KEY": ""}):
+            month = ledger.month()
+        self.assertEqual(month["source"], "counted")
+        self.assertEqual(month["spent"], month["counted"])
+
+    def test_with_an_admin_key_the_bill_wins_and_pages_are_added_up(self) -> None:
+        ledger.record("claude-opus-5-5", 100_000, 1_000)  # 自己记的 $0.42
+        ledger.record("gpt-5", 100_000, 0)  # 顶班的 $0.125，走 OpenAI，账单里没有
+        pages = [
+            {"data": [{"results": [{"amount": "1234.5", "currency": "USD"}]}, {"results": []}], "has_more": True, "next_page": "p2"},
+            {"data": [{"results": [{"amount": "65.5", "currency": "USD"}]}], "has_more": False, "next_page": None},
+        ]
+        replies = [unittest.mock.MagicMock(json=lambda p=p: p, raise_for_status=lambda: None) for p in pages]
+        with patch.dict("os.environ", {"ANTHROPIC_ADMIN_KEY": "sk-ant-admin01-test"}), \
+                patch.object(ledger.requests, "get", side_effect=replies) as get:
+            month = ledger.month()
+        self.assertEqual(month["source"], "bill")
+        self.assertAlmostEqual(month["spent"], 13.00 + 0.125, delta=0.01)  # 1300 分 = $13，加上 OpenAI 那部分
+        self.assertEqual(get.call_args_list[1].kwargs["params"]["page"], "p2")
+        self.assertEqual(get.call_args.kwargs["headers"]["x-api-key"], "sk-ant-admin01-test")
+
+    def test_a_bill_that_cannot_be_read_falls_back_to_counting(self) -> None:
+        ledger.record("claude-opus-5-5", 100_000, 1_000)
+        with patch.dict("os.environ", {"ANTHROPIC_ADMIN_KEY": "sk-ant-admin01-test"}), \
+                patch.object(ledger.requests, "get", side_effect=ledger.requests.ConnectionError("offline")):
+            self.assertEqual(ledger.month()["source"], "counted")
 
 
 class SettingsTests(unittest.TestCase):

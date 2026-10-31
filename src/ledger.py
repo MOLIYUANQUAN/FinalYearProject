@@ -1,6 +1,11 @@
-"""她每问一次模型用了多少 token、大约花了多少钱：按价格表在服务端算，资料页上看这个月的。
+"""这个月花了多少钱，资料页上看。
 
-是估计值，准的数在 Anthropic / OpenAI 的控制台。只记数字，不记对话内容。
+两个来源：
+- 账单：放了 ANTHROPIC_ADMIN_KEY，就直接读 Anthropic 账单上的数（cost report，约 5 分钟内更新，整月都有），
+  和控制台一模一样，也包括 Friday 以外在同一个账户上的用量。
+- 自己记的：每问一次模型，按回复里带回来的 token 数和官方单价算一笔（RunHooks）。Friday 自己用掉的就是这个数，
+  只是记账开始之前的、别处用的看不到。GPT-5 顶班走 OpenAI 的账，也只有这一个来源。
+只记数字，不记对话内容。
 """
 
 from __future__ import annotations
@@ -8,9 +13,12 @@ from __future__ import annotations
 import calendar
 import json
 import os
-from datetime import datetime
+import threading
+import time
+from datetime import datetime, timezone
 from typing import Any
 
+import requests
 from agents import RunHooks
 
 from src.config import STATE_DIR
@@ -119,6 +127,45 @@ def budget() -> float:
         return 200.0
 
 
+BILLING_URL = "https://api.anthropic.com/v1/organizations/cost_report"
+BILLING_FRESH_S = 5 * 60  # 账单本身约 5 分钟才更新一次
+_billing_lock = threading.Lock()
+_billing: tuple[float, str, float] | None = None  # (读到的时刻, 哪个月, 美元)
+
+
+def billed(now: datetime | None = None) -> float | None:
+    """Anthropic 账单上这个月（UTC 自然月）的花费，美元。没放管理员 key 或者读不到就是 None。"""
+    global _billing
+    key = (os.getenv("ANTHROPIC_ADMIN_KEY") or "").strip()
+    if not key:
+        return None
+    now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    month_key = now.strftime("%Y-%m")
+    with _billing_lock:
+        if _billing and _billing[1] == month_key and time.monotonic() - _billing[0] < BILLING_FRESH_S:
+            return _billing[2]
+    start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    params: dict[str, Any] = {"starting_at": start.strftime("%Y-%m-%dT%H:%M:%SZ"), "limit": 31}
+    cents = 0.0
+    try:
+        for _ in range(5):
+            res = requests.get(BILLING_URL, params=params, timeout=8,
+                               headers={"x-api-key": key, "anthropic-version": "2023-06-01"})
+            res.raise_for_status()
+            data = res.json()
+            cents += sum(float(r.get("amount") or 0) for bucket in data.get("data", []) for r in bucket.get("results", []))
+            if not data.get("has_more") or not data.get("next_page"):
+                break
+            params["page"] = data["next_page"]
+    except (requests.RequestException, ValueError) as exc:
+        print(f"[WARN] billing: could not read the cost report: {exc}")
+        return None
+    dollars = round(cents / 100, 2)  # 账单金额是「分」
+    with _billing_lock:
+        _billing = (time.monotonic(), month_key, dollars)
+    return dollars
+
+
 def month(now: datetime | None = None) -> dict[str, Any]:
     """这个月（自然月，按真实时间，不跟演示日期走）花了多少、照这个速度月底大约多少、按模型分、token 和缓存命中。"""
     now = now or datetime.now()
@@ -133,10 +180,18 @@ def month(now: datetime | None = None) -> dict[str, Any]:
         by_model[name] = by_model.get(name, 0.0) + float(r.get("usd") or 0)
     inputs = sum(int(r.get("in") or 0) for r in rows)
     cached = sum(int(r.get("cached") or 0) for r in rows)
+    counted = round(spent, 2)
+    # 有账单就以账单为准；GPT-5 顶班那部分走 OpenAI，账单里没有，加上自己记的
+    openai = sum(float(r.get("usd") or 0) for r in rows if not str(r.get("model", "")).startswith("claude"))
+    bill = billed()
+    if bill is not None:
+        spent = bill + openai
     return {
         "month": f"{now.month}月",
         "spent": round(spent, 2),
-        "projected": round(spent / elapsed * days, 2) if rows else 0.0,
+        "source": "bill" if bill is not None else "counted",
+        "counted": counted,
+        "projected": round(spent / elapsed * days, 2) if rows or bill else 0.0,
         "budget": budget(),
         "calls": len(rows),
         "by_model": [{"model": k, "usd": round(v, 2)} for k, v in sorted(by_model.items(), key=lambda kv: -kv[1])],
