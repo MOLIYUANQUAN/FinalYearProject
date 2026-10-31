@@ -103,13 +103,18 @@ def get_google_calendar_id() -> str:
 
 
 def get_mail_backend() -> str:
-    """邮件后端：none | mock | gmail | outlook。"""
+    """邮件后端：none | mock | gmail | outlook | imap。
+
+    放了 MAIL_ADDRESS 和 MAIL_PASSWORD（163、QQ 这类邮箱的授权码）就读那个邮箱：他重要的信在那儿，比 Gmail 优先。
+    """
     load_env()
     value = (os.getenv("MAIL_BACKEND") or "none").strip().lower()
-    if value not in {"none", "mock", "gmail", "outlook"}:
+    if value not in {"none", "mock", "gmail", "outlook", "imap"}:
         raise RuntimeError(
-            f"无效 MAIL_BACKEND={value!r}。请使用 none、mock、gmail 或 outlook。"
+            f"无效 MAIL_BACKEND={value!r}。请使用 none、mock、gmail、outlook 或 imap。"
         )
+    if value in ("none", "gmail") and (os.getenv("MAIL_ADDRESS") or "").strip() and (os.getenv("MAIL_PASSWORD") or "").strip():
+        return "imap"
     return value
 
 

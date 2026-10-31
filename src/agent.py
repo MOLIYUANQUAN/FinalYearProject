@@ -112,12 +112,13 @@ def _connections_line() -> str:
         "google": "Google 日历（含导入的大学课表）",
         "mock": "演示日历",
     }[get_calendar_backend()]
-    mail = {
-        "gmail": "Gmail",
-        "outlook": "Outlook（只读）",
-        "mock": "演示邮箱",
-        "none": None,
-    }[get_mail_backend()]
+    backend = get_mail_backend()
+    if backend == "imap":
+        from src.mail_providers.imap import label
+
+        mail = label()
+    else:
+        mail = {"gmail": "Gmail", "outlook": "Outlook（只读）", "mock": "演示邮箱", "none": None}[backend]
     tasks = todos.SOURCE_NAMES.get(get_tasks_backend())
     connected = "、".join(x for x in (calendar, mail, tasks) if x)
     return f"已接入：{connected}。没接入的账户就直说没接入。"

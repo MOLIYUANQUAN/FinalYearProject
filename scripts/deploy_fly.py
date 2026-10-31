@@ -168,6 +168,9 @@ def main() -> None:
         "CURSOR_MODEL",
         "GITHUB_TOKEN",
         "GH_TOKEN",
+        # 163 这类邮箱：地址 + 授权码（放了就读这个邮箱，比 Gmail 优先）
+        "MAIL_ADDRESS",
+        "MAIL_PASSWORD",
     ):
         value = (env.get(name) or "").strip()
         if value:

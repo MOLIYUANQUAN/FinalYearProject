@@ -1,4 +1,4 @@
-"""邮件数据源：none | mock | gmail | outlook。"""
+"""邮件数据源：none | mock | gmail | outlook | imap（163、QQ 这类，地址 + 授权码）。"""
 
 from __future__ import annotations
 
@@ -23,6 +23,10 @@ def get_mail_provider() -> MailProvider:
         from src.mail_providers.gmail import GmailMailProvider
 
         return GmailMailProvider()
+    if backend == "imap":
+        from src.mail_providers.imap import ImapMailProvider
+
+        return ImapMailProvider()
     if backend == "outlook":
         from src.mail_providers.outlook import OutlookMailProvider
 

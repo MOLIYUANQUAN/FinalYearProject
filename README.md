@@ -7,7 +7,7 @@ Manchester CS Final Year Project (Zeep): **a single personal agent** that knows 
 
 **Academic route:** Baseline → Application → Evaluation (evidence in [docs/evaluation/](docs/evaluation/), currently frozen)  
 **Baseline snapshot:** tag [`baseline-v1`](https://github.com/MOLIYUANQUAN/FinalYearProject/releases/tag/baseline-v1) · [docs/baseline-v1.md](docs/baseline-v1.md)  
-**Setup guides:** [Google Calendar](docs/google-calendar-setup.md) · [Gmail](docs/gmail-setup.md) · Google Tasks (`scripts\auth_google_tasks.py`, then set `TASKS_BACKEND=google` in `.env`) · [Cloud + iPhone](docs/cloud-and-iphone.md) · [Tunnel (interim)](docs/phone-access.md) · [Personal](docs/application-personal-v1.md) · [Memory](docs/application-memory-v1.md)
+**Setup guides:** [Google Calendar](docs/google-calendar-setup.md) · [Gmail](docs/gmail-setup.md) · 163 / QQ mail (set `MAIL_ADDRESS` and `MAIL_PASSWORD`, the mailbox's authorization code; see `.env.example`) · Google Tasks (`scripts\auth_google_tasks.py`, then set `TASKS_BACKEND=google` in `.env`) · [Cloud + iPhone](docs/cloud-and-iphone.md) · [Tunnel (interim)](docs/phone-access.md) · [Personal](docs/application-personal-v1.md) · [Memory](docs/application-memory-v1.md)
 
 ## Success criteria (Baseline)
 
@@ -61,9 +61,9 @@ Switching to the cloud brain for the first time:
 |------|--------------|-------------------------|
 | `get_calendar_events` | Read the calendar (including the imported university timetable) | |
 | `create_calendar_event` | Add an event to his own calendar | no — done directly with "Undo" |
-| `search_emails` / `read_email` | Search and read Gmail | |
+| `search_emails` / `read_email` | Search and read mail (Gmail, or a 163-style mailbox over IMAP) | |
 | `send_email` | Send an email (subject/body editable in the card) | yes |
-| `modify_email` | Mark read/unread (direct) or archive/trash (confirmed) | archive / trash |
+| `modify_email` | Mark read/unread (direct) or archive/trash (confirmed; 163-style mailboxes have no archive) | archive / trash |
 | `search_files` / `read_file` | Local notes | |
 | `get_personal_context` | Static profile | |
 | `remember_fact` / `search_memory` | Long-term memory | |

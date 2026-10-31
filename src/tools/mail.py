@@ -1,4 +1,4 @@
-"""邮件工具：Gmail / mock / outlook（outlook 仍只读）。"""
+"""邮件工具：Gmail / 163 这类（IMAP）/ mock / outlook（outlook 仍只读）。"""
 
 from __future__ import annotations
 
