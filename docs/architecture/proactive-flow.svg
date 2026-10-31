@@ -174,5 +174,5 @@
   <rect x="24.0" y="1025.5" width="1352.0" height="72.0" rx="12" fill="#fbfaf7" stroke="#dcd9d3" stroke-width="1"/>
   <text class="sans" x="44.0" y="1053.5" style="font-size:14px;font-weight:400;fill:#3a362f">Why no model here: these are the moments he trusts most and sees first. Computing them on the server makes them instant, free and never wrong about a time or a count. One exception: the first</text>
   <text class="sans" x="44.0" y="1073.5" style="font-size:14px;font-weight:400;fill:#3a362f">time a calendar title appears, names.py asks the model once for a short name (「FYP meeting with mentor」 → 「见导师」) and caches it.</text>
-  <text class="sans" x="1360.0" y="1127.5" style="font-size:13px;font-weight:400;fill:#6b665c" text-anchor="end">Follows src/presence.py, src/nudges.py and src/closed.py on develop.</text>
+  <text class="sans" x="1360.0" y="1127.5" style="font-size:13px;font-weight:400;fill:#6b665c" text-anchor="end">Friday 0.9.0 · follows src/presence.py, src/nudges.py and src/closed.py.</text>
 </svg>

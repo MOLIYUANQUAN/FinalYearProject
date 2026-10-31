@@ -7,7 +7,7 @@
 | `proactive-flow.png` | 图 3：不经过模型的主动路径：开场、推送、收工 | 插入 Google Doc |
 | `*.svg` | 上面三张图的源文件 | 以后修改用 |
 
-图中文字用英文，方便导师直接阅读。内容与 `develop` 上的代码（2026-10-31）一一对应：`src/`、`static/`、`.github/workflows/`、`fly.toml`。
+图中文字用英文，方便导师直接阅读。内容与 `develop` 上的代码（版本 0.9.0，2026-10-31）一一对应：`src/`、`static/`、`.github/workflows/`、`fly.toml`。
 
 Baseline v1 时期的旧架构图在分支 `claude/pensive-brown-40tnzr`，画的是 10 月 12 日的 3 个工具版本，已被这一版取代。
 
@@ -58,7 +58,7 @@ Friday 有两条路。**他开口时**，Agent 把这句话交给大模型，由
    - 等确认的那一步。
    - 记忆、提醒、关掉的事、推送设备、用量。
 9. **右下 BUILD & DEPLOY（构建和部署）**：
-   - 每次推送 `develop`，GitHub Actions 先跑 199 个离线测试（用脚本化的假模型，不花钱、不需要 key）。
+   - 每次推送 `develop`，GitHub Actions 先跑 200 多个离线测试（用脚本化的假模型，不花钱、不需要 key）。
    - 测试通过才部署到 Fly.io，部署完核对线上版本号，对不上就算失败。
    - `main` 只放里程碑。
 10. **左边的虚线箭头（Web Push）**：服务端主动把消息推到他的 iPhone 和电脑上，这就是「她来找他」。
@@ -110,13 +110,13 @@ Friday 有两条路。**他开口时**，Agent 把这句话交给大模型，由
 | 工具 | 3 个，只读演示数据 | 24 个，接真实日历、邮件、待办；对外的事硬确认，自己的事可撤销 |
 | 对话 | 一问一答，不保存 | 存在服务端，换设备接着聊 |
 | 主动 | 无 | 开场、准时提醒、每天最多 3 条推送、晚上收工 |
-| 工程 | 手动运行 | 199 个离线测试；推送 develop 自动测试、部署、核对线上版本 |
+| 工程 | 手动运行 | 200 多个离线测试；推送 develop 自动测试、部署、核对线上版本 |
 
 ---
 
 ## Paste-ready captions (English)
 
-**Figure 1: System architecture of Friday (develop, 31 Oct 2026).**
+**Figure 1: System architecture of Friday 0.9.0 (develop, 31 Oct 2026).**
 Friday is a single personal agent served by a FastAPI app on Fly.io and used through one web page: a Windows desktop window, an iPhone home-screen app, or evaluation scripts. A message takes the *reactive path*: the agent (OpenAI Agents SDK) rebuilds its instructions from live data every turn and loops between the model and 24 tools. Outward or destructive tools pause the run until the user explicitly approves; the user's own to-dos, events and reminders run directly with an Undo. Without a message, the *server-computed path* derives the opener, reminders and push notifications from the calendar and to-dos by rule, with no model involved. Both paths share data-source adapters (Google, IMAP, mock) and one state directory on a persistent volume.
 
 | Layer | Component | Code | Responsibility |
@@ -133,7 +133,7 @@ Friday is a single personal agent served by a FastAPI app on Fly.io and used thr
 | Adapters | Data sources | `src/calendar_providers/`, `mail_providers/`, `tasks_providers/` | Google Calendar / Tasks / Gmail, Outlook (read-only), IMAP + SMTP, mock data |
 | State | `FRIDAY_STATE_DIR` | Fly volume `/state` | Conversations (SQLite), paused approvals, memory, reminders, closed loops, push devices, usage |
 | External | Models and services | — | Anthropic (Claude Opus 5.5), OpenAI (GPT-5, transcription, TTS), ElevenLabs, Cursor Cloud Agents, GitHub, Google, Microsoft Graph |
-| Deploy | CI/CD | `.github/workflows/`, `fly.toml`, `Dockerfile` | 199 offline tests on every push; on `develop`: test → `flyctl deploy` → verify the live `git_sha` |
+| Deploy | CI/CD | `.github/workflows/`, `fly.toml`, `Dockerfile` | 200+ offline tests on every push; on `develop`: test → `flyctl deploy` → verify the live `git_sha` |
 
 **Figure 2: Request flow for an outward action (“Reply to John: I can make it tomorrow at 2”).**
 In the first turn the model chains `search_emails` → `read_email` → `send_email`. Because `send_email` is declared with `needs_approval`, the SDK interrupts the run before the tool executes; the paused `RunState` is saved to disk and the server, not the model, renders the confirm card from the exact arguments. In the second turn an explicit yes resumes that exact call, the mail is sent from the mailbox it came to, and the closed loop is recorded. Any other reply cancels the action.

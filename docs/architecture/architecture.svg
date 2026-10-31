@@ -11,7 +11,7 @@
   </defs>
   <rect x="0" y="0" width="1600" height="2165" fill="#ffffff"/>
   <text class="sans" x="40.0" y="58.0" style="font-size:30px;font-weight:700;fill:#1c1a16">Friday — System Architecture</text>
-  <text class="sans" x="40.0" y="88.0" style="font-size:16px;font-weight:400;fill:#5c574e">A personal agent for one user (Zeep) · develop branch, 31 Oct 2026 · Manchester CS Final Year Project</text>
+  <text class="sans" x="40.0" y="88.0" style="font-size:16px;font-weight:400;fill:#5c574e">A personal agent for one user (Zeep) · version 0.9.0 (develop, 31 Oct 2026) · Manchester CS Final Year Project</text>
   <rect x="30.0" y="112.0" width="1540.0" height="232.0" rx="14" fill="#eef4fb" stroke="#c6d8ee" stroke-width="1.2"/>
   <text class="sans" x="50.0" y="139.0" style="font-size:13px;font-weight:700;fill:#2f5f93;letter-spacing:0.09em">CLIENT</text>
   <text class="sans" x="116.1" y="139.0" style="font-size:13.5px;font-weight:500;fill:#2f5f93">one web page, three ways in</text>
@@ -54,7 +54,7 @@
   <text class="sans" x="758.0" y="488.0" style="font-size:14px;font-weight:400;fill:#3a362f">profile page: cost, what she remembers</text>
   <rect x="744.0" y="515.0" width="396.0" height="71.0" rx="10" fill="#f6fbf8" stroke="#9fcbbb" stroke-width="1.1"/>
   <text class="mono" x="758.0" y="542.0" style="font-size:14px;font-weight:700;fill:#1c1a16">GET /api/health</text>
-  <text class="sans" x="758.0" y="567.0" style="font-size:14px;font-weight:400;fill:#3a362f">model in use · git_sha of the live build</text>
+  <text class="sans" x="758.0" y="567.0" style="font-size:14px;font-weight:400;fill:#3a362f">version · model in use · live git_sha</text>
   <rect x="1154.0" y="436.0" width="396.0" height="71.0" rx="10" fill="#f6fbf8" stroke="#9fcbbb" stroke-width="1.1"/>
   <text class="mono" x="1168.0" y="463.0" style="font-size:14px;font-weight:700;fill:#1c1a16">POST /api/chat/stream</text>
   <text class="sans" x="1168.0" y="488.0" style="font-size:14px;font-weight:400;fill:#3a362f">one turn, streamed · also /chat/revise, /undo</text>
@@ -311,7 +311,7 @@
   <path d="M992.5,1943.0 L1014.5,1943.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
   <rect x="1016.5" y="1897.0" width="160.5" height="92.0" rx="10" fill="#ffffff" stroke="#b9c4d3" stroke-width="1.1"/>
   <text class="sans" x="1028.5" y="1922.0" style="font-size:14.5px;font-weight:700;fill:#1c1a16">Tests</text>
-  <text class="sans" x="1028.5" y="1944.0" style="font-size:13px;font-weight:400;fill:#3a362f">199 offline tests,</text>
+  <text class="sans" x="1028.5" y="1944.0" style="font-size:13px;font-weight:400;fill:#3a362f">200+ offline tests,</text>
   <text class="sans" x="1028.5" y="1961.5" style="font-size:13px;font-weight:400;fill:#3a362f">scripted fake model</text>
   <path d="M1179.0,1943.0 L1201.0,1943.0" fill="none" stroke="#3f3b35" stroke-width="1.8" marker-end="url(#arr)"/>
   <rect x="1203.0" y="1897.0" width="160.5" height="92.0" rx="10" fill="#ffffff" stroke="#b9c4d3" stroke-width="1.1"/>
