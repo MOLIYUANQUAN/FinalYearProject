@@ -1,6 +1,6 @@
 """用邮箱地址 + 授权码读写的邮箱（IMAP 收、SMTP 发）：163、126、QQ 这类。
 
-放了 MAIL_ADDRESS 和 MAIL_PASSWORD（授权码，不是登录密码）就用它。服务器按域名认，不用他填。
+放了 MAIL_ADDRESS 和 MAIL_PASSWORD（授权码，不是登录密码）就和 Gmail 一起看。服务器按域名认，不用他填。
 163 有个规矩：登录后先报一下自己是谁（IMAP ID），不然一选收件箱就回「Unsafe Login」。
 
 邮件编号是「文件夹:UID」（inbox:1234、sent:56）。读邮件不会把它标成已读。
@@ -47,20 +47,26 @@ _FETCHED = re.compile(rb"UID (\d+)")
 _LISTED = re.compile(r'\((?P<flags>[^)]*)\) (?:"[^"]*"|NIL) (?P<name>.+)$')
 
 
-def account() -> tuple[str, str]:
+def accounts() -> list[tuple[str, str]]:
+    """放了地址和授权码的邮箱：MAIL_ADDRESS / MAIL_PASSWORD，再多的就 MAIL_ADDRESS_2 / MAIL_PASSWORD_2 ……"""
     load_env()
-    return (os.getenv("MAIL_ADDRESS") or "").strip(), (os.getenv("MAIL_PASSWORD") or "").replace(" ", "").strip()
+    found = []
+    for suffix in ("", "_2", "_3", "_4", "_5"):
+        address = (os.getenv(f"MAIL_ADDRESS{suffix}") or "").strip()
+        password = (os.getenv(f"MAIL_PASSWORD{suffix}") or "").replace(" ", "").strip()
+        if address and password:
+            found.append((address, password))
+    return found
+
+
+def account() -> tuple[str, str]:
+    return (accounts() or [("", "")])[0]
 
 
 def servers(address: str) -> tuple[str, str, str]:
     domain = address.rsplit("@", 1)[-1].lower()
     imap_host, smtp_host, name = HOSTS.get(domain, (f"imap.{domain}", f"smtp.{domain}", f"{domain} 邮箱"))
     return os.getenv("MAIL_IMAP_HOST") or imap_host, os.getenv("MAIL_SMTP_HOST") or smtp_host, name
-
-
-def label() -> str:
-    address, _ = account()
-    return servers(address)[2] if address else "邮箱"
 
 
 # ---- 文字 ----
@@ -190,8 +196,8 @@ def _matches(head: dict[str, str], want: dict[str, Any]) -> bool:
 class ImapMailProvider:
     name = "imap"
 
-    def __init__(self) -> None:
-        self.address, self.password = account()
+    def __init__(self, address: str = "", password: str = "") -> None:
+        self.address, self.password = (address, password) if address else account()
         self.imap_host, self.smtp_host, self.label = servers(self.address)
 
     # ---- 连接 ----

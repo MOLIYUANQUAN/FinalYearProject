@@ -190,12 +190,22 @@ def health() -> dict:
         "has_openai_api_key": has_key,
         "calendar_backend": backend,
         "mail_backend": mail,
+        "mailboxes": _mailbox_names(),
         "tasks_backend": tasks,
         "access_required": bool(get_access_token()),
         "effective_today": effective_today(),
         "effective_tomorrow": effective_tomorrow(),
         "now_label": f"{now.month}月{now.day}日 {weekday_zh(now)}",
     }
+
+
+def _mailbox_names() -> list[str]:
+    try:
+        from src.mail_providers import label_of, mailboxes
+
+        return [label_of(box) for box in mailboxes()]
+    except RuntimeError:
+        return []
 
 
 def _require_key() -> None:

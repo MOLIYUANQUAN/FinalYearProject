@@ -44,10 +44,23 @@ def _clip(text: str, limit: int = 600) -> str:
     return text if len(text) <= limit else text[:limit] + "…"
 
 
+def _sender(mailbox: str) -> str:
+    """接了不止一个邮箱时，这封从哪个发。"""
+    try:
+        from src.mail_providers import sender_label
+
+        return sender_label(mailbox)
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def describe(name: str, args: dict[str, Any]) -> str:
     """把待确认的那一步原样写给他看。全部由服务端拼，不经过模型。"""
     if name == "send_email":
         lines = [f"发邮件给 {args.get('to', '')}"]
+        sender = _sender(str(args.get("mailbox") or ""))
+        if sender:
+            lines.append(f"从 {sender} 发")
         if args.get("cc"):
             lines.append(f"抄送 {args['cc']}")
         lines.append(f"主题：{args.get('subject', '')}")

@@ -2,7 +2,7 @@
 
 测：先报身份再开收件箱（163 的规矩）、中文标题和 GBK 的 HTML 信读得干净、按关键词和发件人找、正文里的词让服务器找、
 读全文不标已读、附件名、发信走 SMTP 且留一份在「已发送」、标已读、删到「已删除」、没有归档就直说、授权码不对说怎么修、
-放了地址和授权码就自动用这个邮箱，以及发信照旧要他确认。
+放了地址和授权码就和 Gmail 一起看，以及发信照旧要他确认。
 """
 
 from __future__ import annotations
@@ -210,23 +210,30 @@ class WrongCodeTests(MailboxCase):
 
         with patch.dict(os.environ, {"MAIL_PASSWORD": "my-login-password"}):
             rows = TestClient(main.app).get("/api/me").json()["connections"]
-        row = next(r for r in rows if r["name"] == "邮件")
+        row = next(r for r in rows if r["name"] == "163 邮箱")
         self.assertFalse(row["ok"])
         self.assertIn("授权码", row["note"])
 
 
 class ChoosingTheMailboxTests(SandboxTestCase):
-    def test_an_address_and_code_switch_mail_to_that_mailbox(self) -> None:
-        with patch.dict(os.environ, {"MAIL_BACKEND": "gmail", "MAIL_ADDRESS": "zeep@163.com", "MAIL_PASSWORD": "CODE"}):
-            self.assertEqual(config.get_mail_backend(), "imap")
-            self.assertIsInstance(get_mail_provider(), ImapMailProvider)
-            from src.agent import _connections_line
+    def test_an_address_and_code_add_that_mailbox_next_to_gmail(self) -> None:
+        from src.agent import _connections_line
+        from src.mail_providers import label_of, mailboxes
+        from src.mail_providers.several import Mailboxes
 
-            self.assertIn("163 邮箱", _connections_line())
+        with patch.dict(os.environ, {"MAIL_BACKEND": "gmail", "MAIL_ADDRESS": "zeep@163.com", "MAIL_PASSWORD": "CODE"}):
+            self.assertEqual([label_of(b) for b in mailboxes()], ["Gmail", "163 邮箱"])
+            self.assertIsInstance(get_mail_provider(), Mailboxes)
+            self.assertIn("Gmail、163 邮箱", _connections_line())
+        with patch.dict(os.environ, {"MAIL_BACKEND": "none", "MAIL_ADDRESS": "zeep@163.com", "MAIL_PASSWORD": "CODE"}):
+            self.assertIsInstance(get_mail_provider(), ImapMailProvider)
         with patch.dict(os.environ, {"MAIL_BACKEND": "mock", "MAIL_ADDRESS": "zeep@163.com", "MAIL_PASSWORD": "CODE"}):
-            self.assertEqual(config.get_mail_backend(), "mock")
+            self.assertEqual([label_of(b) for b in mailboxes()], ["演示邮箱"])
         with patch.dict(os.environ, {"MAIL_BACKEND": "gmail", "MAIL_ADDRESS": "", "MAIL_PASSWORD": ""}):
-            self.assertEqual(config.get_mail_backend(), "gmail")
+            self.assertEqual([label_of(b) for b in mailboxes()], ["Gmail"])
+        with patch.dict(os.environ, {"MAIL_BACKEND": "gmail", "MAIL_ADDRESS": "zeep@163.com", "MAIL_PASSWORD": "CODE",
+                                     "MAIL_ADDRESS_2": "zeep@qq.com", "MAIL_PASSWORD_2": "QQCODE"}):
+            self.assertEqual([label_of(b) for b in mailboxes()], ["Gmail", "163 邮箱", "QQ 邮箱"])
 
 
 class SendingStillAsksTests(MailboxCase):

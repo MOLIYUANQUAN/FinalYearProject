@@ -1,4 +1,4 @@
-"""邮件工具：Gmail / 163 这类（IMAP）/ mock / outlook（outlook 仍只读）。"""
+"""邮件工具：他接上的邮箱一起看（Gmail、163 这类 IMAP；mock；outlook 仍只读）。"""
 
 from __future__ import annotations
 
@@ -14,7 +14,9 @@ ModifyAction = Literal["mark_read", "mark_unread", "archive", "trash"]
 
 @function_tool
 def search_emails(query: str = "", top: int = 5) -> dict[str, Any]:
-    """搜索或列出最近邮件。
+    """搜索或列出最近邮件。他接上的邮箱（Gmail、163……）一起搜，按时间排；每封的 mailbox 写着在哪个邮箱。
+
+    结果里有 problems 就是那个邮箱这次没读到：要说清楚，不能当成那边没有信。
 
     Args:
         query: 关键词（如 FYP、mentor）。空字符串表示收件箱最近邮件。
@@ -39,21 +41,24 @@ def send_email(
     subject: str,
     body: str,
     cc: str = "",
+    mailbox: str = "",
 ) -> dict[str, Any]:
-    """发送一封新邮件。直接调用：系统会先把收件人、主题和正文给他看，他确认后才真的发。
+    """发送一封新邮件。直接调用：系统会先把收件人、主题、正文和从哪个邮箱发给他看，他确认后才真的发。
 
     Args:
         to: 收件人邮箱。
         subject: 主题。
         body: 正文（纯文本）。
         cc: 可选抄送，逗号分隔。
+        mailbox: 从哪个邮箱发。回某封信就填那封信的 mailbox（比如「Gmail」「163 邮箱」）；新写的信不填，用默认的那个。
     """
     provider = get_mail_provider()
     send = getattr(provider, "send_message", None)
     if send is None:
         return {"ok": False, "error": "send_not_supported", "source": provider.name}
     try:
-        sent = send(to=to, subject=subject, body=body, cc=cc)
+        which = {"mailbox": mailbox} if mailbox and hasattr(provider, "sender") else {}
+        sent = send(to=to, subject=subject, body=body, cc=cc, **which)
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": "send_failed", "message": str(exc)}
     if sent.get("ok"):

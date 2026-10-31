@@ -16,8 +16,8 @@ from pydantic import BaseModel, Field
 
 from src import agenda, claude, ledger, memory_store, push, settings, todos, usage_log, voice
 from src.agent import active_model, answering_model
-from src.config import USAGE_LOG_PATH, effective_now, get_calendar_backend, get_mail_backend
-from src.mail_providers import get_mail_provider
+from src.config import USAGE_LOG_PATH, effective_now, get_calendar_backend
+from src.mail_providers import label_of, mailboxes
 
 router = APIRouter(tags=["about"])
 CHECK_TIMEOUT_S = 6
@@ -46,8 +46,8 @@ def connections() -> list[dict[str, Any]]:
     except RuntimeError:
         pass
     try:
-        if get_mail_backend() not in ("none", ""):
-            checks.append(("邮件", lambda: get_mail_provider().search_messages("in:inbox", 1)))
+        for box in mailboxes():  # 每个邮箱一行：Gmail、163 邮箱……
+            checks.append((label_of(box), lambda box=box: box.search_messages("in:inbox", 1)))
     except RuntimeError:
         pass
     if todos.connected():

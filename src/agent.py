@@ -20,7 +20,6 @@ from src.config import (
     DEFAULT_MODEL,
     REASONING_EFFORT,
     get_calendar_backend,
-    get_mail_backend,
     get_tasks_backend,
     require_openai_api_key,
 )
@@ -112,13 +111,9 @@ def _connections_line() -> str:
         "google": "Google 日历（含导入的大学课表）",
         "mock": "演示日历",
     }[get_calendar_backend()]
-    backend = get_mail_backend()
-    if backend == "imap":
-        from src.mail_providers.imap import label
+    from src.mail_providers import label_of, mailboxes
 
-        mail = label()
-    else:
-        mail = {"gmail": "Gmail", "outlook": "Outlook（只读）", "mock": "演示邮箱", "none": None}[backend]
+    mail = "、".join(label_of(box) + ("（只读）" if box.name == "outlook" else "") for box in mailboxes()) or None
     tasks = todos.SOURCE_NAMES.get(get_tasks_backend())
     connected = "、".join(x for x in (calendar, mail, tasks) if x)
     return f"已接入：{connected}。没接入的账户就直说没接入。"
